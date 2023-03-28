@@ -1,0 +1,7 @@
+graphlearn_torch
+sphinx
+sphinx_rtd_theme
+recommonmark
+markdown
+sphinx-markdown-tables
+myst-parser

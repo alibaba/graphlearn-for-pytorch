@@ -1,0 +1,16 @@
+built/
+build/
+_build/
+/dist/
+/graphlearn_torch.egg-info/
+/data/
+CMakeFiles/
+*.cmake
+__pycache__/
+.vscode/
+CMakeCache.txt
+Makefile
+detect_cuda_*
+.idea/
+cmake-build-release/
+cmake-build-debug/
