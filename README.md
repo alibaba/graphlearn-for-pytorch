@@ -1,3 +1,7 @@
+[![GLT-pypi](https://img.shields.io/pypi/v/graphlearn-torch.svg)](https://pypi.org/project/graphlearn-torch/)
+[![docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://graphlearn-torch.readthedocs.io/en/latest/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/LICENSE)
+
 **GraphLearn-for-PyTorch(GLT)** is a graph learning library for PyTorch that makes
 distributed GNN training and inference easy and efficient. It leverages the
 power of GPUs to accelerate graph sampling and utilizes UVA to reduce the
