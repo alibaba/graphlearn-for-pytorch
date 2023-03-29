@@ -41,7 +41,7 @@ As an example, we will use the `ogbn-products` dataset and demonstrate how
 to partition it into two parts for distributed training.
 
 The complete script for partitioning `ogbn-products` dataset can be found
-[here](../../examples/distributed/partition_ogbn_dataset.py).
+[here](https://github.com/alibaba/graphlearn-for-pytorch/tree/main/examples/distributed/partition_ogbn_dataset.py).
 
 First, the following code can be used to load the `ogbn-products` dataset:
 
@@ -553,7 +553,7 @@ for epoch in range(10):
 ```
 
 The complete example of distributed training in the worker mode can be found
-[here](../../examples/distributed/dist_train_sage_supervised.py)
+[here](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/examples/distributed/dist_train_sage_supervised.py)
 
 In the worker deployment mode, GLT also provides another option group
 [`graphlearn_torch.distributed.CollocatedDistSamplingWorkerOptions`](graphlearn_torch.distributed.dist_options.CollocatedDistSamplingWorkerOptions).
@@ -663,4 +663,4 @@ a distributed dataset when creating the `DistNeighborLoader`, as all dataset
 partitions are managed by server nodes.
 
 The complete example of distributed training in the server-client mode can be
-found [here](../../examples/distributed/dist_train_sage_supervised_with_server.py)
+found [here](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/examples/distributed/dist_train_sage_supervised_with_server.py)

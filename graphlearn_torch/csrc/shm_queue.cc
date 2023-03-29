@@ -15,15 +15,18 @@ limitations under the License.
 
 #include "graphlearn_torch/include/shm_queue.h"
 
-#include <cuda_runtime.h>
 #include <sys/shm.h>
 
 #include <cassert>
 #include <cstring>
 #include <thread>
 
+#ifdef WITH_CUDA
+#include <cuda_runtime.h>
 #include "graphlearn_torch/include/common.cuh"
-
+#else
+#include "graphlearn_torch/include/common.h"
+#endif
 namespace graphlearn_torch {
 
 ShmData::~ShmData() {
@@ -224,10 +227,12 @@ ShmData ShmQueue::Dequeue() {
   return {shm_read_ptr, shm_data_size, block_id, meta_};
 }
 
+#ifdef WITH_CUDA
 void ShmQueue::PinMemory() {
   cudaHostRegister(meta_.get(), shm_size_, cudaHostRegisterMapped);
   CUDACheckError();
 }
+#endif
 
 void ShmQueue::ShmQueueMetaDeleter::operator()(ShmQueueMeta* meta_ptr) {
   if (meta_ptr) {

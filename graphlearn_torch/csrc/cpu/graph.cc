@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "graphlearn_torch/include/graph.h"
-#include "graphlearn_torch/include/common.cuh"
+#include "graphlearn_torch/include/common.h"
 
 namespace graphlearn_torch {
 

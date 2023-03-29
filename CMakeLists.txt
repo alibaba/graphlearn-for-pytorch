@@ -79,6 +79,10 @@ string(REGEX MATCH ".*/torch/" TORCH_DIR ${TORCH_DIR})
 list(APPEND CMAKE_PREFIX_PATH ${TORCH_DIR})
 find_package(Torch REQUIRED)
 
+if(WITH_CUDA)
+  add_definitions(-DWITH_CUDA)
+endif()
+
 # Link to Vineyard if enabled
 if(WITH_VINEYARD)
   add_definitions(-DWITH_VINEYARD)
@@ -99,8 +103,10 @@ target_source_tree(graphlearn_torch
 target_source_tree(graphlearn_torch
   ${GLT_CSRC_DIR}/cpu/*.cc
   PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
-target_source_tree(graphlearn_torch
-  ${GLT_CSRC_DIR}/cuda/*.cu)
+if(WITH_CUDA)
+  target_source_tree(graphlearn_torch
+    ${GLT_CSRC_DIR}/cuda/*.cu)
+endif()
 
 target_include_directories(graphlearn_torch
   PUBLIC ${GLT_ROOT})
@@ -133,7 +139,9 @@ if(BUILD_TESTS)
     endif()
   endfunction()
 
-  file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cu)
+  if(WITH_CUDA)
+    file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cu)
+  endif()
 
   foreach(t ${GLT_TEST_FILES})
     get_filename_component(name ${t} NAME_WE)

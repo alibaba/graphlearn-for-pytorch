@@ -18,7 +18,7 @@ limitations under the License.
 
 #include <torch/extension.h>
 
-#include "graphlearn_torch/include/common.cuh"
+#include "graphlearn_torch/include/common.h"
 
 namespace graphlearn_torch {
 
@@ -48,13 +48,14 @@ public:
       graph_mode_(GraphMode::ZERO_COPY),
       device_id_(0) {}
 
-  virtual ~Graph();
-  virtual void LookupDegree(const int64_t* nodes,
-                            int32_t nodes_size,
-                            int64_t* degrees) const;
   void InitCPUGraphFromCSR(const torch::Tensor& indptr,
                            const torch::Tensor& indices,
                            const torch::Tensor& edge_ids=torch::empty(0));
+#ifdef WITH_CUDA
+  virtual ~Graph();
+  void LookupDegree(const int64_t* nodes,
+                    int32_t nodes_size,
+                    int64_t* degrees) const;
   void InitCUDAGraphFromCSR(const torch::Tensor& indptr,
                             const torch::Tensor& indices,
                             int device=0,
@@ -67,6 +68,7 @@ public:
                             const int64_t* edge_ids=nullptr,
                             int device=0,
                             GraphMode graph_mode=GraphMode::ZERO_COPY);
+#endif
 
   const int64_t* GetRowPtr() const {
     return row_ptr_;

@@ -18,7 +18,7 @@ limitations under the License.
 #include <torch/extension.h>
 
 #include "graphlearn_torch/include/graph.h"
-#include "graphlearn_torch/include/common.cuh"
+#include "graphlearn_torch/include/common.h"
 
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>

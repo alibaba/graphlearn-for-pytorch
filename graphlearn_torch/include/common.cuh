@@ -20,26 +20,11 @@ limitations under the License.
 #include <cuda_runtime.h>
 #include <stdexcept>
 
+#include "graphlearn_torch/include/common.h"
+
+
 namespace graphlearn_torch
 {
-
-enum class DataType {
-  Int32 = 0,
-  Int64 = 1,
-  Float32 = 2,
-  Float64 = 3
-};
-
-inline void Check(bool val, const char* err_msg) {
-  if (val) { return; }
-  throw std::runtime_error(err_msg);
-}
-
-template <typename T>
-inline void CheckEq(const T &x, const T &y) {
-  if (x == y) { return; }
-  throw std::runtime_error(std::string("CheckEq failed"));
-}
 
 inline void CUDARegisterByBlock(void* ptr, size_t size, unsigned int flags) {
   constexpr size_t BLOCK = 1000000000;

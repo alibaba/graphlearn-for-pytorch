@@ -24,8 +24,10 @@ _VERSION = '0.2.0'
 
 RELEASE = os.getenv("RELEASE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
-WITH_VINEYARD = os.getenv('WITH_VINEYARD')
-CUDA_VERSION_LT112 = os.getenv('CUDA_VERSION_LT112') #target cuda version < 11.2
+WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
+WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
+# target cuda version < 11.2
+CUDA_VERSION_LT112 = os.getenv('CUDA_VERSION_LT112', 'OFF')
 
 extensions = []
 include_dirs=[]
@@ -64,7 +66,9 @@ extra_cxx_flags.append('-std=gnu++14')
 
 sources = ['graphlearn_torch/python/py_export.cc']
 sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
-sources += glob.glob('graphlearn_torch/csrc/**/**.cu', recursive=True)
+
+if WITH_CUDA == 'ON':
+  sources += glob.glob('graphlearn_torch/csrc/**/**.cu', recursive=True)
 
 if CUDA_VERSION_LT112 == 'ON':
   define_macros.append(('CUDA_VERSION_LT112', 'ON'))
@@ -75,6 +79,11 @@ if WITH_VINEYARD == 'ON':
   define_macros.append(('WITH_VINEYARD', 'ON'))
 else:
   undef_macros.append(('WITH_VINEYARD'))
+
+if WITH_CUDA == 'ON':
+  define_macros.append(('WITH_CUDA', 'ON'))
+else:
+  undef_macros.append(('WITH_CUDA'))
 
 if RELEASE == 'TRUE':
   nvcc_flags = ['-O3', '--expt-extended-lambda', '-lnuma',

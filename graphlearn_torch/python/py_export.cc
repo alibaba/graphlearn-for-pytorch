@@ -21,21 +21,24 @@ limitations under the License.
 #include <torch/extension.h>
 
 #include "graphlearn_torch/csrc/cpu/inducer.h"
-#include "graphlearn_torch/csrc/cuda/inducer.cuh"
 #include "graphlearn_torch/csrc/cpu/random_negative_sampler.h"
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
-#include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
-#include "graphlearn_torch/csrc/cuda/random_sampler.cuh"
 #include "graphlearn_torch/csrc/cpu/subgraph_op.h"
-#include "graphlearn_torch/csrc/cuda/subgraph_op.cuh"
 #include "graphlearn_torch/include/graph.h"
 #include "graphlearn_torch/include/negative_sampler.h"
 #include "graphlearn_torch/include/sample_queue.h"
 #include "graphlearn_torch/include/sampler.h"
 #include "graphlearn_torch/include/stitch_sample_results.h"
 #include "graphlearn_torch/include/types.h"
-#include "graphlearn_torch/include/unified_tensor.cuh"
 #include "graphlearn_torch/include/vineyard_utils.h"
+
+#ifdef WITH_CUDA
+#include "graphlearn_torch/csrc/cuda/inducer.cuh"
+#include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
+#include "graphlearn_torch/csrc/cuda/random_sampler.cuh"
+#include "graphlearn_torch/csrc/cuda/subgraph_op.cuh"
+#include "graphlearn_torch/include/unified_tensor.cuh"
+#endif
 
 namespace py = pybind11;
 using namespace graphlearn_torch;
@@ -43,7 +46,9 @@ using namespace graphlearn_torch;
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.doc() = "Python bindings for graphlearn_torch C++ frontend";
   m.def("cpu_stitch_sample_results", &CPUStitchSampleResults);
+#ifdef WITH_CUDA
   m.def("cuda_stitch_sample_results", &CUDAStitchSampleResults);
+#endif
 #ifdef WITH_VINEYARD
   m.def("vineyard_to_csr", &ToCSR);
   m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
@@ -64,6 +69,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<>())
     .def("init_cpu_from_csr", &Graph::InitCPUGraphFromCSR,
          py::arg("indptr"), py::arg("indices"), py::arg("edge_ids"))
+#ifdef WITH_CUDA
     .def("init_cuda_from_csr",
          py::overload_cast<const torch::Tensor&,
             const torch::Tensor&,
@@ -72,12 +78,51 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
             const torch::Tensor&>(&Graph::InitCUDAGraphFromCSR),
          py::arg("indptr"), py::arg("indices"),
          py::arg("device"), py::arg("mode"), py::arg("edge_ids"))
+#endif
     .def("get_row_count", &Graph::GetRowCount)
     .def("get_edge_count", &Graph::GetEdgeCount)
     .def("get_col_count", &Graph::GetColCount)
     .def("get_mode", &Graph::GetGraphMode);
 
+  py::class_<SubGraph>(m, "SubGraph")
+    .def(py::init<>())
+    .def_readwrite("nodes", &SubGraph::nodes)
+    .def_readwrite("rows", &SubGraph::rows)
+    .def_readwrite("cols", &SubGraph::cols)
+    .def_readwrite("eids", &SubGraph::eids);
 
+  py::class_<CPURandomSampler>(m, "CPURandomSampler")
+    .def(py::init<const Graph*>())
+    .def("sample", &CPURandomSampler::Sample,
+         py::arg("ids"), py::arg("req_num"))
+    .def("sample_with_edge", &CPURandomSampler::SampleWithEdge,
+         py::arg("ids"), py::arg("req_num"));
+
+  py::class_<CPURandomNegativeSampler>(m, "CPURandomNegativeSampler")
+    .def(py::init<const Graph*>())
+    .def("sample", &CPURandomNegativeSampler::Sample,
+         py::arg("req_num"), py::arg("trials_num"), py::arg("padding"));
+
+  py::class_<CPUInducer>(m, "CPUInducer")
+    .def(py::init<int32_t>())
+    .def("init_node", &CPUInducer::InitNode,
+         py::arg("seed"))
+    .def("induce_next", &CPUInducer::InduceNext,
+         py::arg("srcs"), py::arg("nbrs"), py::arg("nbrs_num"));
+
+  py::class_<CPUHeteroInducer>(m, "CPUHeteroInducer")
+    .def(py::init<std::unordered_map<std::string, int32_t>>())
+    .def("init_node", &CPUHeteroInducer::InitNode,
+         py::arg("seed"))
+    .def("induce_next", &CPUHeteroInducer::InduceNext,
+         py::arg("hetero_nbrs"));
+
+  py::class_<CPUSubGraphOp>(m, "CPUSubGraphOp")
+    .def(py::init<const Graph*>())
+    .def("node_subgraph", &CPUSubGraphOp::NodeSubGraph,
+         py::arg("srcs"), py::arg("with_edge"));
+
+#ifdef WITH_CUDA
   py::class_<SharedTensor>(m, "SharedTensor")
     .def(py::init<>())
     .def("share_cuda_ipc", [](SharedTensor& self) {
@@ -117,20 +162,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("stride", &UnifiedTensor::Stride, py::arg("dim"))
     .def("numel", &UnifiedTensor::Numel);
 
-  py::class_<SubGraph>(m, "SubGraph")
-    .def(py::init<>())
-    .def_readwrite("nodes", &SubGraph::nodes)
-    .def_readwrite("rows", &SubGraph::rows)
-    .def_readwrite("cols", &SubGraph::cols)
-    .def_readwrite("eids", &SubGraph::eids);
-
-  py::class_<CPURandomSampler>(m, "CPURandomSampler")
-    .def(py::init<const Graph*>())
-    .def("sample", &CPURandomSampler::Sample,
-         py::arg("ids"), py::arg("req_num"))
-    .def("sample_with_edge", &CPURandomSampler::SampleWithEdge,
-         py::arg("ids"), py::arg("req_num"));
-
   py::class_<CUDARandomSampler>(m, "CUDARandomSampler")
     .def(py::init<const Graph*>())
     .def("sample", &CUDARandomSampler::Sample,
@@ -141,29 +172,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
          py::arg("k"), py::arg("last_prob"), py::arg("nbr_last_prob"),
          py::arg("nbr_graph_"), py::arg("cur_prob"));
 
-  py::class_<CPURandomNegativeSampler>(m, "CPURandomNegativeSampler")
-    .def(py::init<const Graph*>())
-    .def("sample", &CPURandomNegativeSampler::Sample,
-         py::arg("req_num"), py::arg("trials_num"), py::arg("padding"));
-
   py::class_<CUDARandomNegativeSampler>(m, "CUDARandomNegativeSampler")
     .def(py::init<const Graph*>())
     .def("sample", &CUDARandomNegativeSampler::Sample,
          py::arg("req_num"), py::arg("trials_num"), py::arg("padding"));
-
-  py::class_<CPUInducer>(m, "CPUInducer")
-    .def(py::init<int32_t>())
-    .def("init_node", &CPUInducer::InitNode,
-         py::arg("seed"))
-    .def("induce_next", &CPUInducer::InduceNext,
-         py::arg("srcs"), py::arg("nbrs"), py::arg("nbrs_num"));
-
-  py::class_<CPUHeteroInducer>(m, "CPUHeteroInducer")
-    .def(py::init<std::unordered_map<std::string, int32_t>>())
-    .def("init_node", &CPUHeteroInducer::InitNode,
-         py::arg("seed"))
-    .def("induce_next", &CPUHeteroInducer::InduceNext,
-         py::arg("hetero_nbrs"));
 
   py::class_<CUDAInducer>(m, "CUDAInducer")
     .def(py::init<int32_t>())
@@ -178,11 +190,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
          py::arg("seed"))
     .def("induce_next", &CUDAHeteroInducer::InduceNext,
          py::arg("hetero_nbrs"));
-
-  py::class_<CPUSubGraphOp>(m, "CPUSubGraphOp")
-    .def(py::init<const Graph*>())
-    .def("node_subgraph", &CPUSubGraphOp::NodeSubGraph,
-         py::arg("srcs"), py::arg("with_edge"));
 
   py::class_<CUDASubGraphOp>(m, "CUDASubGraphOp")
     .def(py::init<const Graph*>())
@@ -203,4 +210,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
             return new SampleQueue{shmid};
         }
     ));
+#endif
 }

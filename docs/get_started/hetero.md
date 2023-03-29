@@ -161,4 +161,5 @@ for epoch in range(1, 21):
 ```
 
 This example is training on single GPU; for the multi-GPU training version,
-please refer to the `examples/hetero/train_hgt_mag_mp.py`.
+please refer to the
+[multi-GPU example](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/examples/hetero/train_hgt_mag_mp.py).

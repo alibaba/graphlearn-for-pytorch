@@ -29,6 +29,8 @@ limitations under the License.
 #include <thrust/functional.h>
 #include <thrust/reduce.h>
 
+#include "graphlearn_torch/include/common.cuh"
+
 
 namespace graphlearn_torch {
 

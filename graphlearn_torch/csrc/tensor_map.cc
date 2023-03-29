@@ -15,9 +15,11 @@ limitations under the License.
 
 #include "graphlearn_torch/include/tensor_map.h"
 
+#ifdef WITH_CUDA
 #include <cuda_runtime.h>
+#endif
 
-#include "graphlearn_torch/include/common.cuh"
+#include "graphlearn_torch/include/common.h"
 
 namespace graphlearn_torch {
 
@@ -67,10 +69,12 @@ void* SerializeTensor(const std::string& name,
            tensor.data_ptr(),
            tensor.nbytes());
   } else if (tensor.device().type() == torch::kCUDA) {
+#ifdef WITH_CUDA
     cudaMemcpy(write_ptr,
                tensor.data_ptr(),
                tensor.nbytes(),
                cudaMemcpyDeviceToHost);
+#endif
   } else {
     Check(false, "Only support serializing tensor on cpu or cuda device");
   }
