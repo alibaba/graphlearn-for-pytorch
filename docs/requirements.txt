@@ -1,5 +1,16 @@
-graphlearn_torch
+numpy
+torch_geometric
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==1.12.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+torchvision==0.13.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+torchaudio==0.12.0
+https://data.pyg.org/whl/torch-1.12.0%2Bcpu/torch_sparse-0.6.16%2Bpt112cpu-cp38-cp38-linux_x86_64.whl
+https://data.pyg.org/whl/torch-1.12.0%2Bcpu/torch_scatter-2.1.0%2Bpt112cpu-cp38-cp38-linux_x86_64.whl
+https://data.pyg.org/whl/torch-1.12.0%2Bcpu/torch_cluster-1.6.0%2Bpt112cpu-cp38-cp38-linux_x86_64.whl
 sphinx
+https://graphlearn.oss-cn-hangzhou.aliyuncs.com/cpu/graphlearn_torch-0.2.0a1-cp38-cp38-linux_x86_64.whl
 sphinx_rtd_theme
 recommonmark
 markdown
