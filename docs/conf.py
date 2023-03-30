@@ -10,7 +10,7 @@ import datetime
 
 import graphlearn_torch
 
-project = 'graphlearn_torch'
+project = 'graphlearn-for-pytorch'
 author = 'Alibaba-inc'
 copyright = f'{datetime.datetime.now().year}, {author}'
 

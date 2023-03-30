@@ -114,10 +114,11 @@ extensions.append(cpp_extension.CppExtension(
 
 
 setup(
-  name='graphlearn_torch',
+  name='graphlearn-torch',
   version=_VERSION,
   author='Baole Ai',
   description='Graph Learning for PyTorch (GraphLearn-for-PyTorch)',
+  url="https://github.com/alibaba/graphlearn-for-pytorch",
   python_requires='>=3.6',
   requires=['torch'],
   cmdclass={'build_ext': cpp_extension.BuildExtension},
