@@ -118,28 +118,23 @@ distributed training can be found in [distributed examples](examples/distributed
 ## Installation
 
 ### Requirements
-- Python>=3.6
-- PyTorch
-- [PyG](https://github.com/pyg-team/pytorch_geometric)
+- cuda
+- python>=3.6
+- torch(PyTorch)
+- torch_geometric, torch_scatter, torch_sparse. Please refer to [PyG](https://github.com/pyg-team/pytorch_geometric) for installation.
 ### Pip Wheels
 
 ```
+# glibc>=2.14, torch>=1.13
 pip install graphlearn-torch
 ```
 
 ### Build from source
 
-#### C++
-1. Build
-``` shell
+#### Install Dependencies
+```shell
 git submodule update --init
 sh install_dependencies.sh
-cmake .
-make -j
-```
-2. UT
-``` shell
-sh test_cpp_ut.sh
 ```
 
 #### Python
@@ -153,6 +148,18 @@ pip install dist/*
 sh test_python_ut.sh
 ```
 
+#### C++
+If you need to test C++ operations, you can only build the C++ part.
+
+1. Build
+``` shell
+cmake .
+make -j
+```
+2. UT
+``` shell
+sh test_cpp_ut.sh
+```
 ## Quick Tour
 
 ### Accelarating PyG model training on a single GPU.
