@@ -17,8 +17,9 @@ deployment for distributed training to meet different requirements.
   - [Requirements](#requirements)
   - [Pip Wheels](#pip-wheels)
   - [Build from source](#build-from-source)
-    - [C++](#c)
+    - [Install Dependencies](#install-dependencies)
     - [Python](#python)
+    - [C++](#c)
 - [Quick Tour](#quick-tour)
   - [Accelarating PyG model training on a single GPU.](#accelarating-pyg-model-training-on-a-single-gpu)
   - [Distributed training](#distributed-training)
@@ -145,7 +146,7 @@ pip install dist/*
 ```
 2. UT
 ``` shell
-sh test_python_ut.sh
+sh scripts/run_python_ut.sh
 ```
 
 #### C++
@@ -158,7 +159,7 @@ make -j
 ```
 2. UT
 ``` shell
-sh test_cpp_ut.sh
+sh scripts/run_cpp_ut.sh
 ```
 ## Quick Tour
 

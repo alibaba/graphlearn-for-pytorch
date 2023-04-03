@@ -1,0 +1,57 @@
+name: GraphLearn-for-PyTorch Unittests
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - 'benchmarks/**'
+      - 'docs/**'
+      - 'examples/**'
+      - '**.md'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - 'benchmarks/**'
+      - 'docs/**'
+      - 'examples/**'
+      - '**.md'
+
+env:
+  IMAGE: graphlearn/graphlearn_for_pytorch:1.0.0-ubuntu20.04-py3.8-cuda11.6
+  JOBNAME: glt-ci-${{ github.run_id }}
+  DESTDIR: /mnt/graphlearn_for_pytorch
+
+jobs:
+  run-glt-unittests:
+    runs-on: self-hosted
+    if: ${{ github.repository == 'alibaba/graphlearn-for-pytorch' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Update submodules
+        working-directory: ${{github.workspace}}
+        run: |
+          git submodule update --init
+
+      - name: Launch CI container
+        working-directory: ${{github.workspace}}
+        run: |
+          sh scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
+
+      - name: Build wheel
+        run: |
+          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/build_wheel.sh
+
+      - name: Run cpp unit tests
+        run: |
+          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/run_cpp_ut.sh
+
+      - name: Run python unit tests
+        run: |
+          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/run_python_ut.sh
+
+      - name: Remove CI container
+        working-directory: ${{github.workspace}}
+        run: |
+          sh scripts/remove_container.sh ${JOBNAME}
