@@ -29,7 +29,7 @@ jobs:
           bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
 
       - name: Deploy python packages
-        if: startsWith(github.ref, 'refs/tags/') && matrix.no-deploy != '1'
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           docker exec ${JOBNAME} bash ${DESTDIR}/.github/workflows/scripts/upload_glt_packages.sh
