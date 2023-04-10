@@ -15,7 +15,6 @@
 
 import os
 import os.path as osp
-from tkinter import E
 import unittest
 
 import torch

@@ -37,21 +37,21 @@ jobs:
       - name: Launch CI container
         working-directory: ${{github.workspace}}
         run: |
-          sh scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
+          bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
 
       - name: Build wheel
         run: |
-          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/build_wheel.sh
+          docker exec ${JOBNAME} bash ${DESTDIR}/scripts/build_wheel.sh
 
       - name: Run cpp unit tests
         run: |
-          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/run_cpp_ut.sh
+          docker exec ${JOBNAME} bash ${DESTDIR}/scripts/run_cpp_ut.sh
 
       - name: Run python unit tests
         run: |
-          docker exec ${JOBNAME} sh ${DESTDIR}/scripts/run_python_ut.sh
+          docker exec ${JOBNAME} bash ${DESTDIR}/scripts/run_python_ut.sh
 
       - name: Remove CI container
         working-directory: ${{github.workspace}}
         run: |
-          sh scripts/remove_container.sh ${JOBNAME}
+          bash scripts/remove_container.sh ${JOBNAME}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 script_dir=$(dirname "$(realpath "$0")")
 code_src=${script_dir}/googletest
