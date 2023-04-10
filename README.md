@@ -1,6 +1,6 @@
 [![GLT-pypi](https://img.shields.io/pypi/v/graphlearn-torch.svg)](https://pypi.org/project/graphlearn-torch/)
 [![docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://graphlearn-torch.readthedocs.io/en/latest/)
-[![GLT CI](https://github.com/alibaba/graphlearn-for-pytorch/actions/workflows/GLT%20CI/badge.svg)](https://github.com/alibaba/graphlearn-for-pytorch/actions)
+[![GLT CI](https://github.com/alibaba/graphlearn-for-pytorch/workflows/GLT%20CI/badge.svg)](https://github.com/alibaba/graphlearn-for-pytorch/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/LICENSE)
 
 **GraphLearn-for-PyTorch(GLT)** is a graph learning library for PyTorch that makes
