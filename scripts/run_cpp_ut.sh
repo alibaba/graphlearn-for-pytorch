@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-set -eo pipefail
+set -e
 
 GLT_ROOT_DIR=$(dirname $(dirname "$(realpath "$0")"))
 
