@@ -32,7 +32,7 @@ def merge_dict(in_dict: Dict[Any, Any], out_dict: Dict[Any, Any]):
     out_dict[k] = vals
 
 
-def get_free_port(host: str = '127.0.0.1') -> int:
+def get_free_port(host: str = 'localhost') -> int:
   s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   s.bind((host, 0))
   port = s.getsockname()[1]
