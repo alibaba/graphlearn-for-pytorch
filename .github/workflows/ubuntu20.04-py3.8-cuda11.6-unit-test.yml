@@ -52,6 +52,7 @@ jobs:
           docker exec ${JOBNAME} bash ${DESTDIR}/scripts/run_python_ut.sh
 
       - name: Remove CI container
+        if: always()
         working-directory: ${{github.workspace}}
         run: |
           bash scripts/remove_container.sh ${JOBNAME}

@@ -17,7 +17,7 @@ pip install graphlearn-torch
 #### Install Dependencies
 ```shell
 git submodule update --init
-sh install_dependencies.sh
+./install_dependencies.sh
 ```
 
 #### Python
@@ -28,7 +28,7 @@ pip install dist/*
 ```
 2. UT
 ``` shell
-sh test_python_ut.sh
+./scripts/run_python_ut.sh
 ```
 
 #### C++
@@ -41,5 +41,5 @@ make -j
 ```
 2. UT
 ``` shell
-sh test_cpp_ut.sh
+./scripts/run_cpp_ut.sh
 ```
