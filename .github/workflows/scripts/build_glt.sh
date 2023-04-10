@@ -9,13 +9,11 @@ cd $GLT_ROOT_DIR
 
 set -x
 
-bash install_dependencies.sh
-cmake .
 ${PYBIN}/pip install torch==1.13.0+cu117 torchvision==0.14.0+cu117 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu117
 ${PYBIN}/pip install torch_geometric
 ${PYBIN}/pip install --no-index  torch_scatter torch_sparse -f https://data.pyg.org/whl/torch-1.13.0+cu117.html
 ${PYBIN}/pip install auditwheel
-${PYBIN}/python setup.py bdist_wheel
+RELEASE=TRUE WITH_CUDA=ON ${PYBIN}/python setup.py bdist_wheel
 
 # Bundle external shared libraries into the wheels
 for whl in dist/*-linux*.whl; do
