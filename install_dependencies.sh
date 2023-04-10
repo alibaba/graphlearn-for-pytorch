@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+
+set -eo pipefail
 
 root_dir=$(pwd)
 third_party_dir=${root_dir}/third_party
@@ -7,6 +8,6 @@ third_party_dir=${root_dir}/third_party
 echo "prepare googletest library ..."
 if [ ! -d "${third_party_dir}/googletest/build" ]; then
   cd "${third_party_dir}/googletest"
-  sh build.sh
+  bash build.sh
 fi
 echo "googletest done."

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 script_dir=$(dirname "$(realpath "$0")")
 code_src=${script_dir}/googletest
 install_prefix=${script_dir}/build
