@@ -2,14 +2,14 @@ name: GraphLearn-for-PyTorch Unittests
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
       - 'benchmarks/**'
       - 'docs/**'
       - 'examples/**'
       - '**.md'
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
       - 'benchmarks/**'
       - 'docs/**'
