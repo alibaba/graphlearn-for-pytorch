@@ -1,0 +1,41 @@
+name: GLT CD
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  IMAGE: pytorch/manylinux-cuda117
+  JOBNAME: glt-cd-${{ github.run_id }}
+  DESTDIR: /mnt/graphlearn_for_pytorch
+
+jobs:
+  build:
+    runs-on: self-hosted
+    if: ${{ github.repository == 'alibaba/graphlearn-for-pytorch' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Update submodules
+        working-directory: ${{github.workspace}}
+        run: |
+          git submodule update --init
+
+      - name: Launch CD container
+        working-directory: ${{github.workspace}}
+        run: |
+          bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
+
+      - name: Deploy python packages
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          docker exec ${JOBNAME} bash ${DESTDIR}/.github/workflows/scripts/upload_glt_packages.sh
+
+      - name: Remove CD container
+        if: always()
+        working-directory: ${{github.workspace}}
+        run: |
+          bash scripts/remove_container.sh ${JOBNAME}

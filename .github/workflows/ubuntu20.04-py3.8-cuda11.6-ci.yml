@@ -1,4 +1,4 @@
-name: GraphLearn-for-PyTorch Unittests
+name: GLT CI
 
 on:
   push:
