@@ -9,6 +9,7 @@ cd $GLT_ROOT_DIR
 
 set -x
 
+${PYBIN}/pip install scipy
 ${PYBIN}/pip install torch==1.13.0+cu117 torchvision==0.14.0+cu117 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu117
 ${PYBIN}/pip install torch_geometric
 ${PYBIN}/pip install --no-index  torch_scatter torch_sparse -f https://data.pyg.org/whl/torch-1.13.0+cu117.html
