@@ -41,7 +41,6 @@ class RandomPartitioner(PartitionerBase):
     edge_assign_strategy: The assignment strategy when partitioning edges,
       should be 'by_src' or 'by_dst'.
     chunk_size: The chunk size for partitioning.
-    device: The device used for partitioning.
   """
   def __init__(
     self,
@@ -55,11 +54,10 @@ class RandomPartitioner(PartitionerBase):
     edge_feat_dtype: torch.dtype = torch.float32,
     edge_assign_strategy: str = 'by_src',
     chunk_size: int = 10000,
-    device: torch.device = torch.device('cpu')
   ):
     super().__init__(output_dir, num_parts, num_nodes, edge_index, node_feat,
                      node_feat_dtype, edge_feat, edge_feat_dtype,
-                     edge_assign_strategy, chunk_size, device)
+                     edge_assign_strategy, chunk_size)
 
   def _partition_node(
     self,
@@ -70,9 +68,9 @@ class RandomPartitioner(PartitionerBase):
       node_num = self.num_nodes[ntype]
     else:
       node_num = self.num_nodes
-    ids = torch.arange(node_num, dtype=torch.int64, device=self.device)
+    ids = torch.arange(node_num, dtype=torch.int64)
     partition_book = ids % self.num_parts
-    rand_order = torch.randperm(ids.size(0), device=self.device)
+    rand_order = torch.randperm(ids.size(0))
     partition_book = partition_book[rand_order]
     partition_results = []
     for pidx in range(self.num_parts):

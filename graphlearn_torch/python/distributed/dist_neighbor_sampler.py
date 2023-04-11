@@ -622,7 +622,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       output.metadata.pop('bs', 1)
       for k, v in output.metadata.items():
         result_map[k] = v
-  
+
     if is_hetero:
       for ntype, nodes in output.node.items():
         result_map[f'{as_str(ntype)}.ids'] = nodes
@@ -637,7 +637,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         node_labels = self.data.get_node_label(input_type)
         if node_labels is not None:
           result_map[f'{as_str(input_type)}.nlabels'] = \
-            node_labels[output.node[input_type]]
+            node_labels[output.node[input_type].to(node_labels.device)]
       # Collect node features.
       if self.dist_node_feature is not None:
         nfeat_fut_dict = {}
@@ -666,7 +666,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       # Collect node labels.
       node_labels = self.data.get_node_label()
       if node_labels is not None:
-        result_map['nlabels'] = node_labels[output.node]
+        result_map['nlabels'] = node_labels[output.node.to(node_labels.device)]
       # Collect node features.
       if self.dist_node_feature is not None:
         fut = self.dist_node_feature.async_get(output.node)

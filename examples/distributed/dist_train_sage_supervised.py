@@ -215,7 +215,7 @@ if __name__ == '__main__':
   parser.add_argument(
     "--batch_size",
     type=int,
-    default=1024,
+    default=512,
     help="Batch size for the training and testing dataloader.",
   )
   parser.add_argument(
@@ -243,7 +243,7 @@ if __name__ == '__main__':
     help="The port used for RPC initialization across all sampling workers of testing loader.",
   )
   args = parser.parse_args()
-  
+
   f = open('dist_sage_sup.txt', 'a+')
   f.write('--- Distributed training example of supervised SAGE ---\n')
   f.write(f'* dataset: {args.dataset}\n')

@@ -165,7 +165,6 @@ class DistRandomPartitioner(object):
     master_port: The master TCP port for RPC connection between all
       distributed partitioners.
     num_rpc_threads: The number of RPC worker threads to use.
-    device: The device used for partitioning.
   """
   def __init__(
     self,
@@ -186,7 +185,6 @@ class DistRandomPartitioner(object):
     master_addr: Optional[str] = None,
     master_port: Optional[str] = None,
     num_rpc_threads: int = 16,
-    device: torch.device = torch.device('cpu')
   ):
     self.output_dir = output_dir
     ensure_dir(self.output_dir)
@@ -253,7 +251,6 @@ class DistRandomPartitioner(object):
     self.edge_assign_strategy = edge_assign_strategy.lower()
     assert self.edge_assign_strategy in ['by_src', 'by_dst']
     self.chunk_size = chunk_size
-    self.device = device
 
     self._partition_mgr = DistPartitionManager()
 
@@ -275,13 +272,11 @@ class DistRandomPartitioner(object):
     for _ in range(chunk_num):
       chunk_end_pos = min(val_num, chunk_start_pos + self.chunk_size)
       current_chunk_size = chunk_end_pos - chunk_start_pos
-      chunk_idx = torch.arange(
-        current_chunk_size, dtype=torch.long, device=self.device)
+      chunk_idx = torch.arange(current_chunk_size, dtype=torch.long)
       chunk_val = index_select(val, index=(chunk_start_pos, chunk_end_pos))
       chunk_val_idx = val_idx[chunk_start_pos:chunk_end_pos]
       chunk_partition_idx = partition_fn(
         chunk_val_idx, (chunk_start_pos, chunk_end_pos))
-      chunk_partition_idx = chunk_partition_idx.to(self.device)
       chunk_res = []
       for pidx in range(self.num_parts):
         mask = (chunk_partition_idx == pidx)
@@ -325,7 +320,7 @@ class DistRandomPartitioner(object):
 
     def _node_pfn(n_ids, _):
       partition_idx = n_ids % self.num_parts
-      rand_order = torch.randperm(len(n_ids), device=self.device)
+      rand_order = torch.randperm(len(n_ids))
       return partition_idx[rand_order]
 
     _, node_pb = self._partition_by_chunk(

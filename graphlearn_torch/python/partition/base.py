@@ -132,7 +132,6 @@ class PartitionerBase(ABC):
     edge_feat_dtype: torch.dtype = torch.float32,
     edge_assign_strategy: str = 'by_src',
     chunk_size: int = 10000,
-    device: torch.device = torch.device('cpu')
   ):
     self.output_dir = output_dir
     ensure_dir(self.output_dir)
@@ -164,7 +163,6 @@ class PartitionerBase(ABC):
     self.edge_assign_strategy = edge_assign_strategy.lower()
     assert self.edge_assign_strategy in ['by_src', 'by_dst']
     self.chunk_size = chunk_size
-    self.device = device
 
   def get_edge_index(self, etype: Optional[EdgeType] = None):
     if 'hetero' == self.data_cls:
@@ -238,7 +236,7 @@ class PartitionerBase(ABC):
     edge_index = self.get_edge_index(etype)
     rows, cols = edge_index[0], edge_index[1]
     edge_num = len(rows)
-    eids = torch.arange(edge_num, dtype=torch.int64, device=self.device)
+    eids = torch.arange(edge_num, dtype=torch.int64)
 
     if 'hetero' == self.data_cls:
       assert etype is not None
@@ -261,8 +259,7 @@ class PartitionerBase(ABC):
     for _ in range(chunk_num):
       chunk_end_pos = min(edge_num, chunk_start_pos + self.chunk_size)
       current_chunk_size = chunk_end_pos - chunk_start_pos
-      chunk_idx = torch.arange(
-        current_chunk_size, dtype=torch.long, device=self.device)
+      chunk_idx = torch.arange(current_chunk_size, dtype=torch.long)
       chunk_rows = rows[chunk_start_pos:chunk_end_pos]
       chunk_cols = cols[chunk_start_pos:chunk_end_pos]
       chunk_eids = eids[chunk_start_pos:chunk_end_pos]
@@ -271,14 +268,14 @@ class PartitionerBase(ABC):
       chunk_partition_idx = target_node_pb[chunk_target_indices]
       for pidx in range(self.num_parts):
         mask = (chunk_partition_idx == pidx)
-        idx = torch.masked_select(chunk_idx, mask),
+        idx = torch.masked_select(chunk_idx, mask)
         res[pidx].append(GraphPartitionData(
           edge_index=(chunk_rows[idx], chunk_cols[idx]),
           eids=chunk_eids[idx]
         ))
       chunk_start_pos += current_chunk_size
 
-    partition_book = torch.zeros(edge_num, dtype=torch.long, device=self.device)
+    partition_book = torch.zeros(edge_num, dtype=torch.long)
     partition_results = []
     for pidx in range(self.num_parts):
       p_rows = torch.cat([r.edge_index[0] for r in res[pidx]])
