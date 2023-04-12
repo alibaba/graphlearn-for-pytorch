@@ -6,6 +6,9 @@ GLT_ROOT_DIR=$(dirname $(dirname $(dirname $(dirname "$(realpath "$0")"))))
 GITHUB_REF=$1
 PYPI_PWD=$2
 
+rm -rf /usr/local/cuda
+ln -s /usr/local/cuda-11.7 /usr/local/cuda
+
 cd $GLT_ROOT_DIR
 
 if [[ "$GITHUB_REF" =~ ^"refs/tags/" ]]; then
