@@ -2,8 +2,11 @@
 
 set -eo pipefail
 
+GLT_ROOT_DIR=$(dirname $(dirname $(dirname $(dirname "$(realpath "$0")"))))
 GITHUB_REF=$1
 PYPI_PWD=$2
+
+cd $GLT_ROOT_DIR
 
 if [[ "$GITHUB_REF" =~ ^"refs/tags/" ]]; then
   export GITHUB_TAG_REF="$GITHUB_REF"
@@ -12,7 +15,6 @@ fi
 if [ -z "$GITHUB_TAG_REF" ]; then
   echo "Not on a tag, won't deploy to pypi"
 else
-  bash install_dependencies.sh
   PYABIS="cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310"
   for abi in $PYABIS; do
     PYABI=$abi bash .github/workflows/scripts/build_glt.sh
