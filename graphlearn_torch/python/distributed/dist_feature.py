@@ -138,7 +138,6 @@ class DistFeature(object):
   ) -> torch.futures.Future:
     r""" Lookup features asynchronously and return a future.
     """
-    ids = ids.to(self.device)
     remote_fut = self._remote_selecting_get(ids, input_type)
     local_feature = self._local_selecting_get(ids, input_type)
     res_fut = torch.futures.Future()
@@ -185,11 +184,11 @@ class DistFeature(object):
       PartialFeature: features and index for local node/edge ids.
     """
     feat, pb = self._get_local_store(input_type)
-    ids = ids.to(self.device)
     input_order= torch.arange(ids.size(0),
                               dtype=torch.long,
                               device=self.device)
-    partition_ids = pb[ids].to(self.device)
+    partition_ids = pb[ids.to(pb.device)].to(self.device)
+    ids = ids.to(self.device)
     local_mask = (partition_ids == self.partition_idx)
     local_ids = torch.masked_select(ids, local_mask)
     local_index = torch.masked_select(input_order, local_mask)
@@ -216,11 +215,10 @@ class DistFeature(object):
     ), "Remote feature lookup is disabled in 'local_only' mode."
 
     _, pb = self._get_local_store(input_type)
-    ids = ids.to(self.device)
+    ids = ids.to(pb.device)
     input_order= torch.arange(ids.size(0),
-                              dtype=torch.long,
-                              device=self.device)
-    partition_ids = pb[ids].to(self.device)
+                              dtype=torch.long)
+    partition_ids = pb[ids].cpu()
     futs, indexes = [], []
     for pidx in range(0, self.num_partitions):
       if pidx == self.partition_idx:

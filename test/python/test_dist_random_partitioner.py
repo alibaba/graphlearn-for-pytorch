@@ -167,7 +167,7 @@ def run_dist_partitioner(rank, world_size, master_addr, master_port,
     output_dir, num_nodes, edge_index, edge_ids, node_feat, node_ids,
     edge_feat, edge_ids, num_parts=world_size, current_partition_idx=rank,
     chunk_size=7, master_addr=master_addr, master_port=master_port,
-    num_rpc_threads=4, device=torch.device(rank % torch.cuda.device_count())
+    num_rpc_threads=4
   )
   dist_partitioner.partition()
   _check_partition(output_dir, rank, world_size, graph_type)

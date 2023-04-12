@@ -10,6 +10,7 @@ cd $GLT_ROOT_DIR
 set -x
 
 bash install_dependencies.sh
+pip install ninja
 cmake .
 make -j$CORES
 python setup.py bdist_wheel

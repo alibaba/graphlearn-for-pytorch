@@ -91,8 +91,10 @@ class DistGraph(object):
     """
     if self.data_cls == 'hetero':
       assert ntype is not None
-      return self.node_pb[ntype][ids]
-    return self.node_pb[ids]
+      pb = self.node_pb[ntype]
+    else:
+      pb = self.node_pb
+    return pb[ids.to(pb.device)]
 
   def get_edge_partitions(self, eids: torch.Tensor,
                           etype: Optional[EdgeType]=None):
@@ -100,5 +102,7 @@ class DistGraph(object):
     """
     if self.data_cls == 'hetero':
       assert etype is not None
-      return self.edge_pb[etype][eids]
-    return self.edge_pb[eids]
+      pb = self.edge_pb[etype]
+    else:
+      pb = self.edge_pb
+    return pb[eids.to(pb.device)]

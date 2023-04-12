@@ -157,6 +157,7 @@ class Feature(object):
     r""" Perform feature lookups only with CPU feature tensor.
     """
     self.lazy_init_with_ipc_handle()
+    ids = ids.to('cpu')
     if self.id2index is not None:
       ids = self.id2index[ids]
     return self.feature_tensor[ids]

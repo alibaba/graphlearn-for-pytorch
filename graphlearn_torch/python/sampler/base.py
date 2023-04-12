@@ -59,6 +59,7 @@ class NodeSamplerInput(CastMixin):
   def __getitem__(self, index: Union[torch.Tensor, Any]) -> 'NodeSamplerInput':
     if not isinstance(index, torch.Tensor):
       index = torch.tensor(index, dtype=torch.long)
+    index = index.to(self.node.device)
     return NodeSamplerInput(self.node[index], self.input_type)
 
   def __len__(self):
@@ -132,7 +133,7 @@ class NegativeSampling(CastMixin):
 
     def is_triplet(self) -> bool:
         return self.mode == NegativeSamplingMode.triplet
-    
+
     def share_memory(self):
       if self.weight is not None:
         self.weight.share_memory_()
@@ -171,6 +172,7 @@ class EdgeSamplerInput(CastMixin):
   def __getitem__(self, index: Union[torch.Tensor, Any]) -> 'EdgeSamplerInput':
     if not isinstance(index, torch.Tensor):
       index = torch.tensor(index, dtype=torch.long)
+    index = index.to(self.row.device)
     return EdgeSamplerInput(
       self.row[index],
       self.col[index],

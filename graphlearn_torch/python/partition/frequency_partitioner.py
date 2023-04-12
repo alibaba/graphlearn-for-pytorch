@@ -45,7 +45,6 @@ class FrequencyPartitioner(PartitionerBase):
     cache_ratio: The proportion to cache node features per partition for each
       node type, should be a dict for hetero data.
     chunk_size: The chunk size for partitioning.
-    device: The device used for partitioning.
 
   Note that if both `cache_memory_budget` and `cache_ratio` are provided,
   the metric that caches the smaller number of features will be used.
@@ -66,11 +65,10 @@ class FrequencyPartitioner(PartitionerBase):
     cache_memory_budget: Union[int, Dict[NodeType, int]] = None,
     cache_ratio: Union[float, Dict[NodeType, float]] = None,
     chunk_size: int = 10000,
-    device: torch.device = torch.device('cpu')
   ):
     super().__init__(output_dir, num_parts, num_nodes, edge_index, node_feat,
                      node_feat_dtype, edge_feat, edge_feat_dtype,
-                     edge_assign_strategy, chunk_size, device)
+                     edge_assign_strategy, chunk_size)
 
     self.probs = probs
     if self.node_feat is not None:
@@ -109,7 +107,7 @@ class FrequencyPartitioner(PartitionerBase):
     calculate hotness and difference between partitions.
     """
     chunk_probs_sum = [
-      (torch.zeros(chunk.size(0), device=self.device) + 1e-6)
+      (torch.zeros(chunk.size(0)) + 1e-6)
       for _ in range(self.num_parts)
     ]
     for src_rank in range(self.num_parts):
@@ -132,7 +130,6 @@ class FrequencyPartitioner(PartitionerBase):
       node_num = self.num_nodes
       probs = self.probs
     chunk_num = (node_num + self.chunk_size - 1) // self.chunk_size
-    probs = [prob.to(self.device) for prob in probs]
 
     res = [[] for _ in range(self.num_parts)]
     current_chunk_start_pos = 0
@@ -142,7 +139,7 @@ class FrequencyPartitioner(PartitionerBase):
                                   current_chunk_start_pos + self.blob_size)
       current_chunk_size = current_chunk_end_pos - current_chunk_start_pos
       chunk = torch.arange(current_chunk_start_pos, current_chunk_end_pos,
-                           dtype=torch.long, device=self.device)
+                           dtype=torch.long)
       chunk_probs_sum = self._get_chunk_probs_sum(chunk, probs)
       assigned_node_size = 0
       per_partition_size = self.chunk_size
@@ -162,7 +159,7 @@ class FrequencyPartitioner(PartitionerBase):
       current_partition_idx += 1
       current_chunk_start_pos += current_chunk_size
 
-    partition_book = torch.zeros(node_num, dtype=torch.long, device=self.device)
+    partition_book = torch.zeros(node_num, dtype=torch.long)
     partition_results = []
     for partition_idx in range(self.num_parts):
       partition_ids = torch.cat(res[partition_idx])
@@ -186,7 +183,6 @@ class FrequencyPartitioner(PartitionerBase):
       per_feature_bytes = self.per_feature_bytes
       cache_memory_budget = self.cache_memory_budget
       cache_ratio = self.cache_ratio
-    probs = [prob.to(self.device) for prob in probs]
     cache_memory_budget_bytes = parse_size(cache_memory_budget)
     cache_num_by_memory = int(cache_memory_budget_bytes /
                               (per_feature_bytes + 1e-6))

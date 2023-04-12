@@ -261,7 +261,7 @@ if __name__ == '__main__':
   parser.add_argument(
     "--batch_size",
     type=int,
-    default=1024,
+    default=512,
     help="Batch size for the training and testing dataloader.",
   )
   parser.add_argument(

@@ -69,7 +69,7 @@ def partition_dataset(ogbn_dataset: str,
   for pidx in range(num_partitions):
     seeds = train_idx[pidx]
     prob = glt_sampler.sample_prob(seeds, node_num)
-    node_probs.append(prob)
+    node_probs.append(prob.cpu())
 
   print('-- Partitioning graph and features ...')
   partitions_dir = osp.join(root_dir, f'{ogbn_dataset}-partitions')
@@ -81,8 +81,7 @@ def partition_dataset(ogbn_dataset: str,
     probs=node_probs,
     node_feat=data.x,
     chunk_size=chunk_size,
-    cache_ratio=cache_ratio,
-    device=torch.device(0)
+    cache_ratio=cache_ratio
   )
   freq_partitioner.partition()
 
