@@ -28,13 +28,19 @@ jobs:
         run: |
           bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR}
 
-      - name: Deploy python packages
+      - name: Build python packages
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          docker exec ${JOBNAME} bash ${DESTDIR}/.github/workflows/scripts/build.sh ${GITHUB_REF}
+
+      - name: Upload python packages
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           PYPI_PWD: ${{ secrets.PYPI_PWD }}
         run: |
-          docker exec ${JOBNAME} bash ${DESTDIR}/.github/workflows/scripts/upload_glt_packages.sh ${GITHUB_REF} ${PYPI_PWD}
+          bash .github/workflows/scripts/upload_pypi.sh
 
       - name: Remove CD container
         if: always()
