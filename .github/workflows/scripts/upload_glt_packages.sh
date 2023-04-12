@@ -25,7 +25,7 @@ else
 
   echo "********"
   echo "Build packages:"
-  ls graphlearn-for-pytorch/dist/
+  ls ${GLT_ROOT_DIR}/dist/
   echo "********"
 
   echo "[distutils]"                                 > ~/.pypirc
@@ -37,5 +37,5 @@ else
   echo "password=$PYPI_PWD"                          >> ~/.pypirc
 
   /opt/python/cp38-cp38/bin/pip install twine
-  /opt/python/cp38-cp38/bin/python -m twine upload -r pypi --skip-existing graphlearn-for-pytorch/dist/*
+  /opt/python/cp38-cp38/bin/python -m twine upload -r pypi --skip-existing ${GLT_ROOT_DIR}/dist/*
 fi
