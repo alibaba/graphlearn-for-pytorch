@@ -2,9 +2,11 @@
 
 set -eo pipefail
 
+GITHUB_REF=$1
+PYPI_PWD=$2
+
 if [[ "$GITHUB_REF" =~ ^"refs/tags/" ]]; then
   export GITHUB_TAG_REF="$GITHUB_REF"
-  export GIT_TAG=$(echo "$GITHUB_REF" | sed -e "s/refs\/tags\///g")
 fi
 
 if [ -z "$GITHUB_TAG_REF" ]; then
