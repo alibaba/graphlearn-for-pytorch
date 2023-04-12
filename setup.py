@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 from torch.utils import cpp_extension
 
 # This version string should be updated when releasing a new version.
-_VERSION = '0.2.0'
+_VERSION = '0.2.0rc2'
 
 RELEASE = os.getenv("RELEASE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
