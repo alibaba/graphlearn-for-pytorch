@@ -41,8 +41,13 @@ def get_free_port(host: str = 'localhost') -> int:
 
 
 def id2idx_v2(gid, book):
-  book2idx = {x.item(): i for i, x in enumerate(book)}
-  return torch.tensor([book2idx[x.item()] for x in gid], dtype=torch.long)
+  if not isinstance(book, torch.Tensor):
+    book = torch.tensor(book, dtype=torch.int64)
+  max_id = torch.max(book).item()
+  id2idx = torch.zeros(max_id + 1, dtype=torch.int64, device=book.device)
+  id2idx[book] = torch.arange(book.size(0), dtype=torch.int64, device=book.device)
+
+  return id2idx[gid]
 
 
 def index_select(data, index):
