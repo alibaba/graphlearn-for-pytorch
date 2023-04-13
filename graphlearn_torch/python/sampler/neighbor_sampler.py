@@ -22,9 +22,10 @@ from .. import py_graphlearn_torch as pywrap
 from ..data import Graph
 from ..typing import NodeType, EdgeType, NumNeighbors, reverse_edge_type
 from ..utils import (
-    merge_dict, merge_hetero_sampler_output, format_hetero_sampler_output,
-    id2idx_v2
+  merge_dict, merge_hetero_sampler_output, format_hetero_sampler_output,
+  id2idx
 )
+
 
 from .base import (
   BaseSampler, EdgeIndex,
@@ -330,8 +331,8 @@ class NeighborSampler(BaseSampler):
       # edge_label
       if neg_sampling is None or neg_sampling.is_binary():
         if input_type[0] != input_type[-1]:
-          inverse_src = id2idx_v2(src_seed, out.node[input_type[0]])
-          inverse_dst = id2idx_v2(dst_seed, out.node[input_type[-1]])
+          inverse_src = id2idx(out.node[input_type[0]])[src_seed]
+          inverse_dst = id2idx(out.node[input_type[-1]])[dst_seed]
           edge_label_index = torch.stack([
               inverse_src,
               inverse_dst,
@@ -344,8 +345,8 @@ class NeighborSampler(BaseSampler):
         out.input_type = input_type
       elif neg_sampling.is_triplet():
         if input_type[0] != input_type[-1]:
-          inverse_src = id2idx_v2(src_seed, out.node[input_type[0]])
-          inverse_dst = id2idx_v2(dst_seed, out.node[input_type[-1]])
+          inverse_src = id2idx(out.node[input_type[0]])[src_seed]
+          inverse_dst = id2idx(out.node[input_type[-1]])[dst_seed]
           src_index = inverse_src
           dst_pos_index = inverse_dst[:num_pos]
           dst_neg_index = inverse_dst[num_pos:]
