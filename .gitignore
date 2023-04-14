@@ -6,7 +6,6 @@ _build/
 /data/
 CMakeFiles/
 *.cmake
-*.txt
 __pycache__/
 .vscode/
 CMakeCache.txt
