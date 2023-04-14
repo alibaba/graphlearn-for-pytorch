@@ -30,7 +30,7 @@ def tensor_equal_with_device(lhs: torch.Tensor, rhs: torch.Tensor):
 def id2idx(ids: Union[List[int], torch.Tensor]):
   r""" Get tensor of mapping from id to its original index.
   """
-  if not isinstance(ids, torch.Tensor):
+  if not isinstance(ids, torch.Tensor) or ids.dtype != torch.int64:
     ids = torch.tensor(ids, dtype=torch.int64)
   max_id = torch.max(ids).item()
   id2idx = torch.zeros(max_id + 1, dtype=torch.int64, device=ids.device)

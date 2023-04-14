@@ -17,6 +17,7 @@ import os
 import socket
 from typing import Any, Dict
 from ..typing import reverse_edge_type
+from .tensor import id2idx
 
 import torch
 
@@ -38,11 +39,6 @@ def get_free_port(host: str = 'localhost') -> int:
   port = s.getsockname()[1]
   s.close()
   return port
-
-
-def id2idx_v2(gid, book):
-  book2idx = {x.item(): i for i, x in enumerate(book)}
-  return torch.tensor([book2idx[x.item()] for x in gid], dtype=torch.long)
 
 
 def index_select(data, index):
@@ -86,9 +82,9 @@ def merge_hetero_sampler_output(in_sample: Any, out_sample: Any, device):
   merge_tensor_dict(in_sample.col, out_sample.col)
 
   for k, v in out_sample.row.items():
-    out_sample.row[k] = id2idx_v2(v, out_sample.node[k[0]])
+    out_sample.row[k] = id2idx(out_sample.node[k[0]])[v.to(torch.int64)]
   for k, v in out_sample.col.items():
-    out_sample.col[k] = id2idx_v2(v, out_sample.node[k[-1]])
+    out_sample.col[k] = id2idx(out_sample.node[k[-1]])[v.to(torch.int64)]
 
   # if in_sample.batch is not None and out_sample.batch is not None:
   #   merge_tensor_dict(in_sample.batch, out_sample.batch)
