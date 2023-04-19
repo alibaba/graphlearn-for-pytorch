@@ -13,18 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional, Union, Tuple
+from typing import Optional
 
 import torch
-from torch_geometric.data import Data, HeteroData
 
 from ..sampler import (
   EdgeSamplerInput, SamplingType, SamplingConfig, NegativeSampling
 )
-from ..channel import SampleMessage
 from ..loader import get_edge_label_index
 from ..typing import InputEdges, NumNeighbors
-from ..utils import reverse_edge_type
 
 from .dist_dataset import DistDataset
 from .dist_options import AllDistSamplingWorkerOptions
