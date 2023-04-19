@@ -290,17 +290,14 @@ class DistLoader(object):
     r""" Collate sampled messages as PyG's Data/HeteroData
     """
     ensure_device(self.to_device)
-    is_hetero = bool(msg.pop('#IS_HETERO'))
+    is_hetero = bool(msg['#IS_HETERO'])
 
     # extract meta data
-    meta_keys = []
+    metadata = {}
     for k in msg.keys():
       if k.startswith('#META.'):
-        meta_keys.append(k)
-    metadata = {}
-    for k in meta_keys:
-      meta_key = str(k[6:])
-      metadata[meta_key] = msg.pop(k).to(self.to_device)
+        meta_key = str(k[6:])
+        metadata[meta_key] = msg[k].to(self.to_device)
     if len(metadata) == 0:
       metadata = None
 
@@ -312,24 +309,24 @@ class DistLoader(object):
       for ntype in self._node_types:
         ids_key = f'{as_str(ntype)}.ids'
         if ids_key in msg:
-          node_dict[ntype] = msg.pop(ids_key).to(self.to_device)
+          node_dict[ntype] = msg[ids_key].to(self.to_device)
         nfeat_key = f'{as_str(ntype)}.nfeats'
         if nfeat_key in msg:
-          nfeat_dict[ntype] = msg.pop(nfeat_key).to(self.to_device)
+          nfeat_dict[ntype] = msg[nfeat_key].to(self.to_device)
 
       for etype_str, rev_etype in self._etype_str_to_rev.items():
         rows_key = f'{etype_str}.rows'
         cols_key = f'{etype_str}.cols'
         if rows_key in msg:
           # The edge index should be reversed.
-          row_dict[rev_etype] = msg.pop(cols_key).to(self.to_device)
-          col_dict[rev_etype] = msg.pop(rows_key).to(self.to_device)
+          row_dict[rev_etype] = msg[cols_key].to(self.to_device)
+          col_dict[rev_etype] = msg[rows_key].to(self.to_device)
         eids_key = f'{etype_str}.eids'
         if eids_key in msg:
-          edge_dict[rev_etype] = msg.pop(eids_key).to(self.to_device)
+          edge_dict[rev_etype] = msg[eids_key].to(self.to_device)
         efeat_key = f'{etype_str}.efeats'
         if efeat_key in msg:
-          efeat_dict[rev_etype] = msg.pop(efeat_key).to(self.to_device)
+          efeat_dict[rev_etype] = msg[efeat_key].to(self.to_device)
 
       if len(nfeat_dict) == 0:
         nfeat_dict = None
@@ -343,7 +340,7 @@ class DistLoader(object):
         }
         batch_labels_key = f'{self._input_type}.nlabels'
         if batch_labels_key in msg:
-          batch_labels = msg.pop(batch_labels_key).to(self.to_device)
+          batch_labels = msg[batch_labels_key].to(self.to_device)
         else:
           batch_labels = None
         batch_label_dict = {self._input_type: batch_labels}
@@ -362,18 +359,18 @@ class DistLoader(object):
 
     # Homogeneous sampling results
     else:
-      ids = msg.pop('ids').to(self.to_device)
-      rows = msg.pop('rows').to(self.to_device)
-      cols = msg.pop('cols').to(self.to_device)
-      eids = msg.pop('eids').to(self.to_device) if 'eids' in msg else None
+      ids = msg['ids'].to(self.to_device)
+      rows = msg['rows'].to(self.to_device)
+      cols = msg['cols'].to(self.to_device)
+      eids = msg['eids'].to(self.to_device) if 'eids' in msg else None
 
-      nfeats = msg.pop('nfeats').to(self.to_device) if 'nfeats' in msg else None
-      efeats = msg.pop('efeats').to(self.to_device) if 'efeats' in msg else None
+      nfeats = msg['nfeats'].to(self.to_device) if 'nfeats' in msg else None
+      efeats = msg['efeats'].to(self.to_device) if 'efeats' in msg else None
 
       if self.sampling_config.sampling_type in [SamplingType.NODE,
                                                 SamplingType.SUBGRAPH]:
         batch = ids[:self.batch_size]
-        batch_labels = msg.pop('nlabels').to(self.to_device) if 'nlabels' in msg else None
+        batch_labels = msg['nlabels'].to(self.to_device) if 'nlabels' in msg else None
       else:
         batch = None
         batch_labels = None
