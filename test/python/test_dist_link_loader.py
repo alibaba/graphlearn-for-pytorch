@@ -25,9 +25,8 @@ from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
 def _check_sample_result(data):
   tc = unittest.TestCase()
 
-  if len(data) > 7:
+  if 'src_index' in data:
     # triplet negative sampling
-    tc.assertEqual(len(data), 8)
     tc.assertEqual(data.src_index.size(0), 5)
     tc.assertEqual(data.dst_pos_index.size(0), 5)
     tc.assertEqual(data.dst_neg_index.size(0), 5)
@@ -42,12 +41,11 @@ def _check_sample_result(data):
     ))
   else:
     # binary negative sampling
-    tc.assertEqual(len(data), 7)
     tc.assertEqual(data.edge_label_index.size(1), 10)
     tc.assertEqual(data.edge_label.size(0), 10)
     tc.assertTrue(data.edge_attr is not None)
     tc.assertEqual(max(data.edge_label), 1)
-    
+
     out_index = data.edge_label_index
     pos_index = torch.stack(
       (data.node[out_index[0,:5]],
@@ -118,7 +116,7 @@ def _check_hetero_sample_result(data):
     glob_edge_index = torch.stack((data[item_ntype].node[sub_edge_index[0]],
                                    data[user_ntype].node[sub_edge_index[1]]))
     tc.assertTrue(torch.all(
-      ((glob_edge_index[1]+1)%40==glob_edge_index[0]) + 
+      ((glob_edge_index[1]+1)%40==glob_edge_index[0]) +
       ((glob_edge_index[1]+2)%40==glob_edge_index[0])
     ))
 

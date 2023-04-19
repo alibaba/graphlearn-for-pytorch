@@ -19,13 +19,12 @@ import torch
 from torch_geometric.data import Data, HeteroData
 
 from ..sampler import (
-  EdgeSamplerInput, SamplingType, SamplingConfig, NegativeSampling,
-  HeteroSamplerOutput, SamplerOutput
+  EdgeSamplerInput, SamplingType, SamplingConfig, NegativeSampling
 )
 from ..channel import SampleMessage
-from ..loader import get_edge_label_index, to_data, to_hetero_data
-from ..typing import InputEdges, NumNeighbors, as_str
-from ..utils import ensure_device, reverse_edge_type
+from ..loader import get_edge_label_index
+from ..typing import InputEdges, NumNeighbors
+from ..utils import reverse_edge_type
 
 from .dist_dataset import DistDataset
 from .dist_options import AllDistSamplingWorkerOptions
@@ -146,91 +145,12 @@ class DistLinkNeighborLoader(DistLoader):
       input_type=input_type,
       neg_sampling=self.neg_sampling,
     )
-    
+
     sampling_config = SamplingConfig(
       SamplingType.LINK, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg 
+      drop_last, with_edge, collect_features, with_neg
     )
 
     super().__init__(
       data, input_data, sampling_config, to_device, worker_options
     )
-
-  def _collate_fn(self, msg: SampleMessage) -> Union[Data, HeteroData]:
-    # Heterogeneous sampling results
-    ensure_device(self.to_device)
-    is_hetero = bool(msg['meta'][0])
-
-    if is_hetero:
-      node_dict, row_dict, col_dict, edge_dict = {}, {}, {}, {}
-      nfeat_dict, efeat_dict = {}, {}
-
-      for ntype in self._node_types:
-        ids_key = f'{as_str(ntype)}.ids'
-        if ids_key in msg:
-          node_dict[ntype] = msg[ids_key].to(self.to_device)
-        nfeat_key = f'{as_str(ntype)}.nfeats'
-        if nfeat_key in msg:
-          nfeat_dict[ntype] = msg[nfeat_key].to(self.to_device)
-
-      for etype_str, rev_etype in self._etype_str_to_rev.items():
-        rows_key = f'{etype_str}.rows'
-        cols_key = f'{etype_str}.cols'
-        if rows_key in msg:
-          # The edge index should be reversed.
-          row_dict[rev_etype] = msg[cols_key].to(self.to_device)
-          col_dict[rev_etype] = msg[rows_key].to(self.to_device)
-        eids_key = f'{etype_str}.eids'
-        if eids_key in msg:
-          edge_dict[rev_etype] = msg[eids_key].to(self.to_device)
-        efeat_key = f'{etype_str}.efeats'
-        if efeat_key in msg:
-          efeat_dict[rev_etype] = msg[efeat_key].to(self.to_device)
-      etypes = [reverse_edge_type(etype) for etype in self._edge_types]
-      output = HeteroSamplerOutput(node_dict, row_dict, col_dict,
-                                   edge=edge_dict if len(edge_dict) else None,
-                                   edge_types=etypes,
-                                   input_type=self.input_data.input_type,
-                                   device=self.to_device)
-      
-      output.metadata = {}
-      if 'edge_label_index' in msg:
-        output.metadata['edge_label_index'] = msg['edge_label_index'].to(self.to_device)
-        output.metadata['edge_label'] = msg['edge_label'].to(self.to_device)
-      elif 'src_index' in msg:
-        output.metadata['src_index'] = msg['src_index'].to(self.to_device)
-        output.metadata['dst_pos_index'] = msg['dst_pos_index'].to(self.to_device)
-        output.metadata['dst_neg_index'] = msg['dst_neg_index'].to(self.to_device)
-
-      nfeat_dict = None if len(nfeat_dict) == 0 else nfeat_dict
-      efeat_dict = None if len(efeat_dict) == 0 else efeat_dict
-
-      res_data = to_hetero_data(output,
-                                node_feat_dict=nfeat_dict,
-                                edge_feat_dict=efeat_dict)
-
-    # Homogeneous sampling results
-    else:
-      ids = msg['ids'].to(self.to_device)
-      rows = msg['rows'].to(self.to_device)
-      cols = msg['cols'].to(self.to_device)
-      eids = msg['eids'].to(self.to_device) if 'eids' in msg else None
-      # The edge index should be reversed.
-      output = SamplerOutput(ids, cols, rows, eids,
-                             device=self.to_device)
-      output.metadata = {}
-      if 'edge_label_index' in msg:
-        output.metadata['edge_label_index'] = msg['edge_label_index'].to(self.to_device)
-        output.metadata['edge_label'] = msg['edge_label'].to(self.to_device)
-      elif 'src_index' in msg:
-        output.metadata['src_index'] = msg['src_index'].to(self.to_device)
-        output.metadata['dst_pos_index'] = msg['dst_pos_index'].to(self.to_device)
-        output.metadata['dst_neg_index'] = msg['dst_neg_index'].to(self.to_device)
-
-      nfeats = msg['nfeats'].to(self.to_device) if 'nfeats' in msg else None
-      efeats = msg['efeats'].to(self.to_device) if 'efeats' in msg else None
-
-      res_data = to_data(output, node_feats=nfeats, edge_feats=efeats)
-
-    return res_data
-

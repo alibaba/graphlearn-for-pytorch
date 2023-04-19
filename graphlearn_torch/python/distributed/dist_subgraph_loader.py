@@ -16,13 +16,9 @@
 from typing import Optional
 
 import torch
-from torch_geometric.data import Data
 
-from ..channel import SampleMessage
-from ..loader import to_data
-from ..sampler import NodeSamplerInput, SamplerOutput, SamplingType, SamplingConfig
+from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig
 from ..typing import InputNodes, NumNeighbors
-from ..utils import ensure_device
 
 from .dist_dataset import DistDataset
 from .dist_options import AllDistSamplingWorkerOptions
@@ -91,23 +87,3 @@ class DistSubGraphLoader(DistLoader):
     super().__init__(
       data, input_data, sampling_config, to_device, worker_options
     )
-
-  def _collate_fn(self, msg: SampleMessage) -> Data:
-    r""" Collate sampled message as PyG's Data.
-    """
-    ensure_device(self.to_device)
-    mapping = msg['mapping'].to(self.to_device)
-    nodes = msg['ids'].to(self.to_device)
-    rows = msg['rows'].to(self.to_device)
-    cols = msg['cols'].to(self.to_device)
-    eids = msg['eids'].to(self.to_device) if 'eids' in msg else None
-    output = SamplerOutput(nodes, rows, cols, eids, metadata=mapping,
-                           device=self.to_device)
-
-    batch_labels = msg['nlabels'].to(self.to_device) if 'nlabels' in msg else None
-    nfeats = msg['nfeats'].to(self.to_device) if 'nfeats' in msg else None
-    efeats = msg['efeats'].to(self.to_device) if 'efeats' in msg else None
-
-    res_data = to_data(output, batch_labels, nfeats, efeats)
-    res_data.mapping = mapping
-    return res_data

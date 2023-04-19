@@ -81,15 +81,15 @@ def _check_sample_result(data, rank):
   tc = unittest.TestCase()
   if rank == 0:
     true_node = torch.tensor([0, 1, 3, 5, 6, 7], device='cuda:0')
-    true_edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 3, 3, 4, 5],
-                                    [0, 1, 5, 1, 2, 4, 3, 0, 3, 0, 5]],
+    true_edge_index = torch.tensor([[0, 1, 5, 1, 2, 4, 3, 0, 3, 0, 5],
+                                    [0, 0, 0, 1, 1, 1, 2, 3, 3, 4, 5]],
                                   device='cuda:0')
     true_edge_id = torch.tensor([0, 1, 2, 3, 4, 5, 9, 12, 13, 14, 16], device='cuda:0')
     true_mapping = torch.tensor([0, 2, 5], device='cuda:0')
   else:
     true_node = torch.tensor([0, 1, 3, 5, 6, 7], device='cuda:1')
-    true_edge_index = torch.tensor([[3, 3, 4, 5, 0, 0, 0, 1, 1, 1, 2],
-                                    [0, 3, 0, 5, 0, 1, 5, 1, 2, 4, 3]],
+    true_edge_index = torch.tensor([[0, 3, 0, 5, 0, 1, 5, 1, 2, 4, 3],
+                                    [3, 3, 4, 5, 0, 0, 0, 1, 1, 1, 2]],
                                     device='cuda:1')
     true_edge_id = torch.tensor([12, 13, 14, 16, 0, 1, 2, 3, 4, 5, 9], device='cuda:1')
     true_mapping = torch.tensor([0, 2, 5], device='cuda:1')
