@@ -102,7 +102,7 @@ class NeighborSampler(BaseSampler):
         )
       else: # hetero
         self._neg_sampler = {}
-        for etype, g in self.graph.items(): 
+        for etype, g in self.graph.items():
           self._neg_sampler[etype] = RandomNegativeSampler(
             graph=g,
             mode=self.device.type.upper()
@@ -425,8 +425,9 @@ class NeighborSampler(BaseSampler):
 
     return SamplerOutput(
       node=subgraph.nodes,
-      row=subgraph.rows,
-      col=subgraph.cols,
+      # The edge index should be reversed.
+      row=subgraph.cols,
+      col=subgraph.rows,
       edge=subgraph.eids if self.with_edge else None,
       device=self.device,
       metadata=mapping[:input_seeds.numel()])

@@ -35,27 +35,20 @@ def to_data(
   data.edge = sampler_out.edge
   data.node = sampler_out.node
 
-  if sampler_out.metadata is None:
-    data.batch = sampler_out.batch
-    data.batch_size = sampler_out.batch.numel() if data.batch is not None else 0
-  elif isinstance(sampler_out.metadata, dict):
-    if 'edge_label_index' in sampler_out.metadata:
-      # binary negative sampling
-      # In this case, we reverse the edge_label_index and put it into the
-      # reversed edgetype subgraph
-      edge_label_index = torch.stack(
-        (sampler_out.metadata['edge_label_index'][1],
-          sampler_out.metadata['edge_label_index'][0]), dim=0)
-      data.edge_label_index = edge_label_index
-      data.edge_label = sampler_out.metadata['edge_label']
-    elif 'src_index' in sampler_out.metadata:
-      # triplet negative sampling
-      # In this case, src_index and dst_pos/neg_index fields follow the nodetype
-      data.src_index = sampler_out.metadata['src_index']
-      data.dst_pos_index = sampler_out.metadata['dst_pos_index']
-      data.dst_neg_index = sampler_out.metadata['dst_neg_index']
-    else:
-      pass
+  data.batch = sampler_out.batch
+  data.batch_size = sampler_out.batch.numel() if data.batch is not None else 0
+
+  # update meta data
+  if isinstance(sampler_out.metadata, dict):
+    for k, v in sampler_out.metadata.items():
+      if k == 'edge_label_index':
+        # In binary negative sampling from edges, we reverse the
+        # edge_label_index and put it into the reversed edgetype subgraph.
+        data['edge_label_index'] = torch.stack((v[1], v[0]), dim=0)
+      else:
+        data[k] = v
+  elif sampler_out.metadata is not None:
+    data['metadata'] = sampler_out.metadata
 
   return data
 
@@ -76,37 +69,36 @@ def to_hetero_data(
       data[k].edge = hetero_sampler_out.edge.get(k, None)
     if edge_feat_dict is not None:
       data[k].edge_attr = edge_feat_dict.get(k, None)
+
   # nodes
   for k, v in hetero_sampler_out.node.items():
     data[k].node = v
     if node_feat_dict is not None:
       data[k].x = node_feat_dict.get(k, None)
 
-  input_type = hetero_sampler_out.input_type
   # seed nodes
-  if input_type is None or isinstance(input_type, NodeType):
-    for k, v in hetero_sampler_out.batch.items():
-      data[k].batch = v
-      data[k].batch_size = v.numel()
-      if batch_label_dict is not None:
-        data[k].y = batch_label_dict.get(k, None)
-  # seed edges
-  else:
-    rev_input_type = reverse_edge_type(input_type)
-    if 'edge_label_index' in hetero_sampler_out.metadata:
-      # binary negative sampling
-      # In this case, we reverse the edge_label_index and put it into the
-      # reversed edgetype subgraph
-      edge_label_index = torch.stack(
-        (hetero_sampler_out.metadata['edge_label_index'][1],
-         hetero_sampler_out.metadata['edge_label_index'][0]), dim=0)
-      data[rev_input_type].edge_label_index = edge_label_index
-      data[rev_input_type].edge_label = hetero_sampler_out.metadata['edge_label']
-    elif 'src_index' in hetero_sampler_out.metadata:
-      # triplet negative sampling
-      # In this case, src_index and dst_pos/neg_index fields follow the nodetype
-      data[rev_input_type[-1]].src_index = hetero_sampler_out.metadata['src_index']
-      data[rev_input_type[0]].dst_pos_index = hetero_sampler_out.metadata['dst_pos_index']
-      data[rev_input_type[0]].dst_neg_index = hetero_sampler_out.metadata['dst_neg_index']
+  for k, v in hetero_sampler_out.batch.items():
+    data[k].batch = v
+    data[k].batch_size = v.numel()
+    if batch_label_dict is not None:
+      data[k].y = batch_label_dict.get(k, None)
+
+  # update meta data
+  input_type = hetero_sampler_out.input_type
+  if isinstance(hetero_sampler_out.metadata, dict):
+    for k, v in hetero_sampler_out.metadata.items():
+      if k == 'edge_label_index':
+        data[reverse_edge_type(input_type)]['edge_label_index'] = \
+          torch.stack((v[1], v[0]), dim=0)
+      elif k == 'edge_label':
+        data[reverse_edge_type(input_type)]['edge_label'] = v
+      elif k == 'src_index':
+        data[input_type[0]]['src_index'] = v
+      elif k in ['dst_pos_index', 'dst_neg_index']:
+        data[input_type[-1]][k] = v
+      else:
+        data[k] = v
+  elif hetero_sampler_out.metadata is not None:
+    data['metadata'] = hetero_sampler_out.metadata
 
   return data

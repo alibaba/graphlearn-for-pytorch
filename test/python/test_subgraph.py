@@ -57,8 +57,8 @@ class RandomSamplerTestCase(unittest.TestCase):
     subgraph = sampler.subgraph(self.input_seeds1)
     self.assertTrue(tensor_equal_with_device(subgraph.node, self.nodes1))
     self.assertTrue(tensor_equal_with_device(subgraph.metadata, self.mapping1))
-    self.assertTrue(tensor_equal_with_device(subgraph.row, self.rows1))
-    self.assertTrue(tensor_equal_with_device(subgraph.col, self.cols1))
+    self.assertTrue(tensor_equal_with_device(subgraph.row, self.cols1))
+    self.assertTrue(tensor_equal_with_device(subgraph.col, self.rows1))
     self.assertTrue(tensor_equal_with_device(subgraph.edge, self.eids1))
 
   def test_cpu_khop_subgraph(self):
@@ -68,8 +68,8 @@ class RandomSamplerTestCase(unittest.TestCase):
     subgraph = sampler.subgraph(self.input_seeds2)
     self.assertTrue(tensor_equal_with_device(subgraph.node, self.nodes2))
     self.assertTrue(tensor_equal_with_device(subgraph.metadata, self.mapping2))
-    self.assertTrue(tensor_equal_with_device(subgraph.row, self.rows2))
-    self.assertTrue(tensor_equal_with_device(subgraph.col, self.cols2))
+    self.assertTrue(tensor_equal_with_device(subgraph.row, self.cols2))
+    self.assertTrue(tensor_equal_with_device(subgraph.col, self.rows2))
     self.assertTrue(tensor_equal_with_device(subgraph.edge, self.eids2))
 
   def test_cuda_node_subgraph(self):
@@ -78,8 +78,8 @@ class RandomSamplerTestCase(unittest.TestCase):
     subgraph = sampler.subgraph(self.input_seeds1)
     self.assertTrue(tensor_equal_with_device(subgraph.node, self.nodes1.to(0)))
     self.assertTrue(tensor_equal_with_device(subgraph.metadata, self.mapping1.to(0)))
-    self.assertTrue(tensor_equal_with_device(subgraph.row, self.rows1.to(0)))
-    self.assertTrue(tensor_equal_with_device(subgraph.col, self.cols1.to(0)))
+    self.assertTrue(tensor_equal_with_device(subgraph.row, self.cols1.to(0)))
+    self.assertTrue(tensor_equal_with_device(subgraph.col, self.rows1.to(0)))
     self.assertTrue(tensor_equal_with_device(subgraph.edge, self.eids1.to(0)))
 
   def test_cuda_khop_subgraph(self):
@@ -89,8 +89,8 @@ class RandomSamplerTestCase(unittest.TestCase):
     subgraph = sampler.subgraph(self.input_seeds2)
     self.assertTrue(tensor_equal_with_device(subgraph.node, self.nodes2.to(0)))
     self.assertTrue(tensor_equal_with_device(subgraph.metadata, self.mapping2.to(0)))
-    self.assertTrue(tensor_equal_with_device(subgraph.row, self.rows2.to(0)))
-    self.assertTrue(tensor_equal_with_device(subgraph.col, self.cols2.to(0)))
+    self.assertTrue(tensor_equal_with_device(subgraph.row, self.cols2.to(0)))
+    self.assertTrue(tensor_equal_with_device(subgraph.col, self.rows2.to(0)))
     self.assertTrue(tensor_equal_with_device(subgraph.edge, self.eids2.to(0)))
 
 if __name__ == "__main__":

@@ -264,8 +264,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
     if is_hetero:
       assert input_type is not None
       src_dict = inducer.init_node({input_type: input_seeds})
-      batch_size = src_dict[input_type].numel()
-
       out_nodes, out_rows, out_cols, out_edges = {}, {}, {}, {}
       merge_dict(src_dict, out_nodes)
 
@@ -297,12 +295,11 @@ class DistNeighborSampler(ConcurrentEventLoop):
           {etype: torch.cat(eids) for etype, eids in out_edges.items()}
           if self.with_edge else None
         ),
-        metadata={'input_type': input_type, 'bs': batch_size}
+        input_type=input_type,
+        metadata={}
       )
     else:
       srcs = inducer.init_node(input_seeds)
-      batch_size = srcs.numel()
-
       out_nodes, out_edges = [], []
       out_nodes.append(srcs)
       # Sample subgraph.
@@ -319,7 +316,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         row=torch.cat([e[0] for e in out_edges]),
         col=torch.cat([e[1] for e in out_edges]),
         edge=(torch.cat([e[2] for e in out_edges]) if self.with_edge else None),
-        metadata={'input_type': None, 'bs': batch_size}
+        metadata={}
       )
     # Reclaim inducer into pool.
     self.inducer_pool.put(inducer)
@@ -328,8 +325,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
 
   async def _sample_from_edges(
-      self,
-      inputs: EdgeSamplerInput,
+    self,
+    inputs: EdgeSamplerInput,
   ) -> Optional[SampleMessage]:
     r"""Performs sampling from an edge sampler input, leveraging a sampling
     function of the same signature as `node_sample`.
@@ -409,10 +406,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         if input_type[0] != input_type[-1]:
           inverse_src = id2idx(out.node[input_type[0]])[src_seed]
           inverse_dst = id2idx(out.node[input_type[-1]])[dst_seed]
-          edge_label_index = torch.stack([
-              inverse_src,
-              inverse_dst,
-          ], dim=0)
+          edge_label_index = torch.stack([inverse_src, inverse_dst], dim=0)
         else:
           edge_label_index = inverse_seed.view(2, -1)
 
@@ -610,17 +604,13 @@ class DistNeighborSampler(ConcurrentEventLoop):
     r""" Collect labels and features for the sampled subgrarph if necessary,
     and put them into a sample message.
     """
-    is_hetero = (self.dist_graph.data_cls == 'hetero')
     result_map = {}
+    is_hetero = (self.dist_graph.data_cls == 'hetero')
+    result_map['#IS_HETERO'] = torch.LongTensor([int(is_hetero)])
     if isinstance(output.metadata, dict):
-      #scan kv and add metadata
-      input_type = output.metadata.get('input_type', '')
-      batch_size = output.metadata.get('bs', 1)
-      result_map['meta'] = torch.LongTensor([int(is_hetero), batch_size])
-      output.metadata.pop('input_type', '')
-      output.metadata.pop('bs', 1)
+      # scan kv and add metadata
       for k, v in output.metadata.items():
-        result_map[k] = v
+        result_map[f'#META.{k}'] = v
 
     if is_hetero:
       for ntype, nodes in output.node.items():
@@ -632,6 +622,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
         if self.with_edge:
           result_map[f'{etype_str}.eids'] = output.edge[etype]
       # Collect node labels of input node type.
+      input_type = output.input_type
+      assert input_type is not None
       if not isinstance(input_type, Tuple):
         node_labels = self.data.get_node_label(input_type)
         if node_labels is not None:

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch_geometric.data import Data, HeteroData
@@ -23,7 +23,7 @@ from ..loader import to_data, to_hetero_data
 from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput,
   SamplerOutput, HeteroSamplerOutput,
-  SamplingConfig
+  SamplingConfig, SamplingType
 )
 from ..typing import (
   NodeType, EdgeType, as_str, reverse_edge_type
@@ -275,17 +275,31 @@ class DistLoader(object):
                              edge_types: List[EdgeType]):
     self._node_types = node_types
     self._edge_types = edge_types
+    self._reversed_edge_types = []
     self._etype_str_to_rev = {}
     if self._edge_types is not None:
       for etype in self._edge_types:
-        self._etype_str_to_rev[as_str(etype)] = reverse_edge_type(etype)
+        rev_etype = reverse_edge_type(etype)
+        self._reversed_edge_types.append(rev_etype)
+        self._etype_str_to_rev[as_str(etype)] = rev_etype
 
-  def _collate_fn(self, msg: SampleMessage) -> Union[Data, HeteroData]:
-    r""" Collate sampled message as PyG's Data/HeteroData.
+  def _collate_fn(
+    self,
+    msg: SampleMessage
+  ) -> Union[Data, HeteroData]:
+    r""" Collate sampled messages as PyG's Data/HeteroData
     """
     ensure_device(self.to_device)
-    is_hetero = bool(msg['meta'][0])
-    batch_size = int(msg['meta'][1])
+    is_hetero = bool(msg['#IS_HETERO'])
+
+    # extract meta data
+    metadata = {}
+    for k in msg.keys():
+      if k.startswith('#META.'):
+        meta_key = str(k[6:])
+        metadata[meta_key] = msg[k].to(self.to_device)
+    if len(metadata) == 0:
+      metadata = None
 
     # Heterogeneous sampling results
     if is_hetero:
@@ -314,25 +328,34 @@ class DistLoader(object):
         if efeat_key in msg:
           efeat_dict[rev_etype] = msg[efeat_key].to(self.to_device)
 
-      batch_dict = {self._input_type: node_dict[self._input_type][:batch_size]}
-      output = HeteroSamplerOutput(node_dict, row_dict, col_dict,
-                                   edge_dict if len(edge_dict) else None,
-                                   batch_dict, edge_types=self._edge_types,
-                                   device=self.to_device)
-
       if len(nfeat_dict) == 0:
         nfeat_dict = None
       if len(efeat_dict) == 0:
         efeat_dict = None
 
-      batch_labels_key = f'{self._input_type}.nlabels'
-      if batch_labels_key in msg:
-        batch_labels = msg[batch_labels_key].to(self.to_device)
+      if self.sampling_config.sampling_type in [SamplingType.NODE,
+                                                SamplingType.SUBGRAPH]:
+        batch_dict = {
+          self._input_type: node_dict[self._input_type][:self.batch_size]
+        }
+        batch_labels_key = f'{self._input_type}.nlabels'
+        if batch_labels_key in msg:
+          batch_labels = msg[batch_labels_key].to(self.to_device)
+        else:
+          batch_labels = None
+        batch_label_dict = {self._input_type: batch_labels}
       else:
-        batch_labels = None
-      label_dict = {self._input_type: batch_labels}
+        batch_dict = {}
+        batch_label_dict = {}
 
-      res_data = to_hetero_data(output, label_dict, nfeat_dict, efeat_dict)
+      output = HeteroSamplerOutput(node_dict, row_dict, col_dict,
+                                   edge_dict if len(edge_dict) else None,
+                                   batch_dict,
+                                   edge_types=self._reversed_edge_types,
+                                   input_type=self._input_type,
+                                   device=self.to_device,
+                                   metadata=metadata)
+      res_data = to_hetero_data(output, batch_label_dict, nfeat_dict, efeat_dict)
 
     # Homogeneous sampling results
     else:
@@ -340,16 +363,21 @@ class DistLoader(object):
       rows = msg['rows'].to(self.to_device)
       cols = msg['cols'].to(self.to_device)
       eids = msg['eids'].to(self.to_device) if 'eids' in msg else None
-      batch = ids[:batch_size]
-      # The edge index should be reversed.
-      output = SamplerOutput(ids, cols, rows, eids, batch,
-                             device=self.to_device)
-
-      batch_labels = msg['nlabels'].to(self.to_device) if 'nlabels' in msg else None
 
       nfeats = msg['nfeats'].to(self.to_device) if 'nfeats' in msg else None
       efeats = msg['efeats'].to(self.to_device) if 'efeats' in msg else None
 
+      if self.sampling_config.sampling_type in [SamplingType.NODE,
+                                                SamplingType.SUBGRAPH]:
+        batch = ids[:self.batch_size]
+        batch_labels = msg['nlabels'].to(self.to_device) if 'nlabels' in msg else None
+      else:
+        batch = None
+        batch_labels = None
+
+      # The edge index should be reversed.
+      output = SamplerOutput(ids, cols, rows, eids, batch,
+                             device=self.to_device, metadata=metadata)
       res_data = to_data(output, batch_labels, nfeats, efeats)
 
     return res_data
