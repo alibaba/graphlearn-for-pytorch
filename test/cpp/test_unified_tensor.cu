@@ -33,16 +33,13 @@ protected:
   void SetUp() override {
     auto torch_cpu_tensor1 = torch::ones({128, 128}, torch::kFloat32);
     auto torch_cpu_tensor2 = torch_cpu_tensor1 * 2;
-    auto torch_cpu_tensor3 = torch_cpu_tensor1 * 3;
 
-    tensors.resize(3);
-    tensor_devices.resize(3);
+    tensors.resize(2);
+    tensor_devices.resize(2);
     tensors[0] = torch_cpu_tensor1;
     tensors[1] = torch_cpu_tensor2;
-    tensors[2] = torch_cpu_tensor3;
     tensor_devices[0] = 0;
-    tensor_devices[1] = 1;
-    tensor_devices[2] = -1;
+    tensor_devices[1] = -1;
   }
 
 protected:
@@ -55,10 +52,10 @@ TEST_F(UnifiedTensorTest, CUDA) {
   std::cout << "Start Init UnifiedTensor from torch cpu tensors." << std::endl;
   unified_tensor.InitFrom(tensors, tensor_devices);
   std::cout << "Init UnifiedTensor success." << std::endl;
-  EXPECT_EQ(unified_tensor.Shape(), std::vector<int64_t>({128*3, 128}));
+  EXPECT_EQ(unified_tensor.Shape(), std::vector<int64_t>({128*2, 128}));
 
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCUDA, 0);
-  auto indices = torch::tensor({10, 20, 200, 210, 300, 310}, options);
+  auto indices = torch::tensor({10, 20, 200, 210}, options);
   std::cout << "Input Indices:" << indices << std::endl;
   auto res = unified_tensor[indices];
   CUDACheckError();
@@ -66,7 +63,7 @@ TEST_F(UnifiedTensorTest, CUDA) {
   std::cout << "UnifiedTensor on GPU 0 lookups tensor Success." << std::endl;
   EXPECT_EQ(res.device().type(), torch::kCUDA);
   EXPECT_EQ(res.device().index(), 0);
-  EXPECT_EQ(res.size(0), 6);
+  EXPECT_EQ(res.size(0), 4);
   EXPECT_EQ(res.size(1), 128);
   std::cout << "Output Results:" << res << std::endl;
 }

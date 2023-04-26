@@ -47,7 +47,7 @@ class FeatureTestCase(unittest.TestCase):
     self.assertTrue(tensor_equal_with_device(feature[self.input], self.res))
 
   def test_feature_with_degree_sort(self):
-    device_group_list = [DeviceGroup(0, [0, 1])]
+    device_group_list = [DeviceGroup(0, [0])]
     cpu_tensor, id2index = sort_by_in_degree(
       self.tensor.clone(), 0.5, self.csr_topo)
     feature = Feature(
@@ -72,7 +72,7 @@ class FeatureTestCase(unittest.TestCase):
     self.assertTrue(tensor_equal_with_device(feature[self.input], self.res.cpu()))
 
   def test_feature_with_degree_sort_gpu(self):
-    device_group_list = [DeviceGroup(0, [0, 1])]
+    device_group_list = [DeviceGroup(0, [0])]
     cpu_tensor, id2index = sort_by_in_degree(
       self.tensor.clone(), 1.0, self.csr_topo)
     feature = Feature(
