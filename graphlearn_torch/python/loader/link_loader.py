@@ -193,13 +193,15 @@ def get_edge_label_index(
   edge_label_index: InputEdges
 ) -> Tuple[Optional[str], torch.Tensor]:
   edge_type = None
-  if not isinstance(edge_label_index, Tuple):
-    return None, convert_to_tensor(edge_label_index)
-
   # # Need the edge index in COO for LinkNeighborLoader:
   def _get_edge_index(edge_type):
-      row, col, _ = data.get_graph(edge_type).csr_topo.to_coo()
-      return (row, col)
+    row, col, _ = data.get_graph(edge_type).csr_topo.to_coo()
+    return (row, col)
+
+  if not isinstance(edge_label_index, Tuple):
+    if edge_label_index is None:
+      return None, _get_edge_index(edge_type)
+    return None, convert_to_tensor(edge_label_index)
 
   if isinstance(edge_label_index[0], str):
     edge_type = edge_label_index
