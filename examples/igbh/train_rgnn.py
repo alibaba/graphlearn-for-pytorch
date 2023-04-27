@@ -143,7 +143,8 @@ if __name__ == '__main__':
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   device = torch.device('cuda' if args.with_gpu else 'cpu')
 
-  igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory)
+  igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
+                                  args.num_classes==2983)
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset()
   glt_dataset.init_graph(

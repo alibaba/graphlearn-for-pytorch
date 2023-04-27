@@ -26,9 +26,10 @@ def partition_dataset(path: str,
                       num_partitions: int,
                       chunk_size: int,
                       dataset_size: str='tiny',
-                      in_memory: bool=True):
+                      in_memory: bool=True,
+                      use_label_2K: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
-  data = IGBHeteroDataset(path, dataset_size, in_memory)
+  data = IGBHeteroDataset(path, dataset_size, in_memory, use_label_2K)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
 
   print('-- Saving label ...')
@@ -82,6 +83,8 @@ if __name__ == '__main__':
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
+  parser.add_argument('--num_classes', type=int, default=19,
+      choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=0,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
   parser.add_argument("--num_partitions", type=int, default=2,
@@ -96,5 +99,6 @@ if __name__ == '__main__':
     num_partitions=args.num_partitions,
     chunk_size=args.chunk_size,
     dataset_size=args.dataset_size,
-    in_memory=args.in_memory
+    in_memory=args.in_memory,
+    use_label_2K=args.num_classes==2983,
   )
