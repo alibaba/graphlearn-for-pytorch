@@ -44,7 +44,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   config = open(args.config, 'r')
-  config = yaml.load(config)
+  config = yaml.safe_load(config)
   dataset = config['dataset']
   ip_list, port_list, username_list = config['nodes'], config['ports'], config['usernames']
   dst_path_list = config['dst_paths']
@@ -59,7 +59,7 @@ if __name__ == "__main__":
   for username, ip in zip(username_list, ip_list):
     passwd_dict[ip+username] = click.prompt('passwd for '+username+'@'+ip,
     hide_input=True)
-  for username, ip, port, dst, noderk, device, pythonbin in zip(       
+  for username, ip, port, dst, noderk, device, pythonbin in zip(
     username_list,
     ip_list,
     port_list,
