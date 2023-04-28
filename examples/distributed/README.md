@@ -95,6 +95,17 @@ Optional parameters which you can append after the command above includes:
 ```
 
 
+Here we present a comparison of end-to-end training time, as well as
+sampling and feature lookup time between GLT and DGL.
+We conducted the comparison using DGL version 0.9.1 and GLT version 0.2.0rc2
+in an environment consisting of 2 nodes, each with 2 A100 GPUs.
+
+<p align="center">
+  <img width="60%" src=../../docs/figures/glt_dgl.png />
+</p>
+
+
+
 ## Example of distributed training with server-client mode
 - 2 server nodes each with 1 server process for remote sampling and 2 GPUs.
 - 2 client nodes each with 2 client processes for training and 2 GPUs.
