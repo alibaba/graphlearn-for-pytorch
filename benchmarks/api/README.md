@@ -94,6 +94,8 @@ visible_devices:
 #### Step 3: Launch distributed jobs
 
 ```
+pip install paramiko
+pip install click
 python run_dist_bench.py --config=bench_dist_config.yml --master_addr=0.0.0.0 --master_port=11234
 ```
 

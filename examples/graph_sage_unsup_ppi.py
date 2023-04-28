@@ -1,11 +1,3 @@
-# Link Prediction
-Link prediction is a basic task of graph learning and GNNs are powerful models to tackle this kind of tasks. For link prediction tasks, we use links presented in the graph as labels and non-existing links as negative labels for training and predict the unknown potential links.
-
-Here we introduce the basic workflow of GNN training through the link prediction example on the [PPI dataset](https://arxiv.org/abs/1707.04638). The code is based on [PyG's implementation](https://github.com/pyg-team/pytorch_geometric/blob/master/examples/graph_sage_unsup_ppi.py) on the PPI dataset. In this case, a sinple substitution of GLT's LinkNeighborLoader for PyG's can achieve multiple times of acceleration of training.
-
-## Loading PPI dataset.
-
-``` python
 import os.path as osp
 
 import torch
@@ -31,25 +23,7 @@ test_dataset = PPI(path, split='test')
 
 # Group all training graphs into a single graph to perform sampling:
 train_data = Batch.from_data_list(train_dataset)
-```
 
-## Create data loader.
-This part is the only different part from PyG's example.
-We first create an instance of [`graphlearn_torch.data.dataset.Dataset`](graphlearn_torch.data.dataset.Dataset)
-and initialize it with edge_index and node features.
-
-The graph data is stored in pinned memory, since the `graph_mode` is set to `ZERO_COPY`.
-The `graph_mode` can be `GPU`, `ZERO_COPY` or `CPU` indicating the data is
-stored in GPU memory, pinned memory and CPU memory, respectively. `GPU` and `ZERO_COPY`
-are recommended, and you should choose `ZERO_COPY` when graph data is larger than
-GPU memory capacity.
-The node features are sorted by in-degrees of nodes and then split into two parts
-according to `split_ratio`. The node features with higher in-degrees are stored
-in GPU memory, and the remaining part is stored in pinned memory for UVA.
-
-Then, we use a link neigbor loader [`graphlearn_torch.loader.link_neighbor_loader.LinkNeighborLoader`](graphlearn_torch.loader.link_neighbor_loader.LinkNeighborLoader) with very similar API with PyG's `LinkNeighborLoader`. The default negative sampling ratio is 1.0 and you can config it by initialising `NegativeSampling` with ratio.
-
-``` python
 # Prepare graph and feature for graphlearn-torch
 train_feature = train_data.x.clone(memory_format=torch.contiguous_format)
 
@@ -79,12 +53,6 @@ train_loader = DataLoader(train_dataset, batch_size=2)
 val_loader = DataLoader(val_dataset, batch_size=2)
 test_loader = DataLoader(test_dataset, batch_size=2)
 
-```
-
-## Defining model and evaluate.
-
-Here we directly apply PyG's model to train and evaluate.
-``` python
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = GraphSAGE(
     in_channels=train_dataset.num_features,
@@ -157,6 +125,3 @@ for epoch in range(1, 6):
     train_f1, val_f1, test_f1 = test()
     print(f'Train F1: {train_f1:.4f}, Val F1: {val_f1:.4f}, '
           f'Test F1: {test_f1:.4f}')
-
-```
-This example can have about 10x performance improvement compared to the original code.

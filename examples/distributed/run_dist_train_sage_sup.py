@@ -34,7 +34,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   config = open(args.config, 'r')
-  config = yaml.load(config)
+  config = yaml.safe_load(config)
   dataset = config['dataset']
   ip_list, port_list, username_list = config['nodes'], config['ports'], config['usernames']
   dst_path_list = config['dst_paths']
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     ssh._transport = trans
 
     to_dist_dir = 'cd '+dst+'/examples/distributed/ '
-    exec_example = "tmux new -d 'CUDA_VISIBLE_DEVICES="+device+" "+pythonbin+" dist_train_sage_supervised.py --dataset="+dataset+" --in_channel="+in_channel+" --out_channel="+out_channel+" --node_rank="+str(noderk)+" --num_dataset_partitions="+str(num_nodes)+" --num_nodes="+str(num_nodes)+" --num_training_procs="+str(num_cores)+" --master_addr="+args.master_addr+" --training_pg_master_port="+args.master_port+" --train_loader_master_port="+str(int(args.master_port)+1)+" --test_loader_master_port="+str(int(args.master_port)+2)+" --batch_size="+str(args.batch_size)+" --epochs="+str(args.epochs)
+    exec_example = "tmux new -d 'CUDA_VISIBLE_DEVICES="+device+" "+pythonbin+" dist_train_sage_supervised.py --dataset="+dataset+" --dataset_root_dir=../../data/"+dataset+" --in_channel="+in_channel+" --out_channel="+out_channel+" --node_rank="+str(noderk)+" --num_dataset_partitions="+str(num_nodes)+" --num_nodes="+str(num_nodes)+" --num_training_procs="+str(num_cores)+" --master_addr="+args.master_addr+" --training_pg_master_port="+args.master_port+" --train_loader_master_port="+str(int(args.master_port)+1)+" --test_loader_master_port="+str(int(args.master_port)+2)+" --batch_size="+str(args.batch_size)+" --epochs="+str(args.epochs)
 
     print(to_dist_dir + ' && '+ exec_example + " '")
     stdin, stdout, stderr = ssh.exec_command(to_dist_dir+' && '+exec_example+" '", bufsize=1)

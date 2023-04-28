@@ -84,6 +84,8 @@ visible_devices:
 ### Step 3: Launch distributed jobs
 
 ```
+pip install paramiko
+pip install click
 python run_dist_train_sage_sup.py --config=dist_train_sage_sup_config.yml --master_addr=0.0.0.0 --master_port=11234
 ```
 
