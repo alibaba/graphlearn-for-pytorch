@@ -56,7 +56,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     train_loader_master_port,
     val_loader_master_port,
     test_loader_master_port,
-    with_gpu):
+    with_gpu,
+    rpc_timeout):
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
     world_size=num_nodes*num_training_procs,
@@ -80,10 +81,6 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   # Create distributed neighbor loader for training
   train_idx = train_idx.split(train_idx.size(0) // num_training_procs)[local_proc_rank]
-  if with_gpu:
-    worker_devices=[torch.device('cuda', i % torch.cuda.device_count()) for i in range(2)]
-  else:
-    worker_devices=[torch.device('cpu') for i in range(2)]
   train_loader = glt.distributed.DistNeighborLoader(
     data=dataset,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
@@ -94,13 +91,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     collect_features=True,
     to_device=current_device,
     worker_options=glt.distributed.MpDistSamplingWorkerOptions(
-      num_workers=2,
-      worker_devices=worker_devices,
-      worker_concurrency=4,
+      num_workers=1,
+      worker_devices=[current_device] if with_gpu else [torch.device('cpu')],
+      worker_concurrency=2,
       master_addr=master_addr,
       master_port=train_loader_master_port,
       channel_size='2GB',
-      pin_memory=True if with_gpu else False
+      pin_memory=True if with_gpu else False,
+      rpc_timeout=rpc_timeout,
     )
   )
   # Create distributed neighbor loader for validation.
@@ -115,7 +113,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     to_device=current_device,
     worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
       master_addr=master_addr,
-      master_port=val_loader_master_port
+      master_port=val_loader_master_port,
+      rpc_timeout=rpc_timeout,
     )
   )
 
@@ -131,7 +130,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     to_device=current_device,
     worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
       master_addr=master_addr,
-      master_port=test_loader_master_port
+      master_port=test_loader_master_port,
+      rpc_timeout=rpc_timeout,
     )
   )
 
@@ -265,10 +265,13 @@ if __name__ == '__main__':
       help="The port used for RPC initialization across all sampling workers of test loader.")
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
+  parser.add_argument("--rpc_timeout", type=int, default=180,
+                      help="rpc timeout in seconds")
   args = parser.parse_args()
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
-
+  if args.with_gpu:
+    assert(not args.num_training_procs > torch.cuda.device_count())
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
@@ -305,7 +308,8 @@ if __name__ == '__main__':
           args.train_loader_master_port,
           args.val_loader_master_port,
           args.test_loader_master_port,
-          args.with_gpu),
+          args.with_gpu,
+          args.rpc_timeout),
     nprocs=args.num_training_procs,
     join=True
   )

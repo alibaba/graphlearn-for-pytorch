@@ -48,12 +48,12 @@ python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19
 2 nodes each with 2 GPUs
 ```
 # node 0:
-CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --master_addr=localhost --model='gat' --data_sze='tiny' --num_classes=19
+CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
 
 # node 1:
-CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --master_addr=localhost --model='gat' --data_sze='tiny' --num_classes=19
+CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
 ```
-The script use GPU default,, please add `--cpu_mode` if you want to use CPU only.
+The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
 
 Note:
 - The `num_partitions` and `num_nodes` must be the same.
