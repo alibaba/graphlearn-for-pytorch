@@ -32,7 +32,7 @@ Note that in `dataset.py`, we have converted the graph into an undirected graph.
 
 ## 2. Single node and single GPU training:
 ```
-python train_rgnn.py --dataset_size='tiny' --model='rgat' --dataset_size='tiny' --num_classes=19
+python train_rgnn.py --model='rgat' --dataset_size='tiny' --num_classes=19
 ```
 The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
 
