@@ -121,6 +121,21 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<const Graph*>())
     .def("node_subgraph", &CPUSubGraphOp::NodeSubGraph,
          py::arg("srcs"), py::arg("with_edge"));
+  
+  py::class_<SampleQueue>(m, "SampleQueue")
+    .def(py::init<size_t, size_t>(), py::arg("capacity"), py::arg("buf_size"))
+    .def("pin_memory", &SampleQueue::PinMemory)
+    .def("send", &SampleQueue::Enqueue, py::arg("msg"))
+    .def("receive", &SampleQueue::Dequeue)
+    .def(py::pickle(
+        [](const SampleQueue& q) { // __getstate__
+            return q.ShmId();
+        },
+        [](int shmid) { // __setstate__
+            /* Create a new C++ instance */
+            return new SampleQueue{shmid};
+        }
+    ));
 
 #ifdef WITH_CUDA
   py::class_<SharedTensor>(m, "SharedTensor")
@@ -195,20 +210,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<const Graph*>())
     .def("node_subgraph", &CUDASubGraphOp::NodeSubGraph,
          py::arg("srcs"), py::arg("with_edge"));
-
-  py::class_<SampleQueue>(m, "SampleQueue")
-    .def(py::init<size_t, size_t>(), py::arg("capacity"), py::arg("buf_size"))
-    .def("pin_memory", &SampleQueue::PinMemory)
-    .def("send", &SampleQueue::Enqueue, py::arg("msg"))
-    .def("receive", &SampleQueue::Dequeue)
-    .def(py::pickle(
-        [](const SampleQueue& q) { // __getstate__
-            return q.ShmId();
-        },
-        [](int shmid) { // __setstate__
-            /* Create a new C++ instance */
-            return new SampleQueue{shmid};
-        }
-    ));
 #endif
 }

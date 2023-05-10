@@ -15,7 +15,7 @@ pip install torch_geometric
 pip install --no-index  torch_scatter torch_sparse -f https://data.pyg.org/whl/torch-1.13.0+cu117.html
 pip install graphlearn-torch
 ```
-Please refer to the [documentation](../../README.md#installation) for installation details.
+Please refer to the [documentation](../../README.md#installation) for installation and build details.
 
 ## 1. Dataset Preparation
 If you want download the IGBH-large or IGBH600M, i.e. `dataset_size` is 'large' or 'full',
@@ -32,7 +32,7 @@ Note that in `dataset.py`, we have converted the graph into an undirected graph.
 
 ## 2. Single node and single GPU training:
 ```
-python train_rgnn.py --dataset_size='tiny' --model='gat' --data_sze='tiny'--num_classes=19
+python train_rgnn.py --dataset_size='tiny' --model='rgat' --dataset_size='tiny' --num_classes=19
 ```
 The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
 
