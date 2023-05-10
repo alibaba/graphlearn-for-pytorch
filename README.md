@@ -145,6 +145,13 @@ sh install_dependencies.sh
 python setup.py bdist_wheel
 pip install dist/*
 ```
+
+Build in CPU-mode 
+``` shell
+WITH_CUDA=OFF python setup.py bdist_wheel
+pip install dist/*
+```
+
 2. UT
 ``` shell
 sh scripts/run_python_ut.sh
