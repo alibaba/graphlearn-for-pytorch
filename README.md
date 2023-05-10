@@ -145,8 +145,12 @@ sh install_dependencies.sh
 python setup.py bdist_wheel
 pip install dist/*
 ```
-To build in CPU-only mode, set 'WITH_CUDA' to 'OFF' in [CMakeLists.txt](./CMakeLists.txt) 
-and [setup.py](./setup.py).
+
+Build in CPU-mode 
+``` shell
+WITH_CUDA=OFF python setup.py bdist_wheel
+pip install dist/*
+```
 
 2. UT
 ``` shell
