@@ -187,7 +187,6 @@ class DistRandomPartitioner(object):
     num_rpc_threads: int = 16,
   ):
     self.output_dir = output_dir
-    ensure_dir(self.output_dir)
 
     if get_context() is not None:
       if num_parts is not None:
@@ -475,6 +474,7 @@ class DistRandomPartitioner(object):
     other distributed partitioners, save the result of the current partition
     index into output directory.
     """
+    ensure_dir(self.output_dir)
     if 'hetero' == self.data_cls:
       node_pb_dict = {}
       for ntype in self.node_types:
