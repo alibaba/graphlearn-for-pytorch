@@ -22,7 +22,7 @@ from torch.utils import cpp_extension
 # This version string should be updated when releasing a new version.
 _VERSION = '0.2.0'
 
-RELEASE = os.getenv("RELEASE")
+RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
 WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'ON')

@@ -14,10 +14,10 @@
 # ==============================================================================
 
 import datetime
-import time
-
+from multiprocessing.reduction import ForkingPickler
 import numpy as np
 import torch
+import time
 
 try:
   import common_io
@@ -28,20 +28,20 @@ from .dataset import Dataset
 
 
 class TableDataset(Dataset):
-  def __init__(self,
-               edge_tables=None,
-               node_tables=None,
-               graph_mode='ZERO_COPY',
-               sort_func=None,
-               split_ratio=0.0,
-               device_group_list=None,
-               directed=True,
-               reader_threads=10,
-               reader_capacity=10240,
-               reader_batch_size=1024,
-               label=None,
-               device=None,
-               **kwargs):
+  def load(self,
+           edge_tables=None,
+           node_tables=None,
+           graph_mode='ZERO_COPY',
+           sort_func=None,
+           split_ratio=0.0,
+           device_group_list=None,
+           directed=True,
+           reader_threads=10,
+           reader_capacity=10240,
+           reader_batch_size=1024,
+           label=None,
+           device=None,
+           **kwargs):
     """ Creates `Dataset` from ODPS tables.
 
     Args:
@@ -124,10 +124,16 @@ class TableDataset(Dataset):
                 f"{step * reader_batch_size} nodes.")
       ids = torch.tensor([feat[0] for feat in feature_list], dtype=torch.long)
       _, original_index = torch.sort(ids)
-      float_feat= [
-        list(map(float, feat[1].decode().split(':')))
-        for feat in feature_list
-      ]
+      if isinstance(feature_list[0][1], bytes):
+        float_feat= [
+          list(map(float, feat[1].decode().split(':')))
+          for feat in feature_list
+        ]
+      else:
+        float_feat= [
+          list(map(float, feat[1].split(':')))
+          for feat in feature_list
+        ]
       if node_hetero:
         feature[n_type] = torch.tensor(float_feat)[original_index]
       else:
@@ -138,9 +144,20 @@ class TableDataset(Dataset):
       del feature_list
     load_time = (time.time() - start_time) / 60
     print(f'Loading table completed in {load_time:.2f} minutes.')
-
-    super().__init__()
     self.init_graph(edge_index, None, 'COO', graph_mode, directed, device)
     self.init_node_features(feature, None, sort_func, split_ratio,
                             device_group_list, device)
     self.init_node_labels(label)
+
+
+## Pickling Registration
+
+def rebuild_table_dataset(ipc_handle):
+  ds = TableDataset.from_ipc_handle(ipc_handle)
+  return ds
+
+def reduce_table_dataset(dataset: TableDataset):
+  ipc_handle = dataset.share_ipc()
+  return (rebuild_table_dataset, (ipc_handle, ))
+
+ForkingPickler.register(TableDataset, reduce_table_dataset)

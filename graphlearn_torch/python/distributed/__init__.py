@@ -37,6 +37,7 @@ from .dist_server import (
   DistServer, get_server, init_server, wait_and_shutdown_server
 )
 from .dist_subgraph_loader import DistSubGraphLoader
+from .dist_table_dataset import DistTableDataset, DistTableRandomPartitioner
 from .event_loop import ConcurrentEventLoop
 from .rpc import (
   init_rpc, shutdown_rpc, rpc_is_initialized,

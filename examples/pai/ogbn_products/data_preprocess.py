@@ -22,7 +22,7 @@ from ogb.nodeproppred import NodePropPredDataset
 
 # load data
 root = osp.join(osp.dirname(osp.dirname(osp.realpath(__file__))),
-                '..', 'data', 'products')
+                '../..', 'data', 'products')
 dataset = NodePropPredDataset('ogbn-products', root)
 split_idx = dataset.get_idx_split()
 train_idx = split_idx['train']
@@ -46,4 +46,4 @@ with open(node_table, 'w') as f:
 
 with open(edge_table, 'w') as f:
   for i in range(edge_index.shape[1]):
-    f.write(str(edge_index[0][i]) + '\t' + str(edge_index[1][i]) + '\n')
+    f.write(str(edge_index[0][i]) + '\t' + str(edge_index[1][i]) + '\t' + str(i) + '\n')
