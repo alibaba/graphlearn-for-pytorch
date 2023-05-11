@@ -90,16 +90,20 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     drop_last=False,
     collect_features=True,
     to_device=current_device,
-    worker_options=glt.distributed.MpDistSamplingWorkerOptions(
+    worker_options = (glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
-      worker_devices=[current_device] if with_gpu else [torch.device('cpu')],
+      worker_devices=[current_device],
       worker_concurrency=2,
       master_addr=master_addr,
       master_port=train_loader_master_port,
       channel_size='2GB',
-      pin_memory=True if with_gpu else False,
+      pin_memory=True,
       rpc_timeout=rpc_timeout,
-    )
+    ) if with_gpu else glt.distributed.CollocatedDistSamplingWorkerOptions(
+      master_addr=master_addr,
+      master_port=val_loader_master_port,
+      rpc_timeout=rpc_timeout,
+    ))
   )
   # Create distributed neighbor loader for validation.
   val_idx = val_idx.split(val_idx.size(0) // num_training_procs)[local_proc_rank]
