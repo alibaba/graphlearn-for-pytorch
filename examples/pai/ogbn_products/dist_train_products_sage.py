@@ -29,7 +29,7 @@ from torch_geometric.nn import GraphSAGE
 
 
 def run(rank, num_nodes, node_rank, num_training_procs_per_node,
-        dataset, train_idx, train_label, batch_size,
+        dataset, train_idx, train_label, train_id2idx, batch_size,
         lr, nbrs_num, features_num, hidden_dim, class_num, depth, epochs,
         master_addr, training_pg_master_port, train_loader_master_port):
   # Initialize graphlearn_torch distributed worker group context.
@@ -52,6 +52,7 @@ def run(rank, num_nodes, node_rank, num_training_procs_per_node,
 
   train_idx = train_idx.split(train_idx.size(0) // num_training_procs_per_node)[rank]
   train_label = train_label.to(current_device)
+  train_id2idx = train_id2idx.to(current_device)
 
   # Create distributed neighbor loader for training
   train_loader = glt.distributed.DistNeighborLoader(
@@ -93,7 +94,7 @@ def run(rank, num_nodes, node_rank, num_training_procs_per_node,
     for batch in train_loader:
       optimizer.zero_grad()
       out = model(batch.x, batch.edge_index)[:batch.batch_size].log_softmax(dim=-1)
-      loss = F.nll_loss(out, train_label[batch.batch])
+      loss = F.nll_loss(out, train_label[train_id2idx[batch.batch]])
       loss.backward()
       optimizer.step()
     end = time.time()
@@ -129,12 +130,13 @@ if __name__ == "__main__":
   argparser.add_argument('--features_num', type=int, default=100)
   argparser.add_argument('--hidden_dim', type=int, default=256)
   argparser.add_argument('--depth', type=int, default=3)
-  argparser.add_argument('--nbrs_num', type=list, default=[15, 10, 5])
+  argparser.add_argument('--nbrs_num', type=str, default='[15, 10, 5]')
   argparser.add_argument('--learning_rate', type=float, default=0.003)
   argparser.add_argument('--epoch', type=int, default=10)
   argparser.add_argument('--batch_size', type=int, default=512)
 
   args = argparser.parse_args()
+  args.nbrs_num = eval(args.nbrs_num)
 
   # get dist context from PAI environment.
   num_nodes = int(os.getenv('WORLD_SIZE', 1))
@@ -146,8 +148,10 @@ if __name__ == "__main__":
 
   node_table, edge_table, train_table = args.tables.split(',')
   train_idx, train_label = read_train_idx_and_label(train_table, node_rank, num_nodes)
+  train_id2idx = glt.utils.id2idx(train_idx)
   train_idx.share_memory_()
   train_label.share_memory_()
+  train_id2idx.share_memory_()
   node_tables = {'i': node_table}
   edge_tables = {('i', 'i-i', 'i') : edge_table}
   # init glt Dataset.
@@ -178,6 +182,7 @@ if __name__ == "__main__":
                  glt_dataset,
                  train_idx,
                  train_label,
+                 train_id2idx,
                  args.batch_size,
                  args.learning_rate,
                  args.nbrs_num,
