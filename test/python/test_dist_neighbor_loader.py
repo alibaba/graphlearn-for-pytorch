@@ -257,20 +257,20 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.hetero_dataset1 = _prepare_hetero_dataset(rank=1)
     self.hetero_input_nodes0 = (user_ntype, self.input_nodes0)
     self.hetero_input_nodes1 = (user_ntype, self.input_nodes1)
+    self.master_port = glt.utils.get_free_port()
+    self.sampling_master_port = glt.utils.get_free_port()
 
   def test_homo_collocated(self):
     print("\n--- DistNeighborLoader Test (homogeneous, collocated) ---")
-    master_port = glt.utils.get_free_port()
-    sampling_master_port = glt.utils.get_free_port()
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 0, master_port, sampling_master_port,
+      args=(2, 0, self.master_port, self.sampling_master_port,
             self.dataset0, self.input_nodes0, _check_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 1, master_port, sampling_master_port,
+      args=(2, 1, self.master_port, self.sampling_master_port,
             self.dataset1, self.input_nodes1, _check_sample_result, True)
     )
     w0.start()
@@ -280,17 +280,15 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
 
   def test_homo_mp(self):
     print("\n--- DistNeighborLoader Test (homogeneous, multiprocessing) ---")
-    master_port = glt.utils.get_free_port()
-    sampling_master_port = glt.utils.get_free_port()
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 0, master_port, sampling_master_port,
+      args=(2, 0, self.master_port, self.sampling_master_port,
             self.dataset0, self.input_nodes0, _check_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 1, master_port, sampling_master_port,
+      args=(2, 1, self.master_port, self.sampling_master_port,
             self.dataset1, self.input_nodes1, _check_sample_result, False)
     )
     w0.start()
@@ -300,18 +298,16 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
 
   def test_hetero_collocated(self):
     print("\n--- DistNeighborLoader Test (heterogeneous, collocated) ---")
-    master_port = glt.utils.get_free_port()
-    sampling_master_port = glt.utils.get_free_port()
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 0, master_port, sampling_master_port,
+      args=(2, 0, self.master_port, self.sampling_master_port,
             self.hetero_dataset0, self.hetero_input_nodes0,
             _check_hetero_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 1, master_port, sampling_master_port,
+      args=(2, 1, self.master_port, self.sampling_master_port,
             self.hetero_dataset1, self.hetero_input_nodes1,
             _check_hetero_sample_result, True)
     )
@@ -322,18 +318,16 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
 
   def test_hetero_mp(self):
     print("\n--- DistNeighborLoader Test (heterogeneous, multiprocessing) ---")
-    master_port = glt.utils.get_free_port()
-    sampling_master_port = glt.utils.get_free_port()
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 0, master_port, sampling_master_port,
+      args=(2, 0, self.master_port, self.sampling_master_port,
             self.hetero_dataset0, self.hetero_input_nodes0,
             _check_hetero_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
-      args=(2, 1, master_port, sampling_master_port,
+      args=(2, 1, self.master_port, self.sampling_master_port,
             self.hetero_dataset1, self.hetero_input_nodes1,
             _check_hetero_sample_result, False)
     )
@@ -344,25 +338,23 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
 
   def test_remote_mode(self):
     print("\n--- DistNeighborLoader Test (server-client mode, remote) ---")
-    master_port = glt.utils.get_free_port()
-    sampling_master_port = glt.utils.get_free_port()
     mp_context = torch.multiprocessing.get_context('spawn')
     server0 = mp_context.Process(
       target=run_test_as_server,
-      args=(2, 2, 0, master_port, self.dataset0)
+      args=(2, 2, 0, self.master_port, self.dataset0)
     )
     server1 = mp_context.Process(
       target=run_test_as_server,
-      args=(2, 2, 1, master_port, self.dataset1)
+      args=(2, 2, 1, self.master_port, self.dataset1)
     )
     client0 = mp_context.Process(
       target=run_test_as_client,
-      args=(2, 2, 0, master_port, sampling_master_port,
+      args=(2, 2, 0, self.master_port, self.sampling_master_port,
             self.input_nodes0, _check_sample_result)
     )
     client1 = mp_context.Process(
       target=run_test_as_client,
-      args=(2, 2, 1, master_port, sampling_master_port,
+      args=(2, 2, 1, self.master_port, self.sampling_master_port,
             self.input_nodes1, _check_sample_result)
     )
     server0.start()

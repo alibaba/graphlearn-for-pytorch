@@ -16,8 +16,10 @@ limitations under the License.
 #ifndef GRAPHLEARN_TORCH_INCLUDE_COMMON_CUH_
 #define GRAPHLEARN_TORCH_INCLUDE_COMMON_CUH_
 
+#include <ATen/cuda/CUDAContext.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <stdexcept>
 
 #include "graphlearn_torch/include/common.h"
@@ -35,21 +37,13 @@ inline void CUDARegisterByBlock(void* ptr, size_t size, unsigned int flags) {
   }
 }
 
-inline cudaError_t CUDAMemcpy(void* dst, const void* src, size_t count,
-    cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  #ifdef CUDA_VERSION_LT112
-  return cudaMemcpy(dst, src, count, kind);
-  #else
-  return cudaMemcpyAsync(dst, src, count, kind, stream);
-  #endif
+inline void* CUDAAlloc(size_t nbytes, cudaStream_t stream = 0) {
+  at::globalContext().lazyInitCUDA();
+  return c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(nbytes, stream);
 }
 
-inline cudaError_t CUDAFree(void* ptr, cudaStream_t stream = 0) {
-  #ifdef CUDA_VERSION_LT112
-  return cudaFree(ptr);
-  #else
-  return cudaFreeAsync(ptr, stream);
-  #endif
+inline void CUDADelete(void* ptr) {
+  c10::cuda::CUDACachingAllocator::raw_delete(ptr);
 }
 
 #define CUDACheckError()                                                   \
@@ -61,6 +55,33 @@ inline cudaError_t CUDAFree(void* ptr, cudaStream_t stream = 0) {
     exit(EXIT_FAILURE);                                                    \
   }                                                                        \
 }
+
+class CUDAAllocator {
+ public:
+   typedef char value_type;
+
+  explicit CUDAAllocator(cudaStream_t stream) : stream_(stream) {}
+
+  void operator()(void* ptr) const {
+    CUDADelete(ptr);
+  }
+
+  template <typename T>
+  std::unique_ptr<T, CUDAAllocator> alloc_unique(std::size_t size) const {
+    return std::unique_ptr<T, CUDAAllocator>(
+        reinterpret_cast<T*>(CUDAAlloc(size, stream_)), *this);
+  }
+
+  char* allocate(std::ptrdiff_t size) const {
+    return reinterpret_cast<char*>(CUDAAlloc(size, stream_));
+  }
+
+  void deallocate(char* ptr, std::size_t) const {
+    CUDADelete(ptr);
+  }
+private:
+  cudaStream_t stream_;
+};
 
 }  // namespace graphlearn_torch
 

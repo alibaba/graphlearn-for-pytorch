@@ -26,8 +26,6 @@ RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
 WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
-# target cuda version < 11.2
-CUDA_VERSION_LT112 = os.getenv('CUDA_VERSION_LT112', 'OFF')
 
 extensions = []
 include_dirs=[]
@@ -69,11 +67,6 @@ sources += glob.glob('graphlearn_torch/csrc/**/**.cc', recursive=True)
 
 if WITH_CUDA == 'ON':
   sources += glob.glob('graphlearn_torch/csrc/**/**.cu', recursive=True)
-
-if CUDA_VERSION_LT112 == 'ON':
-  define_macros.append(('CUDA_VERSION_LT112', 'ON'))
-else:
-  undef_macros.append(('CUDA_VERSION_LT112'))
 
 if WITH_VINEYARD == 'ON':
   define_macros.append(('WITH_VINEYARD', 'ON'))

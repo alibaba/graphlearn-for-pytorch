@@ -26,6 +26,11 @@ def sort_by_in_degree(cpu_tensor, shuffle_ratio, csr_topo):
   _, old_idx = torch.sort(csr_topo.degrees, descending=True)
   old2new = torch.arange(cpu_tensor.size(0), dtype=torch.long)
   old_idx[:int(row_count * shuffle_ratio)] = old_idx[perm_range]
-  cpu_tensor[:row_count] = cpu_tensor[old_idx]
+  tmp_t = cpu_tensor[old_idx]
+  if row_count < cpu_tensor.size(0):
+    cpu_tensor = torch.cat([tmp_t, cpu_tensor[row_count:]], dim=0)
+  else:
+    cpu_tensor = tmp_t
   old2new[old_idx] = new_idx
+  del new_idx, perm_range, old_idx, tmp_t
   return cpu_tensor, old2new

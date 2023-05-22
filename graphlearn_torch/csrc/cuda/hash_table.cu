@@ -81,22 +81,23 @@ void HostHashTable::InsertDeviceHashTable(cudaStream_t stream,
   InsertDeviceHashTableKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, device_table_);
   // compute output prefix.
-  int32_t* out_prefix;
-  cudaMalloc((void**)&out_prefix, sizeof(int32_t) * (keys_num + 1));
+  int32_t* out_prefix = static_cast<int32_t*>(
+      CUDAAlloc(sizeof(int32_t) * (keys_num + 1), stream));
   cudaMemset((void*)out_prefix, 0, sizeof(int32_t) * (keys_num + 1));
   CountUniqueKeyKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, device_table_, out_prefix);
   // update value in device table.
-  const auto policy = thrust::cuda::par.on(stream);
+  CUDAAllocator allocator(stream);
+  const auto policy = thrust::cuda::par(allocator).on(stream);
   thrust::exclusive_scan(
     policy, out_prefix, out_prefix + keys_num + 1, out_prefix, 0);
   FillValueKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, size_, device_table_, out_prefix, unique_keys);
-  CUDAMemcpy((void*)unique_keys_num, (void*)(out_prefix + keys_num),
-                  sizeof(int32_t), cudaMemcpyDeviceToHost, stream);
+  cudaMemcpyAsync((void*)unique_keys_num, (void*)(out_prefix + keys_num),
+      sizeof(int32_t), cudaMemcpyDeviceToHost, stream);
   input_count_ += keys_num;
   size_ += *unique_keys_num;
-  CUDAFree((void*)out_prefix, stream);
+  CUDADelete((void*)out_prefix);
 }
 
 } // namespace graphlearn_torch

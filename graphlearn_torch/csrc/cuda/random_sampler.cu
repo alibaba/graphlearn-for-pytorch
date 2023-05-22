@@ -277,9 +277,11 @@ CUDARandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   auto nbrs_num_ptr = nbrs_num.data_ptr<int64_t>();
   FillNbrsNum(stream, nodes_ptr, bs, req_num, row_count, row_ptr, nbrs_num_ptr);
 
-  int64_t* nbrs_offset;
-  cudaMalloc((void**)&nbrs_offset, sizeof(int64_t) * bs);
-  const auto policy = thrust::cuda::par.on(stream);
+  int64_t* nbrs_offset = static_cast<int64_t*>(
+      CUDAAlloc(sizeof(int64_t) * bs, stream));
+  cudaMemset((void*)nbrs_offset, 0, sizeof(int64_t) * bs);
+  CUDAAllocator allocator(stream);
+  const auto policy = thrust::cuda::par(allocator).on(stream);
   thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);
   auto total_nbrs_num = thrust::reduce(policy, nbrs_num_ptr, nbrs_num_ptr+bs);
 
@@ -287,7 +289,7 @@ CUDARandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   CSRRowWiseSample(
     stream, nodes_ptr, nbrs_offset, bs, req_num, row_count, row_ptr, col_idx,
     nbrs.data_ptr<int64_t>());
-  CUDAFree((void*) nbrs_offset, stream);
+  CUDADelete((void*) nbrs_offset);
   return std::make_tuple(nbrs, nbrs_num);
 }
 
@@ -306,9 +308,11 @@ CUDARandomSampler::SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) {
   auto nbrs_num_ptr = nbrs_num.data_ptr<int64_t>();
   FillNbrsNum(stream, nodes_ptr, bs, req_num, row_count, row_ptr, nbrs_num_ptr);
 
-  int64_t* nbrs_offset;
-  cudaMalloc((void**)&nbrs_offset, sizeof(int64_t) * bs);
-  const auto policy = thrust::cuda::par.on(stream);
+  int64_t* nbrs_offset = static_cast<int64_t*>(
+      CUDAAlloc(sizeof(int64_t) * bs, stream));
+  cudaMemset((void*)nbrs_offset, 0, sizeof(int64_t) * bs);
+  CUDAAllocator allocator(stream);
+  const auto policy = thrust::cuda::par(allocator).on(stream);
   thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);
   auto total_nbrs_num = thrust::reduce(policy, nbrs_num_ptr, nbrs_num_ptr+bs);
 
@@ -317,7 +321,7 @@ CUDARandomSampler::SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) {
   CSRRowWiseSample(
     stream, nodes_ptr, nbrs_offset, bs, req_num, row_count, row_ptr, col_idx,
     edge_ids, nbrs.data_ptr<int64_t>(), out_eid.data_ptr<int64_t>());
-  CUDAFree((void*) nbrs_offset, stream);
+  CUDADelete((void*) nbrs_offset);
   return std::make_tuple(nbrs, nbrs_num, out_eid);
 }
 
