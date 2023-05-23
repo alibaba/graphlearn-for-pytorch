@@ -83,7 +83,7 @@ void HostHashTable::InsertDeviceHashTable(cudaStream_t stream,
   // compute output prefix.
   int32_t* out_prefix = static_cast<int32_t*>(
       CUDAAlloc(sizeof(int32_t) * (keys_num + 1), stream));
-  cudaMemset((void*)out_prefix, 0, sizeof(int32_t) * (keys_num + 1));
+  cudaMemsetAsync((void*)out_prefix, 0, sizeof(int32_t) * (keys_num + 1), stream);
   CountUniqueKeyKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, device_table_, out_prefix);
   // update value in device table.
