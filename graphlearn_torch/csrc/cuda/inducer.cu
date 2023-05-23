@@ -85,8 +85,8 @@ torch::Tensor CUDAInducer::InitNode(const torch::Tensor& seed) {
     stream, seed_ptr, seed_size, out_nodes, &out_nodes_num);
   CUDACheckError();
   torch::Tensor nodes = torch::empty(out_nodes_num, seed.options());
-  cudaMemcpy((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
-             sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
+      sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice, stream);
   CUDADelete((void*)out_nodes);
   return nodes;
 }
@@ -119,8 +119,8 @@ CUDAInducer::InduceNext(const torch::Tensor& srcs,
   torch::Tensor nodes = torch::empty(out_nodes_num, srcs.options());
   torch::Tensor row_idx = torch::empty(edge_size, srcs.options());
   torch::Tensor col_idx = torch::empty(edge_size, srcs.options());
-  cudaMemcpy((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
-             sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
+      sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice, stream);
 
   auto device_table = host_table_->DeviceHandle();
   const dim3 grid1((edge_size + TILE_SIZE - 1) / TILE_SIZE);
@@ -177,8 +177,8 @@ TensorMap CUDAHeteroInducer::InitNode(const TensorMap& seed) {
       stream, seed_ptr, seed_size, out_nodes, &out_nodes_num);
     CUDACheckError();
     torch::Tensor nodes = torch::empty(out_nodes_num, iter.second.options());
-    cudaMemcpy((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
-               sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice);
+    cudaMemcpyAsync((void*)nodes.data_ptr<int64_t>(), (void*)out_nodes,
+        sizeof(int64_t) * out_nodes_num, cudaMemcpyDeviceToDevice, stream);
     CUDADelete((void*)out_nodes);
     out_nodes_dict.emplace(iter.first, std::move(nodes));
   }
@@ -215,8 +215,8 @@ void CUDAHeteroInducer::InsertHostHashTable(
         CUDAAlloc(sizeof(int64_t) * input_nodes_num, stream));
     int64_t count = 0;
     for (const auto& arr : nodes_vec) {
-      cudaMemcpy((void*)(input_nodes + count), (void*)(arr.data),
-                 sizeof(int64_t) * arr.size, cudaMemcpyDeviceToDevice);
+      cudaMemcpyAsync((void*)(input_nodes + count), (void*)(arr.data),
+          sizeof(int64_t) * arr.size, cudaMemcpyDeviceToDevice, stream);
       count += arr.size;
     }
 
@@ -238,10 +238,9 @@ void CUDAHeteroInducer::BuildNodesDict(
     std::unordered_map<std::string, torch::Tensor>& nodes_dict) {
   for (auto& iter : out_nodes_dict) {
     torch::Tensor nodes = torch::empty(out_nodes_num_dict.at(iter.first), option);
-    cudaMemcpy((void*)nodes.data_ptr<int64_t>(),
-               (void*)(iter.second),
-               sizeof(int64_t) * out_nodes_num_dict.at(iter.first),
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpyAsync((void*)nodes.data_ptr<int64_t>(), (void*)(iter.second),
+        sizeof(int64_t) * out_nodes_num_dict.at(iter.first),
+        cudaMemcpyDeviceToDevice);
     nodes_dict.emplace(iter.first, std::move(nodes));
   }
 }

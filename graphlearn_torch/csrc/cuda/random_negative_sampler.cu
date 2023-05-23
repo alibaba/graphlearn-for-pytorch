@@ -100,8 +100,8 @@ void SortByIndex(int64_t* row_data,
   int64_t* rows = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
   int64_t* cols = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
   cudaMemset((void*)keys, 0, sizeof(int32_t) * req_num);
-  cudaMemcpy(rows, row_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
-  cudaMemcpy(cols, col_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync(rows, row_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync(cols, col_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
   thrust::copy_if(thrust::device,
                   thrust::make_counting_iterator<int32_t>(0),
                   thrust::make_counting_iterator<int32_t>(req_num),
@@ -163,10 +163,10 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
     sampled_num, torch::dtype(torch::kInt64).device(torch::kCUDA, current_device));
   torch::Tensor cols = torch::empty(
     sampled_num, torch::dtype(torch::kInt64).device(torch::kCUDA, current_device));
-  cudaMemcpy((void*)rows.data_ptr<int64_t>(), (void*)row_data,
-             sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
-  cudaMemcpy((void*)cols.data_ptr<int64_t>(), (void*)col_data,
-             sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync((void*)rows.data_ptr<int64_t>(), (void*)row_data,
+      sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync((void*)cols.data_ptr<int64_t>(), (void*)col_data,
+      sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
   CUDADelete((void*) out_prefix);
   CUDADelete((void*) row_data);
   CUDADelete((void*) col_data);
