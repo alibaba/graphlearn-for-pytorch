@@ -18,9 +18,6 @@ limitations under the License.
 #include <cub/cub.cuh>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
-#include <thrust/execution_policy.h>
-#include <thrust/reduce.h>
-#include <thrust/scan.h>
 
 #include "graphlearn_torch/include/common.cuh"
 #include "graphlearn_torch/include/hash_table.cuh"
@@ -135,6 +132,8 @@ CUDASubGraphOp::~CUDASubGraphOp() {
 
 SubGraph CUDASubGraphOp::NodeSubGraph(const torch::Tensor& srcs,
     bool with_edge) {
+  cudaEvent_t copyEvent;
+  cudaEventCreate(&copyEvent);
   if (srcs.numel() > host_table_->Capacity()) {
     delete host_table_;
     host_table_ = new HostHashTable(srcs.numel(), 1);
@@ -146,11 +145,11 @@ SubGraph CUDASubGraphOp::NodeSubGraph(const torch::Tensor& srcs,
   int32_t nodes_size;
   InitNode(stream, srcs, nodes, &nodes_size);
   int64_t* nbrs_num = static_cast<int64_t*>(
-      CUDAAlloc(sizeof(int64_t) * nodes_size, stream));
-  cudaMemsetAsync((void*)nbrs_num, 0, sizeof(int64_t) * nodes_size, stream);
+      CUDAAlloc(sizeof(int64_t) * (nodes_size + 1), stream));
+  cudaMemsetAsync((void*)nbrs_num, 0, sizeof(int64_t) * (nodes_size + 1), stream);
   int64_t* nbrs_offset = static_cast<int64_t*>(
-      CUDAAlloc(sizeof(int64_t) * nodes_size, stream));
-  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * nodes_size, stream);
+      CUDAAlloc(sizeof(int64_t) * (nodes_size + 1), stream));
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * (nodes_size + 1), stream);
   // nbrs offset of each row in original graph_.
   int64_t* sub_indptr = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * (nodes_size + 1), stream));
@@ -159,10 +158,21 @@ SubGraph CUDASubGraphOp::NodeSubGraph(const torch::Tensor& srcs,
   // get subgraph indptr by input order of nodes.
   CSRSliceRows(stream, nodes, nodes_size, sub_indptr);
   GetNbrsNumAndColMask(stream, nodes, sub_indptr, nodes_size, nbrs_num);
-  CUDAAllocator allocator(stream);
-  const auto policy = thrust::cuda::par(allocator).on(stream);
-  thrust::exclusive_scan(policy, nbrs_num, nbrs_num+nodes_size, nbrs_offset);
-  auto edge_size = thrust::reduce(policy, nbrs_num, nbrs_num+nodes_size);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, nbrs_num, nbrs_offset, nodes_size + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, nbrs_num, nbrs_offset, nodes_size + 1, stream);
+  CUDADelete(prefix_temp);
+  int64_t edge_size = 0;
+  cudaMemcpyAsync((void*)&edge_size, (void*)(nbrs_offset + nodes_size),
+      sizeof(int64_t), cudaMemcpyDeviceToHost, stream);
+  cudaEventRecord(copyEvent, stream);
+  cudaEventSynchronize(copyEvent);
+  cudaEventDestroy(copyEvent);
+
   torch::Tensor out_nodes = torch::empty(nodes_size, srcs.options());
   torch::Tensor rows = torch::empty(edge_size, srcs.options());
   torch::Tensor cols = torch::empty(edge_size, srcs.options());
@@ -218,10 +228,14 @@ void CUDASubGraphOp::CSRSliceRows(
     int32_t rows_size,
     int64_t* sub_indptr) {
   graph_->LookupDegree(rows, rows_size, sub_indptr);
-  CUDAAllocator allocator(stream);
-  const auto policy = thrust::cuda::par(allocator).on(stream);
-  thrust::exclusive_scan(policy,
-      sub_indptr, sub_indptr+rows_size+1, sub_indptr);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, sub_indptr, sub_indptr, rows_size + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, sub_indptr, sub_indptr, rows_size + 1, stream);
+  CUDADelete(prefix_temp);
   CUDACheckError();
 }
 
@@ -241,11 +255,14 @@ void CUDASubGraphOp::GetNbrsNumAndColMask(cudaStream_t stream,
   GetNbrsNumKernel<<<grid, block, 0, stream>>>(
       device_table, nodes, sub_indptr, nodes_size,
       row_ptr, col_idx, row_count, out_nbrs_num, col_mask_);
-  CUDAAllocator allocator(stream);
-  const auto policy = thrust::cuda::par(allocator).on(stream);
-  // col prefix
-  thrust::exclusive_scan(
-    policy, col_mask_, col_mask_ + col_count + 1, col_mask_, 0);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, col_mask_, col_mask_, col_count + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, col_mask_, col_mask_, col_count + 1, stream);
+  CUDADelete(prefix_temp);
   CUDACheckError();
 }
 

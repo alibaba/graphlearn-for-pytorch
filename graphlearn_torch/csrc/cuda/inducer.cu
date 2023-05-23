@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"
 
+#include <cub/cub.cuh>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 
@@ -97,8 +98,6 @@ CUDAInducer::InduceNext(const torch::Tensor& srcs,
                         const torch::Tensor& nbrs_num) {
   auto stream = ::at::cuda::getDefaultCUDAStream();
 
-  CUDAAllocator allocator(stream);
-  const auto policy = thrust::cuda::par(allocator).on(stream);
   const auto edge_size = nbrs.numel();
   const auto src_size = srcs.numel();
   const auto rows_ptr = srcs.data_ptr<int64_t>();
@@ -110,8 +109,15 @@ CUDAInducer::InduceNext(const torch::Tensor& srcs,
   int64_t* out_nodes = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * edge_size, stream));
   int32_t out_nodes_num = 0;
-  thrust::exclusive_scan(
-    policy, nbrs_num_ptr, nbrs_num_ptr + src_size, row_prefix);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, nbrs_num_ptr, row_prefix, src_size, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, nbrs_num_ptr, row_prefix, src_size, stream);
+  CUDADelete(prefix_temp);
+
   host_table_->InsertDeviceHashTable(
     stream, cols_ptr, edge_size, out_nodes, &out_nodes_num);
   CUDACheckError();
@@ -283,8 +289,6 @@ void CUDAHeteroInducer::BuildEdgeIndexDict(
 HeteroCOO CUDAHeteroInducer::InduceNext(const HeteroNbr& nbrs) {
   auto stream = ::at::cuda::getDefaultCUDAStream();
 
-  CUDAAllocator allocator(stream);
-  const auto policy = thrust::cuda::par(allocator).on(stream);
   std::unordered_map<std::string, std::vector<Array<int64_t>>> input_ptr_dict;
   std::unordered_map<std::string, int64_t*> out_nodes_dict;
   std::unordered_map<std::string, int64_t> out_nodes_num_dict;
@@ -301,8 +305,13 @@ HeteroCOO CUDAHeteroInducer::InduceNext(const HeteroNbr& nbrs) {
 
     int64_t* row_prefix = static_cast<int64_t*>(
         CUDAAlloc(sizeof(int64_t) * src_size, stream));
-    thrust::exclusive_scan(
-      policy, nbrs_num_ptr, nbrs_num_ptr + src_size, row_prefix);
+    size_t prefix_temp_size = 0;
+    cub::DeviceScan::ExclusiveSum(
+        nullptr, prefix_temp_size, nbrs_num_ptr, row_prefix, src_size, stream);
+    void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+    cub::DeviceScan::ExclusiveSum(
+        prefix_temp, prefix_temp_size, nbrs_num_ptr, row_prefix, src_size, stream);
+    CUDADelete(prefix_temp);
     row_prefix_dict.insert(std::make_pair(iter.first, row_prefix));
     GroupNodesByType(dst_type, dst_ptr, dst_size, input_ptr_dict);
   }
