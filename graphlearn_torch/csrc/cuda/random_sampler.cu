@@ -279,7 +279,7 @@ CUDARandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
 
   int64_t* nbrs_offset = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * bs, stream));
-  cudaMemset((void*)nbrs_offset, 0, sizeof(int64_t) * bs);
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * bs, stream);
   CUDAAllocator allocator(stream);
   const auto policy = thrust::cuda::par(allocator).on(stream);
   thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);
@@ -310,7 +310,7 @@ CUDARandomSampler::SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) {
 
   int64_t* nbrs_offset = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * bs, stream));
-  cudaMemset((void*)nbrs_offset, 0, sizeof(int64_t) * bs);
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * bs, stream);
   CUDAAllocator allocator(stream);
   const auto policy = thrust::cuda::par(allocator).on(stream);
   thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);

@@ -99,7 +99,7 @@ void SortByIndex(int64_t* row_data,
   int32_t* keys = static_cast<int32_t*>(CUDAAlloc(sizeof(int32_t) * req_num));
   int64_t* rows = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
   int64_t* cols = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
-  cudaMemset((void*)keys, 0, sizeof(int32_t) * req_num);
+  cudaMemsetAsync((void*)keys, 0, sizeof(int32_t) * req_num);
   cudaMemcpyAsync(rows, row_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
   cudaMemcpyAsync(cols, col_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
   thrust::copy_if(thrust::device,
@@ -131,7 +131,7 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
   int64_t* row_data = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
   int64_t* col_data = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
   int32_t* out_prefix = static_cast<int32_t*>(CUDAAlloc(sizeof(int32_t) * req_num));
-  cudaMemset((void*)out_prefix, 0, sizeof(int32_t) * req_num);
+  cudaMemsetAsync((void*)out_prefix, 0, sizeof(int32_t) * req_num, stream);
 
   int block_size = 0;
   int grid_size = 0;

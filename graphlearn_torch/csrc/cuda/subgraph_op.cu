@@ -147,14 +147,14 @@ SubGraph CUDASubGraphOp::NodeSubGraph(const torch::Tensor& srcs,
   InitNode(stream, srcs, nodes, &nodes_size);
   int64_t* nbrs_num = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * nodes_size, stream));
-  cudaMemset((void*)nbrs_num, 0, sizeof(int64_t) * nodes_size);
+  cudaMemsetAsync((void*)nbrs_num, 0, sizeof(int64_t) * nodes_size, stream);
   int64_t* nbrs_offset = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * nodes_size, stream));
-  cudaMemset((void*)nbrs_offset, 0, sizeof(int64_t) * nodes_size);
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * nodes_size, stream);
   // nbrs offset of each row in original graph_.
   int64_t* sub_indptr = static_cast<int64_t*>(
       CUDAAlloc(sizeof(int64_t) * (nodes_size + 1), stream));
-  cudaMemset((void*)sub_indptr, 0, sizeof(int64_t) * (nodes_size + 1));
+  cudaMemsetAsync((void*)sub_indptr, 0, sizeof(int64_t) * (nodes_size + 1), stream);
 
   // get subgraph indptr by input order of nodes.
   CSRSliceRows(stream, nodes, nodes_size, sub_indptr);
@@ -237,7 +237,7 @@ void CUDASubGraphOp::GetNbrsNumAndColMask(cudaStream_t stream,
   auto device_table = host_table_->DeviceHandle();
   const dim3 grid((nodes_size + TILE_SIZE - 1) / TILE_SIZE);
   const dim3 block(WARP_SIZE, BLOCK_WARPS);
-  cudaMemset((void*)col_mask_, 0, sizeof(int32_t) * (col_count+ 1));
+  cudaMemsetAsync((void*)col_mask_, 0, sizeof(int32_t) * (col_count+ 1));
   GetNbrsNumKernel<<<grid, block, 0, stream>>>(
       device_table, nodes, sub_indptr, nodes_size,
       row_ptr, col_idx, row_count, out_nbrs_num, col_mask_);

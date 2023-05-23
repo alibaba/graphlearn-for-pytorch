@@ -107,7 +107,7 @@ public:
         1 << static_cast<int32_t>(1 + std::log2(num >> 1));
     capacity_ = next_pow2 << scale;
     void *ptr = CUDAAlloc(capacity_ * sizeof(KeyValue));
-    cudaMemset(ptr, kEmpty, capacity_ * sizeof(KeyValue));
+    cudaMemsetAsync(ptr, kEmpty, capacity_ * sizeof(KeyValue));
     device_table_ = DeviceHashTable(reinterpret_cast<KeyValue*>(ptr), capacity_);
   }
 
@@ -135,7 +135,7 @@ public:
   }
 
   void Clear() {
-    cudaMemset(device_table_.kvs_, kEmpty, capacity_ * sizeof(KeyValue));
+    cudaMemsetAsync(device_table_.kvs_, kEmpty, capacity_ * sizeof(KeyValue));
     size_ = 0;
     input_count_ = 0;
   }
