@@ -96,15 +96,12 @@ void SortByIndex(int64_t* row_data,
                  int64_t* col_data,
                  const int32_t* out_prefix,
                  int32_t req_num) {
-  int32_t* keys;
-  int64_t* rows;
-  int64_t* cols;
-  cudaMalloc((void**)&rows, sizeof(int64_t) * req_num);
-  cudaMalloc((void**)&cols, sizeof(int64_t) * req_num);
-  cudaMalloc((void**)&keys, sizeof(int32_t) * req_num);
-  cudaMemset((void*)keys, 0, sizeof(int32_t) * req_num);
-  cudaMemcpy(rows, row_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
-  cudaMemcpy(cols, col_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
+  int32_t* keys = static_cast<int32_t*>(CUDAAlloc(sizeof(int32_t) * req_num));
+  int64_t* rows = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
+  int64_t* cols = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
+  cudaMemsetAsync((void*)keys, 0, sizeof(int32_t) * req_num);
+  cudaMemcpyAsync(rows, row_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync(cols, col_data, sizeof(int64_t) * req_num, cudaMemcpyDeviceToDevice);
   thrust::copy_if(thrust::device,
                   thrust::make_counting_iterator<int32_t>(0),
                   thrust::make_counting_iterator<int32_t>(req_num),
@@ -113,9 +110,9 @@ void SortByIndex(int64_t* row_data,
                   thrust::placeholders::_1 == 1);
   thrust::gather(thrust::device, keys, keys + req_num, rows, row_data);
   thrust::gather(thrust::device, keys, keys + req_num, cols, col_data);
-  cudaFree((void*) keys);
-  cudaFree((void*) rows);
-  cudaFree((void*) cols);
+  CUDADelete((void*) keys);
+  CUDADelete((void*) rows);
+  CUDADelete((void*) cols);
 }
 
 std::tuple<torch::Tensor, torch::Tensor>
@@ -131,13 +128,10 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
   const int64_t* col_idx = graph_->GetColIdx();
   int64_t row_num = graph_->GetRowCount();
   int64_t col_num = graph_->GetColCount();
-  int64_t* row_data;
-  int64_t* col_data;
-  int32_t* out_prefix;
-  cudaMalloc((void**)&row_data, sizeof(int64_t) * req_num);
-  cudaMalloc((void**)&col_data, sizeof(int64_t) * req_num);
-  cudaMalloc((void**)&out_prefix, sizeof(int32_t) * req_num);
-  cudaMemset((void*)out_prefix, 0, sizeof(int32_t) * req_num);
+  int64_t* row_data = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
+  int64_t* col_data = static_cast<int64_t*>(CUDAAlloc(sizeof(int64_t) * req_num));
+  int32_t* out_prefix = static_cast<int32_t*>(CUDAAlloc(sizeof(int32_t) * req_num));
+  cudaMemsetAsync((void*)out_prefix, 0, sizeof(int32_t) * req_num, stream);
 
   int block_size = 0;
   int grid_size = 0;
@@ -153,7 +147,8 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
   // sort by index.
   SortByIndex(row_data, col_data, out_prefix, req_num);
 
-  const auto policy = thrust::cuda::par.on(stream);
+  CUDAAllocator allocator(stream);
+  const auto policy = thrust::cuda::par(allocator).on(stream);
   auto sampled_num = thrust::reduce(policy, out_prefix, out_prefix + req_num);
   if((sampled_num < req_num) && padding) { // non-strict negative sampling.
     RandomNegativeSampleKernel<<<grid_size, block_size, 0, stream>>>(
@@ -168,13 +163,13 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
     sampled_num, torch::dtype(torch::kInt64).device(torch::kCUDA, current_device));
   torch::Tensor cols = torch::empty(
     sampled_num, torch::dtype(torch::kInt64).device(torch::kCUDA, current_device));
-  cudaMemcpy((void*)rows.data_ptr<int64_t>(), (void*)row_data,
-             sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
-  cudaMemcpy((void*)cols.data_ptr<int64_t>(), (void*)col_data,
-             sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
-  cudaFree((void*) out_prefix);
-  cudaFree((void*) row_data);
-  cudaFree((void*) col_data);
+  cudaMemcpyAsync((void*)rows.data_ptr<int64_t>(), (void*)row_data,
+      sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
+  cudaMemcpyAsync((void*)cols.data_ptr<int64_t>(), (void*)col_data,
+      sizeof(int64_t) * sampled_num, cudaMemcpyDeviceToDevice);
+  CUDADelete((void*) out_prefix);
+  CUDADelete((void*) row_data);
+  CUDADelete((void*) col_data);
   return std::make_tuple(rows, cols);
 }
 

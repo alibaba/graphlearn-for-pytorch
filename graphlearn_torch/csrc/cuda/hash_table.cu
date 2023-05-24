@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cub/cub.cuh>
+
 #include "graphlearn_torch/include/hash_table.cuh"
 #include "graphlearn_torch/include/common.cuh"
 
@@ -81,22 +83,27 @@ void HostHashTable::InsertDeviceHashTable(cudaStream_t stream,
   InsertDeviceHashTableKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, device_table_);
   // compute output prefix.
-  int32_t* out_prefix;
-  cudaMalloc((void**)&out_prefix, sizeof(int32_t) * (keys_num + 1));
-  cudaMemset((void*)out_prefix, 0, sizeof(int32_t) * (keys_num + 1));
+  int32_t* out_prefix = static_cast<int32_t*>(
+      CUDAAlloc(sizeof(int32_t) * (keys_num + 1), stream));
+  cudaMemsetAsync((void*)out_prefix, 0, sizeof(int32_t) * (keys_num + 1), stream);
   CountUniqueKeyKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, device_table_, out_prefix);
   // update value in device table.
-  const auto policy = thrust::cuda::par.on(stream);
-  thrust::exclusive_scan(
-    policy, out_prefix, out_prefix + keys_num + 1, out_prefix, 0);
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, out_prefix, out_prefix, keys_num + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, out_prefix, out_prefix, keys_num + 1, stream);
+  CUDADelete(prefix_temp);
+
   FillValueKernel<<<grid, block, 0, stream>>>(
     keys, keys_num, input_count_, size_, device_table_, out_prefix, unique_keys);
-  CUDAMemcpy((void*)unique_keys_num, (void*)(out_prefix + keys_num),
-                  sizeof(int32_t), cudaMemcpyDeviceToHost, stream);
+  cudaMemcpyAsync((void*)unique_keys_num, (void*)(out_prefix + keys_num),
+      sizeof(int32_t), cudaMemcpyDeviceToHost, stream);
   input_count_ += keys_num;
   size_ += *unique_keys_num;
-  CUDAFree((void*)out_prefix, stream);
+  CUDADelete((void*)out_prefix);
 }
 
 } // namespace graphlearn_torch

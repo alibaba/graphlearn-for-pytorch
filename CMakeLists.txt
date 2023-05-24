@@ -6,7 +6,6 @@ option(DEBUG "Enable debug mode" OFF)
 option(BUILD_TESTS "Enable testing" ON)
 option(WITH_CUDA "Enable CUDA support" ON)
 option(WITH_VINEYARD "Enable vineyard support" OFF)
-option(CUDA_VERSION_LT112 "target CUDA verison less than 11.2" OFF)
 
 set(GLT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(GLT_CSRC_DIR ${GLT_ROOT}/graphlearn_torch/csrc)
@@ -65,9 +64,6 @@ if(WITH_CUDA)
   endfunction()
 endif()
 
-if(CUDA_VERSION_LT112)
-  add_definitions(-DCUDA_VERSION_LT112)
-endif()
 
 # Link to PyTorch
 # Auto-find CMAKE_PREFIX_PATH for PyTorch

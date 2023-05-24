@@ -18,13 +18,10 @@ limitations under the License.
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <cstdint>
+#include <cub/cub.cuh>
 #include <curand.h>
 #include <curand_kernel.h>
 #include <random>
-#include <thrust/device_vector.h>
-#include <thrust/execution_policy.h>
-#include <thrust/reduce.h>
-#include <thrust/scan.h>
 
 #include "graphlearn_torch/include/common.cuh"
 
@@ -50,6 +47,10 @@ __global__ void CSRRowWiseFillNbrsNumKernel(const int64_t* nodes,
                             row_ptr[v+1]-row_ptr[v]);
     } else {
       out_nbr_num[tid] = 0;
+    }
+    if (tid == bs - 1) {
+      // make the prefixsum work
+      out_nbr_num[bs] = 0;
     }
   }
 }
@@ -266,6 +267,9 @@ void CSRRowWiseSample(cudaStream_t stream,
 std::tuple<torch::Tensor, torch::Tensor>
 CUDARandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   auto stream = ::at::cuda::getDefaultCUDAStream();
+  cudaEvent_t copyEvent;
+  cudaEventCreate(&copyEvent);
+
   if (req_num < 0) req_num = std::numeric_limits<int32_t>::max();
   const auto nodes_ptr = nodes.data_ptr<int64_t>();
   int64_t bs = nodes.size(0);
@@ -273,27 +277,41 @@ CUDARandomSampler::Sample(const torch::Tensor& nodes, int32_t req_num) {
   const auto col_idx = graph_->GetColIdx();
   const auto row_count = graph_->GetRowCount();
 
-  torch::Tensor nbrs_num = torch::empty(bs, nodes.options());
+  torch::Tensor nbrs_num = torch::empty(bs + 1, nodes.options());
   auto nbrs_num_ptr = nbrs_num.data_ptr<int64_t>();
   FillNbrsNum(stream, nodes_ptr, bs, req_num, row_count, row_ptr, nbrs_num_ptr);
 
-  int64_t* nbrs_offset;
-  cudaMalloc((void**)&nbrs_offset, sizeof(int64_t) * bs);
-  const auto policy = thrust::cuda::par.on(stream);
-  thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);
-  auto total_nbrs_num = thrust::reduce(policy, nbrs_num_ptr, nbrs_num_ptr+bs);
+  int64_t* nbrs_offset = static_cast<int64_t*>(
+      CUDAAlloc(sizeof(int64_t) * (bs + 1), stream));
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * (bs + 1), stream);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, nbrs_num_ptr, nbrs_offset, bs + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, nbrs_num_ptr, nbrs_offset, bs + 1, stream);
+  CUDADelete(prefix_temp);
+  int64_t total_nbrs_num = 0;
+  cudaMemcpyAsync((void*)&total_nbrs_num, (void*)(nbrs_offset + bs),
+      sizeof(int64_t), cudaMemcpyDeviceToHost, stream);
+  cudaEventRecord(copyEvent, stream);
+  cudaEventSynchronize(copyEvent);
+  cudaEventDestroy(copyEvent);
 
   torch::Tensor nbrs = torch::empty(total_nbrs_num, nodes.options());
   CSRRowWiseSample(
     stream, nodes_ptr, nbrs_offset, bs, req_num, row_count, row_ptr, col_idx,
     nbrs.data_ptr<int64_t>());
-  CUDAFree((void*) nbrs_offset, stream);
-  return std::make_tuple(nbrs, nbrs_num);
+  CUDADelete((void*) nbrs_offset);
+  return std::make_tuple(nbrs, nbrs_num.narrow(0, 0, bs));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 CUDARandomSampler::SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) {
   auto stream = ::at::cuda::getDefaultCUDAStream();
+  cudaEvent_t copyEvent;
+  cudaEventCreate(&copyEvent);
   if (req_num < 0) req_num = std::numeric_limits<int32_t>::max();
   const auto nodes_ptr = nodes.data_ptr<int64_t>();
   int64_t bs = nodes.size(0);
@@ -302,23 +320,35 @@ CUDARandomSampler::SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) {
   const auto edge_ids = graph_->GetEdgeId();
   const auto row_count = graph_->GetRowCount();
 
-  torch::Tensor nbrs_num = torch::empty(bs, nodes.options());
+  torch::Tensor nbrs_num = torch::empty(bs + 1, nodes.options());
   auto nbrs_num_ptr = nbrs_num.data_ptr<int64_t>();
   FillNbrsNum(stream, nodes_ptr, bs, req_num, row_count, row_ptr, nbrs_num_ptr);
 
-  int64_t* nbrs_offset;
-  cudaMalloc((void**)&nbrs_offset, sizeof(int64_t) * bs);
-  const auto policy = thrust::cuda::par.on(stream);
-  thrust::exclusive_scan(policy, nbrs_num_ptr, nbrs_num_ptr+bs, nbrs_offset);
-  auto total_nbrs_num = thrust::reduce(policy, nbrs_num_ptr, nbrs_num_ptr+bs);
+  int64_t* nbrs_offset = static_cast<int64_t*>(
+      CUDAAlloc(sizeof(int64_t) * (bs + 1), stream));
+  cudaMemsetAsync((void*)nbrs_offset, 0, sizeof(int64_t) * (bs + 1), stream);
+
+  size_t prefix_temp_size = 0;
+  cub::DeviceScan::ExclusiveSum(
+      nullptr, prefix_temp_size, nbrs_num_ptr, nbrs_offset, bs + 1, stream);
+  void* prefix_temp = CUDAAlloc(prefix_temp_size, stream);
+  cub::DeviceScan::ExclusiveSum(
+      prefix_temp, prefix_temp_size, nbrs_num_ptr, nbrs_offset, bs + 1, stream);
+  CUDADelete(prefix_temp);
+  int64_t total_nbrs_num = 0;
+  cudaMemcpyAsync((void*)&total_nbrs_num, (void*)(nbrs_offset + bs),
+      sizeof(int64_t), cudaMemcpyDeviceToHost, stream);
+  cudaEventRecord(copyEvent, stream);
+  cudaEventSynchronize(copyEvent);
+  cudaEventDestroy(copyEvent);
 
   torch::Tensor nbrs = torch::empty(total_nbrs_num, nodes.options());
   torch::Tensor out_eid = torch::empty(total_nbrs_num, nodes.options());
   CSRRowWiseSample(
     stream, nodes_ptr, nbrs_offset, bs, req_num, row_count, row_ptr, col_idx,
     edge_ids, nbrs.data_ptr<int64_t>(), out_eid.data_ptr<int64_t>());
-  CUDAFree((void*) nbrs_offset, stream);
-  return std::make_tuple(nbrs, nbrs_num, out_eid);
+  CUDADelete((void*) nbrs_offset);
+  return std::make_tuple(nbrs, nbrs_num.narrow(0, 0, bs), out_eid);
 }
 
 void CUDARandomSampler::CalNbrProb(

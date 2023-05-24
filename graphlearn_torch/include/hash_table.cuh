@@ -18,7 +18,9 @@ limitations under the License.
 
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <thrust/device_vector.h>
+
+#include "graphlearn_torch/include/common.cuh"
+
 
 namespace graphlearn_torch {
 
@@ -103,14 +105,13 @@ public:
     const int32_t next_pow2 =
         1 << static_cast<int32_t>(1 + std::log2(num >> 1));
     capacity_ = next_pow2 << scale;
-    void *ptr;
-    cudaMalloc(&ptr, capacity_ * sizeof(KeyValue));
-    cudaMemset(ptr, kEmpty, capacity_ * sizeof(KeyValue));
+    void *ptr = CUDAAlloc(capacity_ * sizeof(KeyValue));
+    cudaMemsetAsync(ptr, kEmpty, capacity_ * sizeof(KeyValue));
     device_table_ = DeviceHashTable(reinterpret_cast<KeyValue*>(ptr), capacity_);
   }
 
   ~HostHashTable() {
-    cudaFree(device_table_.kvs_);
+    CUDADelete(device_table_.kvs_);
   }
 
   HostHashTable(const HostHashTable& other) = delete;
@@ -133,7 +134,7 @@ public:
   }
 
   void Clear() {
-    cudaMemset(device_table_.kvs_, kEmpty, capacity_ * sizeof(KeyValue));
+    cudaMemsetAsync(device_table_.kvs_, kEmpty, capacity_ * sizeof(KeyValue));
     size_ = 0;
     input_count_ = 0;
   }

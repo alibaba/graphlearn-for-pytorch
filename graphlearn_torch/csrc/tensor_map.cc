@@ -70,10 +70,8 @@ void* SerializeTensor(const std::string& name,
            tensor.nbytes());
   } else if (tensor.device().type() == torch::kCUDA) {
 #ifdef WITH_CUDA
-    cudaMemcpy(write_ptr,
-               tensor.data_ptr(),
-               tensor.nbytes(),
-               cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(write_ptr, tensor.data_ptr(), tensor.nbytes(),
+        cudaMemcpyDeviceToHost);
 #endif
   } else {
     Check(false, "Only support serializing tensor on cpu or cuda device");
