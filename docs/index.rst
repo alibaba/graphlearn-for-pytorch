@@ -37,6 +37,7 @@ different requirements.
    tutorial/basic_object
    tutorial/graph_ops
    tutorial/dist
+   tutorial/aliyun
 
 
 .. toctree::
