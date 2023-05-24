@@ -92,8 +92,7 @@ python partition_ogbn_dataset.py < input.txt --dataset=ogbn-products --num_parti
 `echo -e "y\ny" | python XXX`的方式在DLC上不work。
 
 > :warning:
-`--num_partitions`:此参数填写必须和后续“运行GNN训练任务”中的Worker数一致。
-:::
+注意，`--num_partitions`参数填写必须和后续“运行GNN训练任务”中的Worker数一致。
 
 "**三方库配置**"：忽略
 
