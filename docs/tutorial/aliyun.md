@@ -1,4 +1,4 @@
-# User Guide on Aibaba Cloud
+# User Guide on Alibaba Cloud
 
 ## 简介
 本文档用示例说明如何在[阿里云](https://www.aliyun.com/)上使用GraphLearn-for-pytorch(**GLT**)来训练GNN模型。
@@ -25,7 +25,7 @@
 
 “**选择镜像**”：选择“镜像URL”，填入 `graphlearn/graphlearn_for_pytorch:1.0.0-ubuntu20.04-py3.8-torch1.13-cuda11.6`。
 
-> :warning:
+> **warning**
 注意，该镜像要求“资源组”为“**GPU**”规格，我们暂时未提供预装**GLT**的CPU镜像，如需要使用CPU规格，请预先准备CPU镜像，并根据[文档](https://github.com/alibaba/graphlearn-for-pytorch/tree/main#installation)提示安装依赖的库和CPU版本的**GLT**。
 
 
@@ -91,7 +91,7 @@ python partition_ogbn_dataset.py < input.txt --dataset=ogbn-products --num_parti
 `partition_ogbn_dataset.py`运行时会接受interactive的输入，询问用户是否下载数据，如数据已经存在可不再重复下载。由于DLC运行时无法interactive输入，我们将输入重定向为文件`input.txt`；
 `echo -e "y\ny" | python XXX`的方式在DLC上不work。
 
-> :warning:
+> **warning**
 注意，`--num_partitions`参数填写必须和后续“运行GNN训练任务”中的Worker数一致。
 
 "**三方库配置**"：忽略
