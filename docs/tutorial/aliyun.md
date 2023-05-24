@@ -25,9 +25,9 @@
 
 “**选择镜像**”：选择“镜像URL”，填入 `graphlearn/graphlearn_for_pytorch:1.0.0-ubuntu20.04-py3.8-torch1.13-cuda11.6`。
 
-:::warning
+> :warning:
 注意，该镜像要求“资源组”为“**GPU**”规格，我们暂时未提供预装**GLT**的CPU镜像，如需要使用CPU规格，请预先准备CPU镜像，并根据[文档](https://github.com/alibaba/graphlearn-for-pytorch/tree/main#installation)提示安装依赖的库和CPU版本的**GLT**。
-:::
+
 
 ### 2. 运行任务
 1. 安装wheel包
@@ -82,18 +82,17 @@ python partition_ogbn_dataset.py < input.txt --dataset=ogbn-products --num_parti
 
 说明：
 
-- `**git clone ...**` :
+- `git clone ...` :
 
 克隆graphlearn-for-pytorch的代码，如果挂载的文件系统中已经存在，则不再需要运行。
 
-- `**echo "y\ny" > input.txt && python partition_ogbn_dataset.py < input.txt**`**:**
+- `echo "y\ny" > input.txt && python partition_ogbn_dataset.py < input.txt`:
 
 `partition_ogbn_dataset.py`运行时会接受interactive的输入，询问用户是否下载数据，如数据已经存在可不再重复下载。由于DLC运行时无法interactive输入，我们将输入重定向为文件`input.txt`；
 `echo -e "y\ny" | python XXX`的方式在DLC上不work。
 
-Note：
-:::warning
-`**--num_partitions**`:此参数填写必须和后续“运行GNN训练任务”中的Worker数一致。
+> :warning:
+`--num_partitions`:此参数填写必须和后续“运行GNN训练任务”中的Worker数一致。
 :::
 
 "**三方库配置**"：忽略
@@ -151,4 +150,5 @@ python dist_train_sage_supervised.py --master_addr=$MASTER_ADDR \
 
 #### 2.3. 提交任务
 点击“提交”，等待任务运行完成。此任务多机单卡默认参数配置大概需要运行20分钟。
+
 
