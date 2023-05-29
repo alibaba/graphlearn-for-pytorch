@@ -23,7 +23,7 @@ from ..data import Graph
 from ..typing import NodeType, EdgeType, NumNeighbors, reverse_edge_type
 from ..utils import (
   merge_dict, merge_hetero_sampler_output, format_hetero_sampler_output,
-  id2idx
+  id2idx, count_dict
 )
 
 
@@ -165,9 +165,11 @@ class NeighborSampler(BaseSampler):
     [dst_index, src_index].
     """
     out_nodes, out_rows, out_cols, out_edges = [], [], [], []
+    num_sampled_nodes, num_sampled_edges = [], []
     inducer = self.get_inducer(input_seeds.numel())
     srcs = inducer.init_node(input_seeds)
     batch = srcs
+    num_sampled_nodes.append(input_seeds.numel())
     out_nodes.append(srcs)
     for req_num in self.num_neighbors:
       out_nbrs = self.sample_one_hop(srcs, req_num)
@@ -178,6 +180,8 @@ class NeighborSampler(BaseSampler):
       out_cols.append(cols)
       if out_nbrs.edge is not None:
         out_edges.append(out_nbrs.edge)
+      num_sampled_nodes.append(nodes.size(0))
+      num_sampled_edges.append(cols.size(0))
       srcs = nodes
 
     return SamplerOutput(
@@ -186,6 +190,8 @@ class NeighborSampler(BaseSampler):
       col=torch.cat(out_rows),
       edge=(torch.cat(out_edges) if out_edges else None),
       batch=batch,
+      num_sampled_nodes=num_sampled_nodes,
+      num_sampled_edges=num_sampled_edges,
       device=self.device
     )
 
@@ -209,7 +215,9 @@ class NeighborSampler(BaseSampler):
     src_dict = inducer.init_node(input_seeds_dict)
     batch = src_dict
     out_nodes, out_rows, out_cols, out_edges = {}, {}, {}, {}
+    num_sampled_nodes, num_sampled_edges = {}, {}
     merge_dict(src_dict, out_nodes)
+    count_dict(src_dict, num_sampled_nodes, 1)
     for i in range(self.num_hops):
       nbr_dict, edge_dict = {}, {}
       for etype in self.edge_types:
@@ -225,6 +233,8 @@ class NeighborSampler(BaseSampler):
       merge_dict(rows_dict, out_rows)
       merge_dict(cols_dict, out_cols)
       merge_dict(edge_dict, out_edges)
+      count_dict(nodes_dict, num_sampled_nodes, i + 2)
+      count_dict(cols_dict, num_sampled_edges, i + 1)
       src_dict = nodes_dict
 
     for etype, rows in out_rows.items():
@@ -248,6 +258,8 @@ class NeighborSampler(BaseSampler):
       col=res_cols,
       edge=(res_edges if len(res_edges) else None),
       batch=batch,
+      num_sampled_nodes=num_sampled_nodes,
+      num_sampled_edges=num_sampled_edges,
       edge_types=self.edge_types,
       device=self.device
     )

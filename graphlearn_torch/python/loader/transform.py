@@ -38,6 +38,9 @@ def to_data(
   data.batch = sampler_out.batch
   data.batch_size = sampler_out.batch.numel() if data.batch is not None else 0
 
+  data.num_sampled_nodes = sampler_out.num_sampled_nodes
+  data.num_sampled_edges = sampler_out.num_sampled_edges
+
   # update meta data
   if isinstance(sampler_out.metadata, dict):
     for k, v in sampler_out.metadata.items():
@@ -82,6 +85,10 @@ def to_hetero_data(
     data[k].batch_size = v.numel()
     if batch_label_dict is not None:
       data[k].y = batch_label_dict.get(k, None)
+
+  # update num_sampled_nodes & num_sampled_edges
+  data.num_sampled_nodes = hetero_sampler_out.num_sampled_nodes
+  data.num_sampled_edges = hetero_sampler_out.num_sampled_edges
 
   # update meta data
   input_type = hetero_sampler_out.input_type

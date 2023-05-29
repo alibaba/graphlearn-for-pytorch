@@ -15,7 +15,7 @@
 
 import os
 import socket
-from typing import Any, Dict
+from typing import Any, Dict, Callable, Optional
 from ..typing import reverse_edge_type
 from .tensor import id2idx
 
@@ -32,6 +32,12 @@ def merge_dict(in_dict: Dict[Any, Any], out_dict: Dict[Any, Any]):
     vals.append(v)
     out_dict[k] = vals
 
+def count_dict(in_dict: Dict[Any, Any], out_dict: Dict[Any, Any], target_len):
+  for k, v in in_dict.items():
+    vals = out_dict.get(k, [])
+    vals += [0] * (target_len - len(vals) - 1)
+    vals.append(len(v))
+    out_dict[k] = vals
 
 def get_free_port(host: str = 'localhost') -> int:
   s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

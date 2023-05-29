@@ -235,6 +235,8 @@ class SamplerOutput(CastMixin):
   col: torch.Tensor
   edge: Optional[torch.Tensor] = None
   batch: Optional[torch.Tensor] = None
+  num_sampled_nodes: Optional[List[int]] = None
+  num_sampled_edges: Optional[List[int]] = None
   device: Optional[torch.device] = None
   metadata: Optional[Any] = None
 
@@ -282,6 +284,8 @@ class HeteroSamplerOutput(CastMixin):
   col: Dict[EdgeType, torch.Tensor]
   edge: Optional[Dict[EdgeType, torch.Tensor]] = None
   batch: Optional[Dict[NodeType, torch.Tensor]] = None
+  num_sampled_nodes: Optional[Dict[NodeType, List[int]]] = None
+  num_sampled_edges: Optional[Dict[EdgeType, List[int]]] = None
   edge_types: Optional[List[EdgeType]] = None
   input_type: Optional[Union[NodeType, EdgeType]] = None
   device: Optional[torch.device] = None
