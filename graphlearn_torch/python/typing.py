@@ -62,9 +62,9 @@ class FeaturePartitionData(NamedTuple):
   r""" Data and indexing info of a node/edge feature partition.
   """
   # node/edge feature tensor
-  feats: torch.Tensor
+  feats: Optional[torch.Tensor]
   # node/edge ids tensor corresponding to `feats`
-  ids: torch.Tensor
+  ids: Optional[torch.Tensor]
   # feature cache tensor
   cache_feats: Optional[torch.Tensor]
   # cached node/edge ids tensor corresponding to `cache_feats`
