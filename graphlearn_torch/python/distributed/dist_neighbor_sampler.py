@@ -31,7 +31,7 @@ from ..typing import EdgeType, as_str, NumNeighbors
 from ..utils import (
     get_available_device, ensure_device, merge_dict, id2idx,
     merge_hetero_sampler_output, format_hetero_sampler_output,
-    count_dict
+    count_dict, convert_to_tensor
 )
 
 from .dist_dataset import DistDataset
@@ -268,7 +268,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       out_nodes, out_rows, out_cols, out_edges = {}, {}, {}, {}
       num_sampled_nodes, num_sampled_edges = {}, {}
       merge_dict(src_dict, out_nodes)
-      count_dict(src_dict, num_sampled_nodes)
+      count_dict(src_dict, num_sampled_nodes, 1)
 
       for i in range(self.num_hops):
         task_dict, nbr_dict, edge_dict = {}, {}, {}
@@ -288,8 +288,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
         merge_dict(rows_dict, out_rows)
         merge_dict(cols_dict, out_cols)
         merge_dict(edge_dict, out_edges)
-        count_dict(nodes_dict, num_sampled_nodes)
-        count_dict(cols_dict, num_sampled_edges)
+        count_dict(nodes_dict, num_sampled_nodes, i + 2)
+        count_dict(cols_dict, num_sampled_edges, i + 1)
         src_dict = nodes_dict
 
       sample_output = HeteroSamplerOutput(
@@ -628,16 +628,20 @@ class DistNeighborSampler(ConcurrentEventLoop):
     if is_hetero:
       for ntype, nodes in output.node.items():
         result_map[f'{as_str(ntype)}.ids'] = nodes
-        result_map[f'{as_str(ntype)}.num_sampled_nodes'] = \
-          output.num_sampled_nodes[ntype]
+        if output.num_sampled_nodes is not None:
+          if ntype in output.num_sampled_nodes:
+            result_map[f'{as_str(ntype)}.num_sampled_nodes'] = \
+              torch.tensor(output.num_sampled_nodes[ntype], device=self.device)
       for etype, rows in output.row.items():
         etype_str = as_str(etype)
         result_map[f'{etype_str}.rows'] = rows
         result_map[f'{etype_str}.cols'] = output.col[etype]
         if self.with_edge:
           result_map[f'{etype_str}.eids'] = output.edge[etype]
-        result_map[f'{etype_str}.num_sampled_edges'] = \
-          output.num_sampled_edges[etype]
+        if output.num_sampled_edges is not None:
+          if etype in output.num_sampled_edges:
+            result_map[f'{etype_str}.num_sampled_edges'] = \
+              torch.tensor(output.num_sampled_edges[etype], device=self.device)
       # Collect node labels of input node type.
       input_type = output.input_type
       assert input_type is not None
@@ -669,8 +673,11 @@ class DistNeighborSampler(ConcurrentEventLoop):
       result_map['ids'] = output.node
       result_map['rows'] = output.row
       result_map['cols'] = output.col
-      result_map['num_sampled_nodes'] = output.num_sampled_nodes
-      result_map['num_sampled_edges'] = output.num_sampled_edges
+      if output.num_sampled_nodes is not None:
+        result_map['num_sampled_nodes'] = \
+          torch.tensor(output.num_sampled_nodes, device=self.device)
+        result_map['num_sampled_edges'] = \
+          torch.tensor(output.num_sampled_edges, device=self.device)
       if self.with_edge:
         result_map['eids'] = output.edge
       # Collect node labels.

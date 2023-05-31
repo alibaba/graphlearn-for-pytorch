@@ -16,6 +16,7 @@
 from typing import Dict, Optional
 
 import torch
+import torch.nn.functional as F
 from torch_geometric.data import Data, HeteroData
 
 from ..sampler import SamplerOutput, HeteroSamplerOutput
@@ -75,10 +76,13 @@ def to_hetero_data(
     if edge_feat_dict is not None:
       data[k].edge_attr = edge_feat_dict.get(k, None)
     if k not in hetero_sampler_out.num_sampled_edges:
-      hetero_sampler_out.num_sampled_edges[k] = [0] * num_hops
+      hetero_sampler_out.num_sampled_edges[k] = \
+        torch.tensor([0] * num_hops, device=data[k].edge_index.device)
     else:
-      hetero_sampler_out.num_sampled_edges[k] += \
-        [0] * (num_hops - len(hetero_sampler_out.num_sampled_edges[k]))
+      hetero_sampler_out.num_sampled_edges[k] = F.pad(
+        hetero_sampler_out.num_sampled_edges[k],
+        (0, num_hops - hetero_sampler_out.num_sampled_edges[k].size(0))
+      )
 
   # nodes
   for k, v in hetero_sampler_out.node.items():
@@ -86,10 +90,13 @@ def to_hetero_data(
     if node_feat_dict is not None:
       data[k].x = node_feat_dict.get(k, None)
     if k not in hetero_sampler_out.num_sampled_nodes:
-      hetero_sampler_out.num_sampled_nodes[k] = [0] * (num_hops + 1)
+      hetero_sampler_out.num_sampled_nodes[k] = \
+        torch.tensor([0] * (num_hops + 1), device=data[k].node.device)
     else:
-      hetero_sampler_out.num_sampled_nodes[k] += \
-        [0] * (num_hops + 1 - len(hetero_sampler_out.num_sampled_nodes[k]))
+      hetero_sampler_out.num_sampled_nodes[k] = F.pad(
+        hetero_sampler_out.num_sampled_nodes[k],
+        (0, num_hops + 1 - hetero_sampler_out.num_sampled_nodes[k].size(0))
+      )
 
   # seed nodes
   for k, v in hetero_sampler_out.batch.items():

@@ -51,15 +51,11 @@ def run(rank, glt_ds, train_idx,
 
   optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
-  for name, params in model.named_parameters():
-    print(name, ":", params.size())
-
   for epoch in range(1, 10):
     model.train()
     start = time.time()
     total_examples = total_loss = 0
     for batch in tqdm(train_loader):
-      # print(batch.num_sampled_nodes)
       optimizer.zero_grad()
       if trimmed:
         out = model(

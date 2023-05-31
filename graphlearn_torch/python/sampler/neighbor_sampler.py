@@ -258,9 +258,11 @@ class NeighborSampler(BaseSampler):
       col=res_cols,
       edge=(res_edges if len(res_edges) else None),
       batch=batch,
-      num_sampled_nodes=num_sampled_nodes,
+      num_sampled_nodes={k : torch.tensor(v, device=self.device)
+        for k, v in num_sampled_nodes.items()},
       num_sampled_edges={
-        reverse_edge_type(k) : v for k, v in num_sampled_edges.items()},
+        reverse_edge_type(k) : torch.tensor(v, device=self.device)
+        for k, v in num_sampled_edges.items()},
       edge_types=self.edge_types,
       device=self.device
     )
