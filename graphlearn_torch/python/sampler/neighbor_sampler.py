@@ -259,7 +259,8 @@ class NeighborSampler(BaseSampler):
       edge=(res_edges if len(res_edges) else None),
       batch=batch,
       num_sampled_nodes=num_sampled_nodes,
-      num_sampled_edges=num_sampled_edges,
+      num_sampled_edges={
+        reverse_edge_type(k) : v for k, v in num_sampled_edges.items()},
       edge_types=self.edge_types,
       device=self.device
     )

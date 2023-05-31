@@ -31,6 +31,7 @@ from ..typing import EdgeType, as_str, NumNeighbors
 from ..utils import (
     get_available_device, ensure_device, merge_dict, id2idx,
     merge_hetero_sampler_output, format_hetero_sampler_output,
+    count_dict
 )
 
 from .dist_dataset import DistDataset
@@ -265,7 +266,9 @@ class DistNeighborSampler(ConcurrentEventLoop):
       assert input_type is not None
       src_dict = inducer.init_node({input_type: input_seeds})
       out_nodes, out_rows, out_cols, out_edges = {}, {}, {}, {}
+      num_sampled_nodes, num_sampled_edges = {}, {}
       merge_dict(src_dict, out_nodes)
+      count_dict(src_dict, num_sampled_nodes)
 
       for i in range(self.num_hops):
         task_dict, nbr_dict, edge_dict = {}, {}, {}
@@ -285,6 +288,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
         merge_dict(rows_dict, out_rows)
         merge_dict(cols_dict, out_cols)
         merge_dict(edge_dict, out_edges)
+        count_dict(nodes_dict, num_sampled_nodes)
+        count_dict(cols_dict, num_sampled_edges)
         src_dict = nodes_dict
 
       sample_output = HeteroSamplerOutput(
@@ -295,13 +300,17 @@ class DistNeighborSampler(ConcurrentEventLoop):
           {etype: torch.cat(eids) for etype, eids in out_edges.items()}
           if self.with_edge else None
         ),
+        num_sampled_nodes=num_sampled_nodes,
+        num_sampled_edges=num_sampled_edges,
         input_type=input_type,
         metadata={}
       )
     else:
       srcs = inducer.init_node(input_seeds)
       out_nodes, out_edges = [], []
+      num_sampled_nodes, num_sampled_edges = [], []
       out_nodes.append(srcs)
+      num_sampled_nodes.append(srcs.size(0))
       # Sample subgraph.
       for req_num in self.num_neighbors:
         output: NeighborOutput = await self._sample_one_hop(srcs, req_num, None)
@@ -309,6 +318,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
           inducer.induce_next(srcs, output.nbr, output.nbr_num)
         out_nodes.append(nodes)
         out_edges.append((rows, cols, output.edge))
+        num_sampled_nodes.append(nodes.size(0))
+        num_sampled_edges.append(cols.size(0))
         srcs = nodes
 
       sample_output = SamplerOutput(
@@ -316,6 +327,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
         row=torch.cat([e[0] for e in out_edges]),
         col=torch.cat([e[1] for e in out_edges]),
         edge=(torch.cat([e[2] for e in out_edges]) if self.with_edge else None),
+        num_sampled_nodes=num_sampled_nodes,
+        num_sampled_edges=num_sampled_edges,
         metadata={}
       )
     # Reclaim inducer into pool.
@@ -615,12 +628,16 @@ class DistNeighborSampler(ConcurrentEventLoop):
     if is_hetero:
       for ntype, nodes in output.node.items():
         result_map[f'{as_str(ntype)}.ids'] = nodes
+        result_map[f'{as_str(ntype)}.num_sampled_nodes'] = \
+          output.num_sampled_nodes[ntype]
       for etype, rows in output.row.items():
         etype_str = as_str(etype)
         result_map[f'{etype_str}.rows'] = rows
         result_map[f'{etype_str}.cols'] = output.col[etype]
         if self.with_edge:
           result_map[f'{etype_str}.eids'] = output.edge[etype]
+        result_map[f'{etype_str}.num_sampled_edges'] = \
+          output.num_sampled_edges[etype]
       # Collect node labels of input node type.
       input_type = output.input_type
       assert input_type is not None
@@ -652,6 +669,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
       result_map['ids'] = output.node
       result_map['rows'] = output.row
       result_map['cols'] = output.col
+      result_map['num_sampled_nodes'] = output.num_sampled_nodes
+      result_map['num_sampled_edges'] = output.num_sampled_edges
       if self.with_edge:
         result_map['eids'] = output.edge
       # Collect node labels.

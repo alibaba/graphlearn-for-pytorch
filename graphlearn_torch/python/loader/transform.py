@@ -65,6 +65,8 @@ def to_hetero_data(
 ) -> HeteroData:
   data = HeteroData(**kwargs)
   edge_index_dict = hetero_sampler_out.get_edge_index()
+  num_hops = max(map(
+    lambda x: len(x), list(hetero_sampler_out.num_sampled_edges.values())))
   # edges
   for k, v in edge_index_dict.items():
     data[k].edge_index = v
@@ -72,12 +74,22 @@ def to_hetero_data(
       data[k].edge = hetero_sampler_out.edge.get(k, None)
     if edge_feat_dict is not None:
       data[k].edge_attr = edge_feat_dict.get(k, None)
+    if k not in hetero_sampler_out.num_sampled_edges:
+      hetero_sampler_out.num_sampled_edges[k] = [0] * num_hops
+    else:
+      hetero_sampler_out.num_sampled_edges[k] += \
+        [0] * (num_hops - len(hetero_sampler_out.num_sampled_edges[k]))
 
   # nodes
   for k, v in hetero_sampler_out.node.items():
     data[k].node = v
     if node_feat_dict is not None:
       data[k].x = node_feat_dict.get(k, None)
+    if k not in hetero_sampler_out.num_sampled_nodes:
+      hetero_sampler_out.num_sampled_nodes[k] = [0] * (num_hops + 1)
+    else:
+      hetero_sampler_out.num_sampled_nodes[k] += \
+        [0] * (num_hops + 1 - len(hetero_sampler_out.num_sampled_nodes[k]))
 
   # seed nodes
   for k, v in hetero_sampler_out.batch.items():
