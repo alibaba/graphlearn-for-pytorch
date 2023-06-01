@@ -33,7 +33,7 @@ class IGBHeteroDataset(object):
     self.in_memory = in_memory
     self.use_label_2K = use_label_2K
 
-    self.ntypes = ['paper', 'author', 'institue', 'fos']
+    self.ntypes = ['paper', 'author', 'institute', 'fos']
     self.etypes = None
     self.edge_dict = {}
     self.feat_dict = {}

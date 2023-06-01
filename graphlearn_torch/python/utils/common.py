@@ -20,6 +20,7 @@ from ..typing import reverse_edge_type
 from .tensor import id2idx
 
 import torch
+import pickle
 
 def ensure_dir(dir_path: str):
   if not os.path.exists(dir_path):
@@ -115,3 +116,35 @@ def format_hetero_sampler_output(in_sample: Any):
       for etype in in_sample.edge_types
     ]
   return in_sample
+
+# Append a tensor to a file using pickle
+def append_tensor_to_file(filename, tensor):
+    # Try to open file in append binary mode
+    try:
+        with open(filename, 'ab') as f:
+            pickle.dump(tensor, f)
+    except Exception as e:
+        print('Error:', e)
+
+
+# Load a file containing tensors and concatenate them into a single tensor
+def load_and_concatenate_tensors(filename, device):
+    # Load file and read tensors
+    with open(filename, 'rb') as f:
+        tensor_list = []
+        while True:
+            try:
+                tensor = pickle.load(f)
+                tensor_list.append(tensor)
+            except EOFError:
+                break
+    # Pre-allocate memory for combined tensor
+    combined_tensor = torch.empty((sum(t.shape[0] for t in tensor_list), 
+      *tensor_list[0].shape[1:]), dtype=tensor_list[0].dtype, device=device)
+    # Concatenate tensors in list into combined tensor
+    start_idx = 0
+    for tensor in tensor_list:
+        end_idx = start_idx + tensor.shape[0]
+        combined_tensor[start_idx:end_idx] = tensor.to(device)
+        start_idx = end_idx
+    return combined_tensor

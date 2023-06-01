@@ -26,7 +26,7 @@ from ..typing import (
   FeaturePartitionData, HeteroFeaturePartitionData,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
-from ..utils import convert_to_tensor, ensure_dir, id2idx
+from ..utils import convert_to_tensor, ensure_dir, id2idx, append_tensor_to_file, load_and_concatenate_tensors
 
 
 def save_meta(
@@ -96,7 +96,6 @@ def save_graph_partition(
   torch.save(graph_partition.edge_index[1], os.path.join(subdir, 'cols.pt'))
   torch.save(graph_partition.eids, os.path.join(subdir, 'eids.pt'))
 
-
 def save_feature_partition(
   output_dir: str,
   partition_idx: int,
@@ -110,8 +109,41 @@ def save_feature_partition(
   if graph_type is not None:
     subdir = os.path.join(subdir, as_str(graph_type))
   ensure_dir(subdir)
-  torch.save(feature_partition.feats, os.path.join(subdir, 'feats.pt'))
-  torch.save(feature_partition.ids, os.path.join(subdir, 'ids.pt'))
+  append_tensor_to_file(os.path.join(subdir, 'feats.pkl'), feature_partition.feats)
+  append_tensor_to_file(os.path.join(subdir,'ids.pkl'), feature_partition.ids)
+  if feature_partition.cache_feats is not None:
+    torch.save(feature_partition.cache_feats, os.path.join(subdir, 'cache_feats.pt'))
+    torch.save(feature_partition.cache_ids, os.path.join(subdir, 'cache_ids.pt'))
+
+def save_feature_partition_chunk(
+  output_dir: str,
+  partition_idx: int,
+  feature_partition: FeaturePartitionData,
+  group: str = 'node_feat',
+  graph_type: Optional[Union[NodeType, EdgeType]] = None
+):
+  r""" Append a chunk of a feature partition to files in the output directory.
+  """
+  subdir = os.path.join(output_dir, f'part{partition_idx}', group)
+  if graph_type is not None:
+    subdir = os.path.join(subdir, as_str(graph_type))
+  ensure_dir(subdir)
+  append_tensor_to_file(os.path.join(subdir, 'feats.pkl'), feature_partition.feats)
+  append_tensor_to_file(os.path.join(subdir,'ids.pkl'), feature_partition.ids)
+
+def save_feature_partition_cache(
+  output_dir: str,
+  partition_idx: int,
+  feature_partition: FeaturePartitionData,
+  group: str = 'node_feat',
+  graph_type: Optional[Union[NodeType, EdgeType]] = None
+):
+  r""" Save the feature cache of a partition into the output directory.
+  """
+  subdir = os.path.join(output_dir, f'part{partition_idx}', group)
+  if graph_type is not None:
+    subdir = os.path.join(subdir, as_str(graph_type))
+  ensure_dir(subdir)
   if feature_partition.cache_feats is not None:
     torch.save(feature_partition.cache_feats, os.path.join(subdir, 'cache_feats.pt'))
     torch.save(feature_partition.cache_ids, os.path.join(subdir, 'cache_ids.pt'))
@@ -289,50 +321,64 @@ class PartitionerBase(ABC):
 
     return partition_results, partition_book
 
-  def _partition_node_feat(
+  def _partition_and_save_node_feat(
     self,
     node_ids_list: List[torch.Tensor],
     ntype: Optional[NodeType] = None,
-  ) -> List[FeaturePartitionData]:
+  ):
     r""" Partition node features by the partitioned node results, and calculate
     the cached nodes if needed.
     """
     node_feat = self.get_node_feat(ntype)
     if node_feat is None:
-      return [None for _ in range(self.num_parts)]
+      return
     cache_node_ids_list = self._cache_node(ntype)
-    res = []
     for pidx in range(self.num_parts):
-      n_ids = node_ids_list[pidx]
+      # save partitioned node feature cache
       cache_n_ids = cache_node_ids_list[pidx]
-      p_node_feat = FeaturePartitionData(
-        feats=node_feat[n_ids],
-        ids=n_ids,
+      p_node_cache_feat = FeaturePartitionData(
+        feats=None, 
+        ids=None,
         cache_feats=(node_feat[cache_n_ids] if cache_n_ids is not None else None),
         cache_ids=cache_n_ids
       )
-      res.append(p_node_feat)
-    return res
+      save_feature_partition_cache(self.output_dir, pidx, p_node_cache_feat,
+                                   group='node_feat', graph_type=ntype)
+      # save partitioned node feature chunk
+      n_ids = node_ids_list[pidx]
+      n_ids_chunks = torch.chunk(n_ids, chunks=((n_ids.shape[0] + self.chunk_size - 1) // self.chunk_size))
+      for chunk in n_ids_chunks:
+        p_node_feat_chunk = FeaturePartitionData(
+          feats=node_feat[chunk], 
+          ids=chunk,
+          cache_feats=None,
+          cache_ids=None
+        )
+        save_feature_partition_chunk(self.output_dir, pidx, p_node_feat_chunk,
+                                     group='node_feat', graph_type=ntype)
 
-  def _partition_edge_feat(
+  def _partition_and_save_edge_feat(
     self,
     graph_list: List[GraphPartitionData],
     etype: Optional[EdgeType] = None
-  ) -> List[FeaturePartitionData]:
+  ):
     r""" Partition edge features by the partitioned edge results.
     """
     edge_feat = self.get_edge_feat(etype)
     if edge_feat is None:
-      return [None for _ in range(self.num_parts)]
-    res = []
+      return
     for pidx in range(self.num_parts):
       eids = graph_list[pidx].eids
-      p_edge_feat = FeaturePartitionData(
-        feats=edge_feat[eids], ids=eids,
-        cache_feats=None, cache_ids=None
-      )
-      res.append(p_edge_feat)
-    return res
+      eids_chunks = torch.chunk(eids, chunks=((eids.shape[0] + self.chunk_size - 1) // self.chunk_size))
+      for chunk in eids_chunks:
+        p_edge_feat_chunk = FeaturePartitionData(
+          feats=edge_feat[chunk],
+          ids=chunk,
+          cache_feats=None,
+          cache_ids=None
+        )
+        save_feature_partition_chunk(self.output_dir, pidx, p_edge_feat_chunk,
+                                     group='edge_feat', graph_type=etype)
 
   def partition(self):
     r""" Partition graph and feature data into different parts.
@@ -351,13 +397,13 @@ class PartitionerBase(ABC):
               |-- cols.pt
               |-- eids.pt
           |-- node_feat/
-              |-- feats.pt
-              |-- ids.pt
+              |-- feats.pkl
+              |-- ids.pkl
               |-- cache_feats.pt (optional)
               |-- cache_ids.pt (optional)
           |-- edge_feat/
-              |-- feats.pt
-              |-- ids.pt
+              |-- feats.pkl
+              |-- ids.pkl
               |-- cache_feats.pt (optional)
               |-- cache_ids.pt (optional)
       |-- part1/
@@ -388,16 +434,16 @@ class PartitionerBase(ABC):
                   ...
           |-- node_feat/
               |-- ntype1/
-                  |-- feats.pt
-                  |-- ids.pt
+                  |-- feats.pkl
+                  |-- ids.pkl
                   |-- cache_feats.pt (optional)
                   |-- cache_ids.pt (optional)
               |-- ntype2/
                   ...
           |-- edge_feat/
               |-- etype1/
-                  |-- feats.pt
-                  |-- ids.pt
+                  |-- feats.pkl
+                  |-- ids.pkl
                   |-- cache_feats.pt (optional)
                   |-- cache_ids.pt (optional)
               |-- etype2/
@@ -415,41 +461,27 @@ class PartitionerBase(ABC):
       node_pb_dict = {}
       for ntype in self.node_types:
         node_ids_list, node_pb = self._partition_node(ntype)
-        node_feat_list = self._partition_node_feat(node_ids_list, ntype)
-        for pidx in range(self.num_parts):
-          if node_feat_list[pidx] is not None:
-            save_feature_partition(self.output_dir, pidx, node_feat_list[pidx],
-                                    group='node_feat', graph_type=ntype)
         save_node_pb(self.output_dir, node_pb, ntype)
         node_pb_dict[ntype] = node_pb
+        self._partition_and_save_node_feat(node_ids_list, ntype)
 
       for etype in self.edge_types:
         graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
-        edge_feat_list = self._partition_edge_feat(graph_list, etype)
+        save_edge_pb(self.output_dir, edge_pb, etype)
         for pidx in range(self.num_parts):
           save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
-          if edge_feat_list[pidx] is not None:
-            save_feature_partition(self.output_dir, pidx, edge_feat_list[pidx],
-                                    group='edge_feat', graph_type=etype)
-        save_edge_pb(self.output_dir, edge_pb, etype)
+        self._partition_and_save_edge_feat(graph_list, etype)
 
     else:
       node_ids_list, node_pb = self._partition_node()
-      node_feat_list = self._partition_node_feat(node_ids_list)
-      for pidx in range(self.num_parts):
-        if node_feat_list[pidx] is not None:
-          save_feature_partition(self.output_dir, pidx, node_feat_list[pidx],
-                                  group='node_feat')
       save_node_pb(self.output_dir, node_pb)
-
+      self._partition_and_save_node_feat(node_ids_list)
+      
       graph_list, edge_pb = self._partition_graph(node_pb)
-      edge_feat_list = self._partition_edge_feat(graph_list)
+      save_edge_pb(self.output_dir, edge_pb)
       for pidx in range(self.num_parts):
         save_graph_partition(self.output_dir, pidx, graph_list[pidx])
-        if edge_feat_list[pidx] is not None:
-          save_feature_partition(self.output_dir, pidx, edge_feat_list[pidx],
-                                  group='edge_feat')
-      save_edge_pb(self.output_dir, edge_pb)
+      self._partition_and_save_edge_feat(graph_list)
 
     # save meta.
     save_meta(self.output_dir, self.num_parts, self.data_cls,
@@ -482,10 +514,9 @@ def _load_feature_partition_data(
   """
   if not os.path.exists(feature_data_dir):
     return None
-  feats = torch.load(os.path.join(feature_data_dir, 'feats.pt'),
-                     map_location=device)
-  ids = torch.load(os.path.join(feature_data_dir, 'ids.pt'),
-                   map_location=device)
+
+  feats = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'feats.pkl'), device)
+  ids = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'ids.pkl'), device)
   cache_feats_path = os.path.join(feature_data_dir, 'cache_feats.pt')
   cache_ids_path = os.path.join(feature_data_dir, 'cache_ids.pt')
   cache_feats = None
