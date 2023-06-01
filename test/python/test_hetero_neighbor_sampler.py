@@ -44,7 +44,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     u2i_edge_index = torch.tensor([u2i_rows, u2i_cols], dtype=torch.int64)
 
     u2i_edge_ids = torch.tensor(u2i_eids, dtype=torch.int64)
-    u2i_csr_topo = glt.data.CSRTopo(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
+    u2i_csr_topo = glt.data.Topology(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
     u2i_graph = glt.data.Graph(u2i_csr_topo, 'ZERO_COPY', device=0)
 
     item_nodes, i2i_rows, i2i_cols, i2i_eids = [], [], [], []
@@ -56,7 +56,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     i2i_edge_index = torch.tensor([i2i_rows, i2i_cols], dtype=torch.int64)
 
     i2i_edge_ids = torch.tensor(i2i_eids, dtype=torch.int64)
-    i2i_csr_topo = glt.data.CSRTopo(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
+    i2i_csr_topo = glt.data.Topology(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
     i2i_graph = glt.data.Graph(i2i_csr_topo, 'ZERO_COPY', device=0)
 
     self.graph_dict = {

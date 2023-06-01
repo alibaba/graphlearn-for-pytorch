@@ -16,14 +16,14 @@
 import torch
 
 
-def sort_by_in_degree(cpu_tensor, shuffle_ratio, csr_topo):
-  if csr_topo is None:
+def sort_by_in_degree(cpu_tensor, shuffle_ratio, topo):
+  if topo is None:
     return cpu_tensor, None
-  row_count = csr_topo.row_count
+  row_count = topo.row_count
   assert not (cpu_tensor.size(0) < row_count)
   new_idx = torch.arange(row_count, dtype=torch.long)
   perm_range = torch.randperm(int(row_count * shuffle_ratio))
-  _, old_idx = torch.sort(csr_topo.degrees, descending=True)
+  _, old_idx = torch.sort(topo.degrees, descending=True)
   old2new = torch.arange(cpu_tensor.size(0), dtype=torch.long)
   old_idx[:int(row_count * shuffle_ratio)] = old_idx[perm_range]
   tmp_t = cpu_tensor[old_idx]

@@ -55,7 +55,7 @@ def _prepare_dataset(rank: int):
     eids.extend([(v * degree + i) for i in range(degree)])
   edge_index = torch.tensor([rows, cols], dtype=torch.int64)
   edge_ids = torch.tensor(eids, dtype=torch.int64)
-  csr_topo = glt.data.CSRTopo(edge_index=edge_index, edge_ids=edge_ids)
+  csr_topo = glt.data.Topology(edge_index=edge_index, edge_ids=edge_ids)
   graph = glt.data.Graph(csr_topo, 'ZERO_COPY', device=0)
 
   # feature
@@ -115,7 +115,7 @@ def _prepare_hetero_dataset(rank: int):
     u2i_eids.extend([(v * degree + i) for i in range(degree)])
   u2i_edge_index = torch.tensor([u2i_rows, u2i_cols], dtype=torch.int64)
   u2i_edge_ids = torch.tensor(u2i_eids, dtype=torch.int64)
-  u2i_csr_topo = glt.data.CSRTopo(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
+  u2i_csr_topo = glt.data.Topology(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
   u2i_graph = glt.data.Graph(u2i_csr_topo, 'ZERO_COPY', device=0)
 
   item_nodes = []
@@ -129,7 +129,7 @@ def _prepare_hetero_dataset(rank: int):
     i2i_eids.extend([(v * degree + i) for i in range(degree)])
   i2i_edge_index = torch.tensor([i2i_rows, i2i_cols], dtype=torch.int64)
   i2i_edge_ids = torch.tensor(i2i_eids, dtype=torch.int64)
-  i2i_csr_topo = glt.data.CSRTopo(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
+  i2i_csr_topo = glt.data.Topology(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
   i2i_graph = glt.data.Graph(i2i_csr_topo, 'ZERO_COPY', device=0)
 
   graph_dict = {

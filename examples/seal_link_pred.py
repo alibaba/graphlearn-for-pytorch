@@ -41,21 +41,21 @@ class SEALDataset(InMemoryDataset):
 
     # Collect a list of subgraphs for training, validation and testing:
     start = time.time()
-    graph = glt.data.Graph(glt.data.CSRTopo(train_data.edge_index), mode='CPU')
+    graph = glt.data.Graph(glt.data.Topology(train_data.edge_index), mode='CPU')
     subgraph_sampler = glt.sampler.NeighborSampler(graph, [-1]*self.num_hops)
     train_pos_data_list = self.extract_enclosing_subgraphs(
         subgraph_sampler, train_data.pos_edge_label_index, 1)
     train_neg_data_list = self.extract_enclosing_subgraphs(
         subgraph_sampler, train_data.neg_edge_label_index, 0)
 
-    graph = glt.data.Graph(glt.data.CSRTopo(val_data.edge_index), mode='CPU')
+    graph = glt.data.Graph(glt.data.Topology(val_data.edge_index), mode='CPU')
     subgraph_sampler = glt.sampler.NeighborSampler(graph, [-1]*self.num_hops)
     val_pos_data_list = self.extract_enclosing_subgraphs(
         subgraph_sampler, val_data.pos_edge_label_index, 1)
     val_neg_data_list = self.extract_enclosing_subgraphs(
         subgraph_sampler, val_data.neg_edge_label_index, 0)
 
-    graph = glt.data.Graph(glt.data.CSRTopo(test_data.edge_index), mode='CPU')
+    graph = glt.data.Graph(glt.data.Topology(test_data.edge_index), mode='CPU')
     subgraph_sampler = glt.sampler.NeighborSampler(graph, [-1]*self.num_hops)
     test_pos_data_list = self.extract_enclosing_subgraphs(
         subgraph_sampler, test_data.pos_edge_label_index, 1)

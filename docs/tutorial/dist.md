@@ -120,6 +120,10 @@ random_partitioner = glt.partition.RandomPartitioner(
 )
 random_partitioner.partition()
 ```
+Note here that the `edge_assign_strategy` parameter needs to be selected correctly, 
+when the subsequent sampling process is out-bound sampling, 'by_src' should be selected here, 
+if it is in-bound sampling, `by_des` needs to be selected. This is to determine the 
+attribution of edges and ensure that they are placed on the correct nodes.
 
 Besides, GLT implements another
 [`graphlearn_torch.partition.FrequencyPartitioner`](graphlearn_torch.partition.frequency_partitioner.FrequencyPartitioner),
@@ -142,7 +146,7 @@ partition graph data with `FrequencyPartitioner`:
 import graphlearn_torch as glt
 
 # Initialize the graph store for sampling.
-csr_topo = glt.data.CSRTopo(edge_index=data.edge_index)
+csr_topo = glt.data.Topology(edge_index=data.edge_index, layout='CSR')
 graph = glt.data.Graph(csr_topo, mode='ZERO_COPY')
 
 # Calculate the sampling probabilities.
