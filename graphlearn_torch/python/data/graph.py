@@ -14,9 +14,10 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Literal
 
 import torch
+import warnings
 
 from .. import py_graphlearn_torch as pywrap
 from ..typing import TensorDataType
@@ -24,29 +25,31 @@ from ..utils import (
   convert_to_tensor, share_memory, ptr2ind, coo_to_csr, coo_to_csc
 )
 
-
-class CSRTopo(object):
-  r""" Graph topology in CSR format.
+class Topology(object):
+  r""" Graph topology with support for CSC and CSR formats.
 
   Args:
     edge_index (a 2D torch.Tensor or numpy.ndarray, or a tuple): The edge
-      index for graph topology.
+      index for graph topology, in the order of first row and then column. 
     edge_ids (torch.Tensor or numpy.ndarray, optional): The edge ids for
       graph edges. If set to ``None``, it will be aranged by the edge size.
       (default: ``None``)
-    layout (str): The edge layout representation for the input edge index,
+    input_layout (str): The edge layout representation for the input edge index,
       should be 'COO' (rows and cols uncompressed), 'CSR' (rows compressed)
       or 'CSC' (columns compressed). (default: 'COO')
+    layout ('CSR' or 'CSC'): The target edge layout representation for 
+      the output. (default: 'CSR')
   """
   def __init__(self,
                edge_index: Union[TensorDataType,
                                  Tuple[TensorDataType, TensorDataType]],
                edge_ids: Optional[TensorDataType] = None,
-               layout: str = 'COO'):
-    layout = str(layout).upper()
-    if layout not in ['COO', 'CSR', 'CSC']:
+               input_layout: str = 'COO',
+               layout: Literal['CSR', 'CSC'] = 'CSR'):
+    input_layout = str(input_layout).upper()
+    if input_layout not in ['COO', 'CSR', 'CSC']:
       raise RuntimeError(f"'{self.__class__.__name__}': got "
-                         f"invalid edge layout {layout}")
+                         f"invalid edge layout {input_layout}")
 
     edge_index = convert_to_tensor(edge_index, dtype=torch.int64)
     row, col = edge_index[0], edge_index[1]
@@ -57,23 +60,39 @@ class CSRTopo(object):
       edge_ids = torch.arange(num_edges, dtype=torch.int64, device=row.device)
     else:
       assert edge_ids.numel() == num_edges
-
-    if layout == 'CSR':
-      self._indptr, self._indices = row, col
+    
+    self._layout = layout
+    
+    if input_layout == layout:
+      if input_layout == 'CSC':
+        self._indices, self._indptr = row, col
+      elif input_layout == 'CSR':
+        self._indptr, self._indices = row, col
       self._edge_ids = edge_ids
-    else:
-      if layout == 'CSC':
-        col = ptr2ind(col)
+      return
+    elif input_layout == 'CSC':
+      col = ptr2ind(col)
+    elif input_layout == 'CSR':
+      row = ptr2ind(row)
+    # COO format data is prepared.
+    
+    if layout == 'CSR':
       self._indptr, self._indices, self._edge_ids = \
         coo_to_csr(row, col, edge_value=edge_ids)
-
+    elif layout == 'CSC':
+      self._indices, self._indptr, self._edge_ids = \
+        coo_to_csc(row, col, edge_value=edge_ids)
+  
   def to_coo(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r""" Convert to COO format.
 
     Returns:
       row indice tensor, column indice tensor and edge id tensor
     """
-    return ptr2ind(self._indptr), self._indices, self._edge_ids
+    if self._layout == 'CSR':
+      return ptr2ind(self._indptr), self._indices, self._edge_ids
+    elif self._layout == 'CSC':
+      return self._indices, ptr2ind(self._indptr), self._edge_ids
 
   def to_csc(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     r""" Convert to CSC format.
@@ -81,8 +100,23 @@ class CSRTopo(object):
     Returns:
       row indice tensor, column ptr tensor and edge id tensor
     """
-    row, col, edge_ids = self.to_coo()
-    return coo_to_csc(row, col, edge_value=edge_ids)
+    if self._layout == 'CSR':
+      row, col, edge_ids = self.to_coo()
+      return coo_to_csc(row, col, edge_value=edge_ids)
+    elif self._layout == 'CSC':
+      return self._indices, self._indptr, self._edge_ids
+  
+  def to_csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    r""" Convert to CSR format.
+
+    Returns:
+      row ptr tensor, column indice tensor and edge id tensor
+    """
+    if self._layout == 'CSR':
+      return self._indptr, self._indices, self._edge_ids
+    elif self._layout == 'CSC':
+      row, col, edge_ids = self.to_coo()
+      return coo_to_csr(row, col, edge_value=edge_ids)
 
   @property
   def indptr(self):
@@ -94,7 +128,7 @@ class CSRTopo(object):
 
   @property
   def edge_ids(self):
-    r""" local edge ids in CSR.
+    r""" local edge ids.
     """
     return self._edge_ids
 
@@ -134,7 +168,7 @@ class Graph(object):
       are executed on GPU.
 
   Args:
-    csr_topo (CSRTopo): An instance of ``CSRTopo`` with graph topology data.
+    topo (Topology): An instance of ``Topology`` with graph topology data.
     mode (str): The graph operation mode, must be 'CPU', 'ZERO_COPY' or 'CUDA'.
       (Default: 'ZERO_COPY').
     device (int, optional): The target cuda device rank to perform graph
@@ -142,10 +176,10 @@ class Graph(object):
       set to 'CPU'. The value of ``torch.cuda.current_device()`` will be used
       if set to ``None``. (Default: ``None``).
   """
-  def __init__(self, csr_topo: CSRTopo, mode = 'ZERO_COPY',
+  def __init__(self, topo: Topology, mode = 'ZERO_COPY',
                device: Optional[int] = None):
-    self.csr_topo = csr_topo
-    self.csr_topo.share_memory_()
+    self.topo = topo
+    self.topo.share_memory_()
     self.mode = mode.upper()
     self.device = device
 
@@ -162,10 +196,10 @@ class Graph(object):
       return
 
     self._graph = pywrap.Graph()
-    indptr = self.csr_topo.indptr
-    indices = self.csr_topo.indices
-    if self.csr_topo.edge_ids is not None:
-      edge_ids = self.csr_topo.edge_ids
+    indptr = self.topo.indptr
+    indices = self.topo.indices
+    if self.topo.edge_ids is not None:
+      edge_ids = self.topo.edge_ids
     else:
       edge_ids = torch.empty(0)
 
@@ -191,16 +225,16 @@ class Graph(object):
     r""" Create ipc handle for multiprocessing.
 
     Returns:
-      A tuple of csr_topo and graph mode.
+      A tuple of topo and graph mode.
     """
-    return self.csr_topo, self.mode
+    return self.topo, self.mode
 
   @classmethod
   def from_ipc_handle(cls, ipc_handle):
     r""" Create from ipc handle.
     """
-    csr_topo, mode = ipc_handle
-    return cls(csr_topo, mode, device=None)
+    topo, mode = ipc_handle
+    return cls(topo, mode, device=None)
 
   @property
   def row_count(self):

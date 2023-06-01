@@ -44,7 +44,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     u2i_edge_index = torch.tensor([u2i_rows, u2i_cols], dtype=torch.int64)
 
     u2i_edge_ids = torch.tensor(u2i_eids, dtype=torch.int64)
-    u2i_csr_topo = glt.data.CSRTopo(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
+    u2i_csr_topo = glt.data.Topology(edge_index=u2i_edge_index, edge_ids=u2i_edge_ids)
     u2i_graph = glt.data.Graph(u2i_csr_topo, 'ZERO_COPY', device=0)
 
     item_nodes, i2i_rows, i2i_cols, i2i_eids = [], [], [], []
@@ -56,7 +56,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     i2i_edge_index = torch.tensor([i2i_rows, i2i_cols], dtype=torch.int64)
 
     i2i_edge_ids = torch.tensor(i2i_eids, dtype=torch.int64)
-    i2i_csr_topo = glt.data.CSRTopo(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
+    i2i_csr_topo = glt.data.Topology(edge_index=i2i_edge_index, edge_ids=i2i_edge_ids)
     i2i_graph = glt.data.Graph(i2i_csr_topo, 'ZERO_COPY', device=0)
 
     self.graph_dict = {
@@ -109,7 +109,8 @@ class RandomSamplerTestCase(unittest.TestCase):
     node_sampler = glt.sampler.NeighborSampler(
        graph=self.graph_dict,
        num_neighbors=[2,1],
-       with_edge=True
+       with_edge=True,
+       edge_dir='out',
     )
     sampler_input = glt.sampler.NodeSamplerInput(
        node=torch.tensor([1,5,9,13,17,21,25,29]), input_type=self.user_ntype)
@@ -138,6 +139,42 @@ class RandomSamplerTestCase(unittest.TestCase):
     self.assertTrue(glt.utils.tensor_equal_with_device(
        base_edge_ids, sample_out.edge[self.rev_u2i_etype].unique())
     )
+  
+  def test_hetero_insample_from_items(self):
+    node_sampler = glt.sampler.NeighborSampler(
+       graph=self.graph_dict,
+       num_neighbors=[2,1],
+       with_edge=True,
+       edge_dir='in'
+    )
+    # sample from 'user' will raise exception
+    with self.assertRaises(RuntimeError):
+      sampler_input = glt.sampler.NodeSamplerInput(
+        node=torch.tensor([1,5,9,13,17,21,25,29]), input_type=self.user_ntype)
+      sample_out = node_sampler.sample_from_nodes(sampler_input)
+    
+    # sampler from 'item', we can get 'user' and 'item'
+    sampler_input = glt.sampler.NodeSamplerInput(
+       node=torch.tensor([1,5,9,13,17,21,25,29]), input_type=self.item_ntype)
+    sample_out = node_sampler.sample_from_nodes(sampler_input)
+
+    base_homo_edge_index = torch.stack((
+       sample_out.node['item'][sample_out.row[self.i2i_etype]],
+       sample_out.node['item'][sample_out.col[self.i2i_etype]]
+    ))
+    base_hetero_edge_index = torch.stack((
+       sample_out.node['item'][sample_out.col[self.u2i_etype]],
+       sample_out.node['user'][sample_out.row[self.u2i_etype]]
+    ))
+    self.assertTrue(torch.all(
+      ((base_homo_edge_index[1]+2)%40==base_homo_edge_index[0]) +
+      ((base_homo_edge_index[1]+3)%40==base_homo_edge_index[0])
+    ))
+    self.assertTrue(torch.all(
+      ((base_hetero_edge_index[1]-1)%40==base_hetero_edge_index[0]) +
+      ((base_hetero_edge_index[1]-2)%40==base_hetero_edge_index[0])
+    ))
+
 
   def test_hetero_sample_from_edges(self):
     edge_sampler = glt.sampler.NeighborSampler(

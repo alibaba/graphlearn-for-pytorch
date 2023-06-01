@@ -14,7 +14,7 @@
 # ==============================================================================
 
 
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Literal
 
 import torch
 
@@ -87,6 +87,11 @@ class LinkLoader(object):
         negative sampling mode.
         If set to :obj:`None`, no negative sampling strategy is applied.
         (default: :obj:`None`)
+      device (torch.device, optional): The device to put the data on.
+        If set to :obj:`None`, the CPU is used.
+      edge_dir (str:["in", "out"]): The edge direction for sampling.
+        Can be either :str:`"out"` or :str:`"in"`.
+        (default: :str:`"out"`)
       **kwargs (optional): Additional arguments of
         :class:`torch.utils.data.DataLoader`, such as :obj:`batch_size`,
         :obj:`shuffle`, :obj:`drop_last` or :obj:`num_workers`.
@@ -100,6 +105,7 @@ class LinkLoader(object):
     edge_label: Optional[torch.Tensor] = None,
     neg_sampling: Optional[NegativeSampling] = None,
     device: torch.device = torch.device(0),
+    edge_dir: Literal['out', 'in'] = 'out',
     **kwargs,
   ):
     # Get edge type (or `None` for homogeneous graphs):
@@ -109,6 +115,7 @@ class LinkLoader(object):
     self.link_sampler = link_sampler
     self.neg_sampling = NegativeSampling.cast(neg_sampling)
     self.device = device
+    self._edge_dir = edge_dir
 
     if (self.neg_sampling is not None and self.neg_sampling.is_binary()
         and edge_label is not None and edge_label.min() == 0):
@@ -151,11 +158,13 @@ class LinkLoader(object):
 
   def _collate_fn(self, sampler_out: Union[SamplerOutput, HeteroSamplerOutput]):
     r"""format sampler output to Data/HeteroData
-      To adapt to the out-edge sampling scheme (i.e. the direction of edges in
+      For the out-edge sampling scheme (i.e. the direction of edges in
       the output is inverse to the original graph), we put the reversed
       edge_label_index into the (dst, rev_to, src) subgraph for
       HeteroSamplerOutput and (dst, to, src) for SamplerOutput.
-
+      However, for the in-edge sampling scheme (i.e. the direction of edges 
+      in the output is the same as the original graph), we do not need to
+      reverse the edge type of the sampler_out.
     """
     if isinstance(sampler_out, SamplerOutput):
       x = self.data.node_features[sampler_out.node]
@@ -169,18 +178,21 @@ class LinkLoader(object):
                         )
     else: # hetero
       x_dict = {}
-      for ntype, ids in sampler_out.node.items():
-        x_dict[ntype] = self.data.get_node_feature(ntype)[ids]
+      x_dict = {ntype : self.data.get_node_feature(ntype)[ids] for ntype, ids in sampler_out.node.items()}
       edge_attr_dict = {}
       if sampler_out.edge is not None:
         for etype, eids in sampler_out.edge.items():
-          efeat = self.data.get_edge_feature(reverse_edge_type(etype))
+          if self._edge_dir == 'out':
+            efeat = self.data.get_edge_feature(reverse_edge_type(etype))
+          elif self._edge_dir == 'in':
+            efeat = self.data.get_edge_feature(etype)
           if efeat is not None:
             edge_attr_dict[etype] = efeat[eids]
 
       res_data = to_hetero_data(sampler_out,
                                 node_feat_dict=x_dict,
                                 edge_feat_dict=edge_attr_dict,
+                                edge_dir=self._edge_dir,
                                )
     return res_data
 
@@ -195,7 +207,7 @@ def get_edge_label_index(
   edge_type = None
   # # Need the edge index in COO for LinkNeighborLoader:
   def _get_edge_index(edge_type):
-    row, col, _ = data.get_graph(edge_type).csr_topo.to_coo()
+    row, col, _ = data.get_graph(edge_type).topo.to_coo()
     return (row, col)
 
   if not isinstance(edge_label_index, Tuple):
@@ -212,6 +224,6 @@ def get_edge_label_index(
   edge_type, edge_label_index = convert_to_tensor(edge_label_index)
 
   if edge_label_index is None:
-    return edge_type, data.get_graph(edge_type).csr_topo.to_coo()
+    return edge_type, data.get_graph(edge_type).topo.to_coo()
 
   return edge_type, edge_label_index

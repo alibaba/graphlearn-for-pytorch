@@ -15,7 +15,7 @@
 
 import logging
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Literal
 
 import torch
 
@@ -23,7 +23,7 @@ from ..typing import NodeType, EdgeType, TensorDataType
 from ..utils import convert_to_tensor, share_memory, squeeze
 
 from .feature import DeviceGroup, Feature
-from .graph import CSRTopo, Graph
+from .graph import Topology, Graph
 
 
 class Dataset(object):
@@ -34,12 +34,14 @@ class Dataset(object):
     graph: Union[Graph, Dict[EdgeType, Graph]] = None,
     node_features: Union[Feature, Dict[NodeType, Feature]] = None,
     edge_features: Union[Feature, Dict[EdgeType, Feature]] = None,
-    node_labels: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None
+    node_labels: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    edge_dir: Literal['in', 'out'] = 'out'
   ):
     self.graph = graph
     self.node_features = node_features
     self.edge_features = edge_features
     self.node_labels = squeeze(convert_to_tensor(node_labels))
+    self._edge_dir = edge_dir
 
   def init_graph(
     self,
@@ -81,22 +83,24 @@ class Dataset(object):
           edge_ids = {}
         if not isinstance(layout, dict):
           layout = {etype: layout for etype in edge_index.keys()}
-        csr_topo_dict = {}
+        topo_dict = {}
+        
         for etype, e_idx in edge_index.items():
-          csr_topo_dict[etype] = CSRTopo(
+          topo_dict[etype] = Topology(
             edge_index=e_idx,
             edge_ids=edge_ids.get(etype, None),
-            layout=layout[etype]
+            input_layout=layout[etype],
+            layout='CSR' if self._edge_dir == 'out' else 'CSC',
           )
         self.graph = {}
-        for etype, csr_topo in csr_topo_dict.items():
-          g = Graph(csr_topo, graph_mode, device)
+        for etype, topo in topo_dict.items():
+          g = Graph(topo, graph_mode, device)
           g.lazy_init()
           self.graph[etype] = g
       else:
         # homogeneous.
-        csr_topo = CSRTopo(edge_index, edge_ids, layout)
-        self.graph = Graph(csr_topo, graph_mode, device)
+        topo = Topology(edge_index, edge_ids, input_layout=layout, layout='CSR' if self._edge_dir == 'out' else 'CSC')
+        self.graph = Graph(topo, graph_mode, device)
         self.graph.lazy_init()
 
   def init_node_features(
@@ -150,12 +154,12 @@ class Dataset(object):
           # reorder node features of homogeneous graph.
           assert isinstance(self.graph, Graph)
           if self._directed is None or not self._directed:
-            csr_topo_rev = self.graph.csr_topo
+            topo_rev = self.graph.topo
           else:
-            row, col, eids = self.graph.csr_topo.to_coo()
-            csr_topo_rev = CSRTopo((col, row), eids, layout='COO')
+            row, col, eids = self.graph.topo.to_coo()
+            topo_rev = Topology((col, row), eids, input_layout='COO', layout='CSR' if self._edge_dir == 'out' else 'CSC')
           node_feature_data, id2idx = \
-            sort_func(node_feature_data, split_ratio, csr_topo_rev)
+            sort_func(node_feature_data, split_ratio, topo_rev)
       self.node_features = _build_features(
         node_feature_data, id2idx, split_ratio,
         device_group_list, device, with_gpu, dtype

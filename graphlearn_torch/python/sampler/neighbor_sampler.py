@@ -14,7 +14,7 @@
 # ==============================================================================
 
 import math
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Literal
 
 import torch
 
@@ -43,13 +43,15 @@ class NeighborSampler(BaseSampler):
                device: torch.device=torch.device('cuda', 0),
                with_edge: bool=False,
                with_neg: bool=False,
-               strategy: str = 'random'):
+               strategy: str = 'random',
+               edge_dir: Literal['in', 'out'] = 'out'):
     self.graph = graph
     self.num_neighbors = num_neighbors
     self.device = device
     self.with_edge = with_edge
     self.with_neg = with_neg
     self.strategy = strategy
+    self._edge_dir = edge_dir
     self._subgraph_op = None
     self._sampler = None
     self._neg_sampler = None
@@ -98,14 +100,16 @@ class NeighborSampler(BaseSampler):
       if self._g_cls == 'homo':
         self._neg_sampler = RandomNegativeSampler(
           graph=self.graph,
-          mode=self.device.type.upper()
+          mode=self.device.type.upper(),
+          edge_dir=self._edge_dir
         )
       else: # hetero
         self._neg_sampler = {}
         for etype, g in self.graph.items():
           self._neg_sampler[etype] = RandomNegativeSampler(
             graph=g,
-            mode=self.device.type.upper()
+            mode=self.device.type.upper(),
+            edge_dir=self._edge_dir
           )
 
   def lazy_init_subgraph_op(self):
@@ -158,11 +162,12 @@ class NeighborSampler(BaseSampler):
   ) -> SamplerOutput:
     r""" Sample on homogenous graphs and induce COO format subgraph.
 
-    Note that messages in PyG are passed from src to dst. But we sample src's
-    out neighbors and induce [src_index, dst_index] subgraphs. The direction
-    of sampling is opposite to the direction of message passing. To be
-    consistent with the semantics of PyG, the final edge index is transpose to
-    [dst_index, src_index].
+    Note that messages in PyG are passed from src to dst. In 'out' direction,
+    we sample src's out neighbors and induce [src_index, dst_index] subgraphs. 
+    The direction of sampling is opposite to the direction of message passing. 
+    To be consistent with the semantics of PyG, the final edge index is 
+    transpose to [dst_index, src_index]. In 'in' direction, we don't need to 
+    reverse it.
     """
     out_nodes, out_rows, out_cols, out_edges = [], [], [], []
     num_sampled_nodes, num_sampled_edges = [], []
@@ -201,13 +206,14 @@ class NeighborSampler(BaseSampler):
   ) -> HeteroSamplerOutput:
     r""" Sample on heterogenous graphs and induce COO format subgraph dict.
 
-    Note that messages in PyG are passed from src to dst. But we sample src's
-    out neighbors and induce [src_index, dst_index] subgraphs. The direction
-    of sampling is opposite to the direction of message passing. To be
-    consistent with the semantics of PyG, the final edge index is transpose to
+    Note that messages in PyG are passed from src to dst. In 'out' direction,
+    we sample src's out neighbors and induce [src_index, dst_index] subgraphs. 
+    The direction of sampling is opposite to the direction of message passing. 
+    To be consistent with the semantics of PyG, the final edge index is transpose to
     [dst_index, src_index] and edge_type is reversed as well. For example,
     given the edge_type (u, u2i, i), we sample by meta-path u->i, but return
-    edge_index_dict {(i, rev_u2i, u) : [i, u]}.
+    edge_index_dict {(i, rev_u2i, u) : [i, u]}. In 'in' direction, we don't need to
+    reverse it.
     """
     # sample neighbors hop by hop.
     max_input_batch_size = max([t.numel() for t in input_seeds_dict.values()])
@@ -221,13 +227,24 @@ class NeighborSampler(BaseSampler):
     for i in range(self.num_hops):
       nbr_dict, edge_dict = {}, {}
       for etype in self.edge_types:
-        src = src_dict.get(etype[0], None)
         req_num = self.num_neighbors[etype][i]
-        if src is not None:
-          output = self.sample_one_hop(src, req_num, etype)
-          nbr_dict[etype] = [src, output.nbr, output.nbr_num]
-          if output.edge is not None:
-            edge_dict[etype] = output.edge
+        # out sampling needs dst_type==seed_type, in sampling needs src_type==seed_type
+        if self._edge_dir == 'in':
+          src = src_dict.get(etype[-1], None)
+          if src is not None:
+            output = self.sample_one_hop(src, req_num, etype)
+            nbr_dict[reverse_edge_type(etype)] = [src, output.nbr, output.nbr_num]
+            if output.edge is not None:
+              edge_dict[reverse_edge_type(etype)] = output.edge
+        elif self._edge_dir == 'out':
+          src = src_dict.get(etype[0], None)
+          if src is not None:
+            output = self.sample_one_hop(src, req_num, etype)
+            nbr_dict[etype] = [src, output.nbr, output.nbr_num]
+            if output.edge is not None:
+              edge_dict[etype] = output.edge
+      if len(nbr_dict) == 0:
+        raise RuntimeError('No neighbors sampled.')
       nodes_dict, rows_dict, cols_dict = inducer.induce_next(nbr_dict)
       merge_dict(nodes_dict, out_nodes)
       merge_dict(rows_dict, out_rows)
@@ -243,7 +260,6 @@ class NeighborSampler(BaseSampler):
       if self.with_edge:
         out_edges[etype] = torch.cat(out_edges[etype])
 
-    # TODO: support inbound sampling.
     res_rows, res_cols, res_edges = {}, {}, {}
     for etype, rows in out_rows.items():
       rev_etype = reverse_edge_type(etype)
@@ -275,9 +291,9 @@ class NeighborSampler(BaseSampler):
     r"""Performs sampling from an edge sampler input, leveraging a sampling
     function of the same signature as `node_sample`.
 
-    Currently, we support the out-edge sampling manner, so we reverse the
-    direction of src and dst for the output so that features of the sampled
-    nodes during training can be aggregated from k-hop to (k-1)-hop nodes.
+    Note that in out-edge sampling, we reverse the direction of src and dst
+    for the output so that features of the sampled nodes during training can
+    be aggregated from k-hop to (k-1)-hop nodes.
     """
     src = inputs.row.to(self.device)
     dst = inputs.col.to(self.device)
@@ -306,7 +322,7 @@ class NeighborSampler(BaseSampler):
         dst = torch.cat([dst, dst_neg], dim=0)
         if edge_label is None:
             edge_label = torch.ones(num_pos, device=self.device)
-        size = (num_neg, ) + edge_label.size()[1:]
+        size = (src_neg.size()[0], ) + edge_label.size()[1:]
         edge_neg_label = edge_label.new_zeros(size)
         edge_label = torch.cat([edge_label, edge_neg_label])
       elif neg_sampling.is_triplet():
@@ -340,9 +356,10 @@ class NeighborSampler(BaseSampler):
       if len(temp_out) == 2:
         out = merge_hetero_sampler_output(temp_out[0],
                                           temp_out[1],
-                                          device=self.device)
+                                          device=self.device,
+                                          edge_dir=self._edge_dir)
       else:
-        out = format_hetero_sampler_output(temp_out[0])
+        out = format_hetero_sampler_output(temp_out[0], edge_dir=self._edge_dir)
       # edge_label
       if neg_sampling is None or neg_sampling.is_binary():
         if input_type[0] != input_type[-1]:

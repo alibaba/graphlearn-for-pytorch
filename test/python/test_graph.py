@@ -16,31 +16,54 @@
 import unittest
 import torch
 
-from graphlearn_torch.data import CSRTopo, Graph
+from graphlearn_torch.data import Topology, Graph
 
 
 class GraphTestCase(unittest.TestCase):
   def setUp(self):
-    self.indptr = torch.tensor([0, 2, 4, 7, 8], dtype=torch.int64)
-    self.indices = torch.tensor([0, 1, 1, 3, 2, 3, 4, 5], dtype=torch.int64)
-    self.edge_ids = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7], dtype=torch.int64)
-    self.csr_topo = CSRTopo(
-      edge_index=(self.indptr, self.indices),
-      edge_ids=self.edge_ids,
+    """
+    input graph:
+      r/c	0	1	2	3	4	5
+       0	0	1				
+       1  	2		3		
+       2 		  4	5	6	
+       3 	  				7
+       4
+       5
+    """
+    # CSC 
+    self.indptr_csc = torch.tensor([0, 1, 3, 4, 6, 7, 8], dtype=torch.int64)
+    self.indices_csc = torch.tensor([0, 0, 1, 2, 1, 2, 2, 3], dtype=torch.int64)
+    self.edge_ids_csc = torch.tensor([0, 1, 2, 4, 3, 5, 6, 7], dtype=torch.int64)
+    self.csc_topo = Topology(
+      edge_index=(self.indices_csc, self.indptr_csc),
+      edge_ids=self.edge_ids_csc,
+      input_layout='CSC',
+      layout='CSC'
+    )
+    
+    # CSR
+    self.indptr_csr = torch.tensor([0, 2, 4, 7, 8], dtype=torch.int64)
+    self.indices_csr = torch.tensor([0, 1, 1, 3, 2, 3, 4, 5], dtype=torch.int64)
+    self.edge_ids_csr = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7], dtype=torch.int64)
+    self.csr_topo = Topology(
+      edge_index=(self.indptr_csr, self.indices_csr),
+      edge_ids=self.edge_ids_csr,
+      input_layout='CSR',
       layout='CSR'
     )
-
+    
   def test_csr_topo_with_coo(self):
     row = torch.tensor([0, 0, 1, 1, 2, 2, 2, 3], dtype=torch.int64)
     col = torch.tensor([0, 1, 1, 3, 2, 3, 4, 5], dtype=torch.int64)
     edge_ids = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7], dtype=torch.int64)
 
-    csr_topo_from_coo = CSRTopo(
-      edge_index=(row, col), edge_ids=edge_ids, layout='COO'
+    csr_topo_from_coo = Topology(
+      edge_index=(row, col), edge_ids=edge_ids, input_layout='COO'
     )
-    self.assertTrue(torch.equal(self.indptr, csr_topo_from_coo.indptr))
-    self.assertTrue(torch.equal(self.indices, csr_topo_from_coo.indices))
-    self.assertTrue(torch.equal(self.edge_ids, csr_topo_from_coo.edge_ids))
+    self.assertTrue(torch.equal(self.indptr_csr, csr_topo_from_coo.indptr))
+    self.assertTrue(torch.equal(self.indices_csr, csr_topo_from_coo.indices))
+    self.assertTrue(torch.equal(self.edge_ids_csr, csr_topo_from_coo.edge_ids))
 
     row_from_csr, col_from_csr, edge_ids_from_csr = self.csr_topo.to_coo()
     self.assertTrue(torch.equal(row, row_from_csr))
@@ -52,12 +75,12 @@ class GraphTestCase(unittest.TestCase):
     colptr = torch.tensor([0, 1, 3, 4, 6, 7, 8], dtype=torch.int64)
     edge_ids = torch.tensor([0, 1, 2, 4, 3, 5, 6, 7], dtype=torch.int64)
 
-    csr_topo_from_csc = CSRTopo(
-      edge_index=(row, colptr), edge_ids=edge_ids, layout='CSC'
+    csr_topo_from_csc = Topology(
+      edge_index=(row, colptr), edge_ids=edge_ids, input_layout='CSC'
     )
-    self.assertTrue(torch.equal(self.indptr, csr_topo_from_csc.indptr))
-    self.assertTrue(torch.equal(self.indices, csr_topo_from_csc.indices))
-    self.assertTrue(torch.equal(self.edge_ids, csr_topo_from_csc.edge_ids))
+    self.assertTrue(torch.equal(self.indptr_csr, csr_topo_from_csc.indptr))
+    self.assertTrue(torch.equal(self.indices_csr, csr_topo_from_csc.indices))
+    self.assertTrue(torch.equal(self.edge_ids_csr, csr_topo_from_csc.edge_ids))
 
     row_from_csr, colptr_from_csr, edge_ids_from_csr = self.csr_topo.to_csc()
     self.assertTrue(torch.equal(row, row_from_csr))
@@ -66,18 +89,90 @@ class GraphTestCase(unittest.TestCase):
 
   def test_cpu_graph_init(self):
     g = Graph(self.csr_topo, mode='CPU')
-    self.assertEqual(g.edge_count, self.indices.size(0))
-    self.assertEqual(g.row_count, self.indptr.size(0) - 1)
+    self.assertEqual(g.edge_count, self.indices_csr.size(0))
+    self.assertEqual(g.row_count, self.indptr_csr.size(0) - 1)
 
   def test_cuda_graph_init(self):
     g = Graph(self.csr_topo, 'CUDA', 0)
-    self.assertEqual(g.edge_count, self.indices.size(0))
-    self.assertEqual(g.row_count, self.indptr.size(0) - 1)
+    self.assertEqual(g.edge_count, self.indices_csr.size(0))
+    self.assertEqual(g.row_count, self.indptr_csr.size(0) - 1)
 
   def test_pin_graph_init(self):
     g = Graph(self.csr_topo, 'ZERO_COPY', 0)
-    self.assertEqual(g.edge_count, self.indices.size(0))
-    self.assertEqual(g.row_count, self.indptr.size(0) - 1)
+    self.assertEqual(g.edge_count, self.indices_csr.size(0))
+    self.assertEqual(g.row_count, self.indptr_csr.size(0) - 1)
+  
+  def test_topo_with_layout(self):
+    # 'COO' -> 'CSC'
+    row = torch.tensor([0, 0, 1, 1, 2, 2, 2, 3], dtype=torch.int64)
+    col = torch.tensor([0, 1, 1, 3, 2, 3, 4, 5], dtype=torch.int64)
+    edge_ids = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7], dtype=torch.int64)
+    csc_topo = Topology(
+      edge_index=(row, col),
+      edge_ids=edge_ids,
+      input_layout='COO',
+      layout='CSC'
+    )
+    self.assertTrue(torch.equal(self.indices_csc, csc_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csc, csc_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csc, csc_topo.edge_ids))
+    
+    # 'COO' -> 'CSR'
+    csr_topo = Topology(
+      edge_index=(row, col),
+      edge_ids=edge_ids,
+      input_layout='COO',
+      layout='CSR'
+    )
+    self.assertTrue(torch.equal(self.indices_csr, csr_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csr, csr_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csr, csr_topo.edge_ids))
+    
+    # 'CSC' -> 'CSR'
+    csr_topo = Topology(
+      edge_index=(self.indices_csc, self.indptr_csc),
+      edge_ids=self.edge_ids_csc,
+      input_layout='CSC',
+      layout='CSR'
+    )
+    self.assertTrue(torch.equal(self.indices_csr, csr_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csr, csr_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csr, csr_topo.edge_ids))
+    
+    # 'CSR' -> 'CSC'
+    csc_topo = Topology(
+      edge_index=(self.indptr_csr, self.indices_csr),
+      edge_ids=self.edge_ids_csr,
+      input_layout='CSR',
+      layout='CSC'
+    )
+    self.assertTrue(torch.equal(self.indices_csc, csc_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csc, csc_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csc, csc_topo.edge_ids))
+    
+    # 'CSR' -> 'CSR'
+    csr_topo = Topology(
+      edge_index=(self.indptr_csr, self.indices_csr),
+      edge_ids=self.edge_ids_csr,
+      input_layout='CSR',
+      layout='CSR'
+    )
+    self.assertTrue(torch.equal(self.indices_csr, csr_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csr, csr_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csr, csr_topo.edge_ids))
+    
+    # 'CSC' -> 'CSC'
+    csc_topo = Topology(
+      edge_index=(self.indices_csc, self.indptr_csc),
+      edge_ids=self.edge_ids_csc,
+      input_layout='CSC',
+      layout='CSC'
+    )
+    self.assertTrue(torch.equal(self.indices_csc, csc_topo.indices))
+    self.assertTrue(torch.equal(self.indptr_csc, csc_topo.indptr))
+    self.assertTrue(torch.equal(self.edge_ids_csc, csc_topo.edge_ids))
+    
+    
 
 
 if __name__ == "__main__":

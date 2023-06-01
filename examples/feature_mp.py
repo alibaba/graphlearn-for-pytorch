@@ -40,7 +40,7 @@ if __name__ == "__main__":
   cols = torch.cat([torch.randint(128*3, (128*3,)),
                     torch.randint(128*3, (128*3,)),
                     torch.randint(128*3, (128*3,))])
-  csr_topo = glt.data.CSRTopo(edge_index=torch.stack([rows, cols]))
+  csr_topo = glt.data.Topology(edge_index=torch.stack([rows, cols]))
 
   device_group_list = [glt.data.DeviceGroup(0, [0]),
                        glt.data.DeviceGroup(1, [1])]
