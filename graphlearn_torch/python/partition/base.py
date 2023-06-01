@@ -349,8 +349,8 @@ class PartitionerBase(ABC):
       n_ids_chunks = torch.chunk(n_ids, chunks=((n_ids.shape[0] + self.chunk_size - 1) // self.chunk_size))
       for chunk in n_ids_chunks:
         p_node_feat_chunk = FeaturePartitionData(
-          feats=node_feat[chunk], 
-          ids=chunk,
+          feats=node_feat[chunk],
+          ids=chunk.clone(),
           cache_feats=None,
           cache_ids=None
         )
@@ -373,7 +373,7 @@ class PartitionerBase(ABC):
       for chunk in eids_chunks:
         p_edge_feat_chunk = FeaturePartitionData(
           feats=edge_feat[chunk],
-          ids=chunk,
+          ids=chunk.clone(),
           cache_feats=None,
           cache_ids=None
         )
