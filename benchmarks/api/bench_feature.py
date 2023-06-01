@@ -33,7 +33,7 @@ def test_glt_ogbnproducts(split_ratio):
                                              batch_size=1024,
                                              pin_memory=True,
                                              shuffle=True)
-  csr_topo = glt.data.CSRTopo(dataset[0].edge_index)
+  csr_topo = glt.data.Topology(dataset[0].edge_index)
 
   g = glt.data.Graph(csr_topo, 'CUDA', device=0)
   device = torch.device(0)
@@ -72,7 +72,7 @@ def test_quiver_ogbnproducts(split_ratio):
                                              batch_size=1024,
                                              pin_memory=True,
                                              shuffle=True)
-  csr_topo = quiver.CSRTopo(dataset[0].edge_index)
+  csr_topo = quiver.Topology(dataset[0].edge_index)
   quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, [15, 10, 5],
                                                device=0,
                                                mode="GPU")
