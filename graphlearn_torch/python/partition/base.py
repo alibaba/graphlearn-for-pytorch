@@ -122,7 +122,7 @@ def save_feature_partition_chunk(
   group: str = 'node_feat',
   graph_type: Optional[Union[NodeType, EdgeType]] = None
 ):
-  r""" Append a chunk of feature partition to files in the output directory.
+  r""" Append a chunk of a feature partition to files in the output directory.
   """
   subdir = os.path.join(output_dir, f'part{partition_idx}', group)
   if graph_type is not None:
