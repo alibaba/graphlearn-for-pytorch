@@ -49,6 +49,13 @@ def _check_sample_result(data):
       int(rows[i]) == ((int(cols[i]) + 2) % vnum_total)
     )
 
+  tc.assertEqual(data.num_sampled_nodes[0].item(), 5)
+  tc.assertEqual(data.num_sampled_nodes.size(0), 3)
+  tc.assertNotEqual(data.num_sampled_nodes[1].item(), 0)
+  tc.assertNotEqual(data.num_sampled_nodes[2].item(), 0)
+  tc.assertEqual(data.num_sampled_edges[0].item(), 10)
+  tc.assertEqual(data.num_sampled_edges.size(0), 2)
+  tc.assertNotEqual(data.num_sampled_edges[1].item(), 0)
 
 def _check_hetero_sample_result(data):
   tc = unittest.TestCase()
@@ -107,6 +114,16 @@ def _check_hetero_sample_result(data):
       int(rev_i2i_rows[i]) == ((int(rev_i2i_cols[i]) + 3) % vnum_total)
     )
 
+  tc.assertEqual(data.num_sampled_nodes['item'][0].item(), 0)
+  tc.assertNotEqual(data.num_sampled_nodes['item'][1].item(), 0)
+  tc.assertNotEqual(data.num_sampled_nodes['item'][2].item(), 0)
+  tc.assertEqual(data.num_sampled_nodes['user'][0].item(), 5)
+  tc.assertEqual(data.num_sampled_nodes['user'][1].item(), 0)
+  tc.assertEqual(data.num_sampled_nodes['user'][2].item(), 0)
+  tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][0].item(), 10)
+  tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][1].item(), 0)
+  tc.assertEqual(data.num_sampled_edges['item', 'i2i', 'item'][0].item(), 0)
+  tc.assertNotEqual(data.num_sampled_edges['item', 'i2i', 'item'][1].item(), 0)
 
 def run_test_as_worker(world_size: int, rank: int,
                        master_port: int, sampling_master_port: int,
