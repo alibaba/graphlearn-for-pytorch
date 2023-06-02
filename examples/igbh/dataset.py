@@ -33,10 +33,12 @@ class IGBHeteroDataset(object):
     self.in_memory = in_memory
     self.use_label_2K = use_label_2K
 
-    self.ntypes = ['paper', 'author', 'institue', 'fos']
+    self.ntypes = ['paper', 'author', 'institute', 'fos']
     self.etypes = None
     self.edge_dict = {}
     self.feat_dict = {}
+    self.paper_nodes_num = {'tiny':100000, 'small':1000000, 'medium':10000000, 'large':100000000, 'full':269346174}
+    self.author_nodes_num = {'tiny':357041, 'small':1926066, 'medium':15544654, 'large':116959896, 'full':277220883}
     # 'paper' nodes.
     self.label = None
     self.train_idx = None
@@ -94,25 +96,35 @@ class IGBHeteroDataset(object):
     self.etypes = list(self.edge_dict.keys())
 
     label_file = 'node_label_19.npy' if not self.use_label_2K else 'node_label_2K.npy'
+    paper_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', 'node_feat.npy')
+    paper_lbl_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', label_file)
+    num_paper_nodes = self.paper_nodes_num[self.dataset_size]
     if self.in_memory:
-      paper_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'paper', 'node_feat.npy')))
-      paper_node_labels = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'paper', label_file))).to(torch.long)
+      if self.dataset_size in ['large', 'full']:
+        raise Exception(f"Cannot load related files into memory directly")
+      paper_node_features = torch.from_numpy(np.load(paper_feat_path))
+      paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long) 
     else:
-      paper_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'paper', 'node_feat.npy'), mmap_mode='r'))
-      paper_node_labels = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'paper', label_file), mmap_mode='r')).to(torch.long)
+      if self.dataset_size in ['large', 'full']:
+        paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
+        paper_node_labels = torch.from_numpy(np.memmap(paper_lbl_path, dtype='float32', mode='r', shape=(num_paper_nodes))).to(torch.long)
+      else:
+        paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
+        paper_node_labels = torch.from_numpy(np.load(paper_lbl_path, mmap_mode='r')).to(torch.long)
     self.feat_dict['paper'] = paper_node_features
     self.label = paper_node_labels
 
+    num_author_nodes = self.author_nodes_num[self.dataset_size]
+    author_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'author', 'node_feat.npy')
     if self.in_memory:
-      author_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'author', 'node_feat.npy')))
+      if self.dataset_size in ['large', 'full']:
+        raise Exception(f"Cannot load related files into memory directly")
+      author_node_features = torch.from_numpy(np.load(author_feat_path))
     else:
-      author_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'author', 'node_feat.npy'), mmap_mode='r'))
+      if self.dataset_size in ['large', 'full']:
+        author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
+      else:
+        author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
     self.feat_dict['author'] = author_node_features
 
     if self.in_memory:

@@ -305,6 +305,7 @@ class DistLoader(object):
     if is_hetero:
       node_dict, row_dict, col_dict, edge_dict = {}, {}, {}, {}
       nfeat_dict, efeat_dict = {}, {}
+      num_sampled_nodes_dict, num_sampled_edges_dict = {}, {}
 
       for ntype in self._node_types:
         ids_key = f'{as_str(ntype)}.ids'
@@ -313,6 +314,9 @@ class DistLoader(object):
         nfeat_key = f'{as_str(ntype)}.nfeats'
         if nfeat_key in msg:
           nfeat_dict[ntype] = msg[nfeat_key].to(self.to_device)
+        num_sampled_nodes_key = f'{as_str(ntype)}.num_sampled_nodes'
+        if num_sampled_nodes_key in msg:
+          num_sampled_nodes_dict[ntype] = msg[num_sampled_nodes_key]
 
       for etype_str, rev_etype in self._etype_str_to_rev.items():
         rows_key = f'{etype_str}.rows'
@@ -324,6 +328,9 @@ class DistLoader(object):
         eids_key = f'{etype_str}.eids'
         if eids_key in msg:
           edge_dict[rev_etype] = msg[eids_key].to(self.to_device)
+        num_sampled_edges_key = f'{etype_str}.num_sampled_edges'
+        if num_sampled_edges_key in msg:
+          num_sampled_edges_dict[rev_etype] = msg[num_sampled_edges_key]
         efeat_key = f'{etype_str}.efeats'
         if efeat_key in msg:
           efeat_dict[rev_etype] = msg[efeat_key].to(self.to_device)
@@ -351,6 +358,8 @@ class DistLoader(object):
       output = HeteroSamplerOutput(node_dict, row_dict, col_dict,
                                    edge_dict if len(edge_dict) else None,
                                    batch_dict,
+                                   num_sampled_nodes=num_sampled_nodes_dict,
+                                   num_sampled_edges=num_sampled_edges_dict,
                                    edge_types=self._reversed_edge_types,
                                    input_type=self._input_type,
                                    device=self.to_device,
@@ -363,6 +372,8 @@ class DistLoader(object):
       rows = msg['rows'].to(self.to_device)
       cols = msg['cols'].to(self.to_device)
       eids = msg['eids'].to(self.to_device) if 'eids' in msg else None
+      num_sampled_nodes = msg['num_sampled_nodes'] if 'num_sampled_nodes' in msg else None
+      num_sampled_edges = msg['num_sampled_edges'] if 'num_sampled_edges' in msg else None
 
       nfeats = msg['nfeats'].to(self.to_device) if 'nfeats' in msg else None
       efeats = msg['efeats'].to(self.to_device) if 'efeats' in msg else None
@@ -377,6 +388,7 @@ class DistLoader(object):
 
       # The edge index should be reversed.
       output = SamplerOutput(ids, cols, rows, eids, batch,
+                             num_sampled_nodes, num_sampled_edges,
                              device=self.to_device, metadata=metadata)
       res_data = to_data(output, batch_labels, nfeats, efeats)
 

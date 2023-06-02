@@ -16,6 +16,7 @@
 from typing import Dict, Optional
 
 import torch
+import torch.nn.functional as F
 from torch_geometric.data import Data, HeteroData
 
 from ..sampler import SamplerOutput, HeteroSamplerOutput
@@ -37,6 +38,9 @@ def to_data(
 
   data.batch = sampler_out.batch
   data.batch_size = sampler_out.batch.numel() if data.batch is not None else 0
+
+  data.num_sampled_nodes = sampler_out.num_sampled_nodes
+  data.num_sampled_edges = sampler_out.num_sampled_edges
 
   # update meta data
   if isinstance(sampler_out.metadata, dict):
@@ -62,6 +66,8 @@ def to_hetero_data(
 ) -> HeteroData:
   data = HeteroData(**kwargs)
   edge_index_dict = hetero_sampler_out.get_edge_index()
+  num_hops = max(map(
+    lambda x: len(x), list(hetero_sampler_out.num_sampled_edges.values())))
   # edges
   for k, v in edge_index_dict.items():
     data[k].edge_index = v
@@ -69,12 +75,28 @@ def to_hetero_data(
       data[k].edge = hetero_sampler_out.edge.get(k, None)
     if edge_feat_dict is not None:
       data[k].edge_attr = edge_feat_dict.get(k, None)
+    if k not in hetero_sampler_out.num_sampled_edges:
+      hetero_sampler_out.num_sampled_edges[k] = \
+        torch.tensor([0] * num_hops, device=data[k].edge_index.device)
+    else:
+      hetero_sampler_out.num_sampled_edges[k] = F.pad(
+        hetero_sampler_out.num_sampled_edges[k],
+        (0, num_hops - hetero_sampler_out.num_sampled_edges[k].size(0))
+      )
 
   # nodes
   for k, v in hetero_sampler_out.node.items():
     data[k].node = v
     if node_feat_dict is not None:
       data[k].x = node_feat_dict.get(k, None)
+    if k not in hetero_sampler_out.num_sampled_nodes:
+      hetero_sampler_out.num_sampled_nodes[k] = \
+        torch.tensor([0] * (num_hops + 1), device=data[k].node.device)
+    else:
+      hetero_sampler_out.num_sampled_nodes[k] = F.pad(
+        hetero_sampler_out.num_sampled_nodes[k],
+        (0, num_hops + 1 - hetero_sampler_out.num_sampled_nodes[k].size(0))
+      )
 
   # seed nodes
   for k, v in hetero_sampler_out.batch.items():
@@ -82,6 +104,10 @@ def to_hetero_data(
     data[k].batch_size = v.numel()
     if batch_label_dict is not None:
       data[k].y = batch_label_dict.get(k, None)
+
+  # update num_sampled_nodes & num_sampled_edges
+  data.num_sampled_nodes = hetero_sampler_out.num_sampled_nodes
+  data.num_sampled_edges = hetero_sampler_out.num_sampled_edges
 
   # update meta data
   input_type = hetero_sampler_out.input_type
