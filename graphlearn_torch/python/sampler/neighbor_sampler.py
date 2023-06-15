@@ -162,11 +162,12 @@ class NeighborSampler(BaseSampler):
   ) -> SamplerOutput:
     r""" Sample on homogenous graphs and induce COO format subgraph.
 
-    Note that messages in PyG are passed from src to dst. But we sample src's
-    out neighbors and induce [src_index, dst_index] subgraphs. The direction
-    of sampling is opposite to the direction of message passing. To be
-    consistent with the semantics of PyG, the final edge index is transpose to
-    [dst_index, src_index].
+    Note that messages in PyG are passed from src to dst. In 'out' direction,
+    we sample src's out neighbors and induce [src_index, dst_index] subgraphs. 
+    The direction of sampling is opposite to the direction of message passing. 
+    To be consistent with the semantics of PyG, the final edge index is 
+    transpose to [dst_index, src_index]. In 'in' direction, we don't need to 
+    reverse it.
     """
     out_nodes, out_rows, out_cols, out_edges = [], [], [], []
     num_sampled_nodes, num_sampled_edges = [], []
@@ -205,13 +206,14 @@ class NeighborSampler(BaseSampler):
   ) -> HeteroSamplerOutput:
     r""" Sample on heterogenous graphs and induce COO format subgraph dict.
 
-    Note that messages in PyG are passed from src to dst. But we sample src's
-    out neighbors and induce [src_index, dst_index] subgraphs. The direction
-    of sampling is opposite to the direction of message passing. To be
-    consistent with the semantics of PyG, the final edge index is transpose to
+    Note that messages in PyG are passed from src to dst. In 'out' direction,
+    we sample src's out neighbors and induce [src_index, dst_index] subgraphs. 
+    The direction of sampling is opposite to the direction of message passing. 
+    To be consistent with the semantics of PyG, the final edge index is transpose to
     [dst_index, src_index] and edge_type is reversed as well. For example,
     given the edge_type (u, u2i, i), we sample by meta-path u->i, but return
-    edge_index_dict {(i, rev_u2i, u) : [i, u]}.
+    edge_index_dict {(i, rev_u2i, u) : [i, u]}. In 'in' direction, we don't need to
+    reverse it.
     """
     # sample neighbors hop by hop.
     max_input_batch_size = max([t.numel() for t in input_seeds_dict.values()])
@@ -289,9 +291,9 @@ class NeighborSampler(BaseSampler):
     r"""Performs sampling from an edge sampler input, leveraging a sampling
     function of the same signature as `node_sample`.
 
-    Currently, we support the out-edge sampling manner, so we reverse the
-    direction of src and dst for the output so that features of the sampled
-    nodes during training can be aggregated from k-hop to (k-1)-hop nodes.
+    Note that in out-edge sampling, we reverse the direction of src and dst
+    for the output so that features of the sampled nodes during training can
+    be aggregated from k-hop to (k-1)-hop nodes.
     """
     src = inputs.row.to(self.device)
     dst = inputs.col.to(self.device)
