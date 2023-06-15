@@ -15,7 +15,7 @@
 
 import os
 import socket
-from typing import Any, Dict, Callable, Optional
+from typing import Any, Dict, Callable, Optional, Literal
 from ..typing import reverse_edge_type
 from .tensor import id2idx
 
@@ -69,7 +69,7 @@ def index_select(data, index):
   return data[index]
 
 
-def merge_hetero_sampler_output(in_sample: Any, out_sample: Any, device):
+def merge_hetero_sampler_output(in_sample: Any, out_sample: Any, device, edge_dir: Literal['in', 'out']='out'):
   def subid2gid(sample):
     for k, v in sample.row.items():
       sample.row[k] = sample.node[k[0]][v]
@@ -99,22 +99,24 @@ def merge_hetero_sampler_output(in_sample: Any, out_sample: Any, device):
     merge_tensor_dict(in_sample.edge, out_sample.edge, unique=False)
   if out_sample.edge_types is not None and in_sample.edge_types is not None:
     out_sample.edge_types = list(set(out_sample.edge_types) | set(in_sample.edge_types))
-    out_sample.edge_types = [
-      reverse_edge_type(etype) if etype[0] != etype[-1] else etype
-      for etype in out_sample.edge_types
-    ]
+    if edge_dir == 'out':
+      out_sample.edge_types = [
+        reverse_edge_type(etype) if etype[0] != etype[-1] else etype
+        for etype in out_sample.edge_types
+      ]
 
   return out_sample
 
 
-def format_hetero_sampler_output(in_sample: Any):
+def format_hetero_sampler_output(in_sample: Any, edge_dir=Literal['in', 'out']):
   for k in in_sample.node.keys():
     in_sample.node[k] = in_sample.node[k].unique()
   if in_sample.edge_types is not None:
-    in_sample.edge_types = [
-      reverse_edge_type(etype) if etype[0] != etype[-1] else etype
-      for etype in in_sample.edge_types
-    ]
+    if edge_dir == 'out':
+      in_sample.edge_types = [
+        reverse_edge_type(etype) if etype[0] != etype[-1] else etype
+        for etype in in_sample.edge_types
+      ]
   return in_sample
 
 # Append a tensor to a file using pickle

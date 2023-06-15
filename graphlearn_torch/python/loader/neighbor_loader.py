@@ -78,8 +78,10 @@ class NeighborLoader(NodeLoader):
         strategy=strategy,
         with_edge=with_edge,
         device=device,
+        edge_dir=data._edge_dir,
       )
     self.as_pyg_v1 = as_pyg_v1
+    self._edge_dir = data._edge_dir
     super().__init__(
       data=data,
       node_sampler=neighbor_sampler,

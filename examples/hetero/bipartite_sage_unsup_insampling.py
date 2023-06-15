@@ -29,7 +29,7 @@ from torch_geometric.utils.convert import to_scipy_sparse_matrix
 import graphlearn_torch as glt
 from graphlearn_torch.loader import LinkNeighborLoader
 
-device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 path = osp.join(osp.dirname(osp.realpath(__file__)), '../../data/Taobao')
 
 dataset = Taobao(path)
@@ -81,7 +81,9 @@ for ntype in train_data.node_types:
 # Add the generated item<>item relationships for high-order information:
 train_edge_dict[('item', 'to', 'item')] = item_to_item_edge_index
 
-train_dataset = glt.data.Dataset(edge_dir='in')
+edge_dir = 'out' # 'in' for in-bound sampling, 'out' for out-boung sampling
+
+train_dataset = glt.data.Dataset(edge_dir=edge_dir)
 train_dataset.init_graph(
   edge_index=train_edge_dict,
   graph_mode='ZERO_COPY'
@@ -101,7 +103,7 @@ for ntype in test_data.node_types:
 # Add the generated item<>item relationships for high-order information:
 test_edge_dict[('item', 'to', 'item')] = item_to_item_edge_index
 
-test_dataset = glt.data.Dataset(edge_dir='in')
+test_dataset = glt.data.Dataset(edge_dir=edge_dir)
 test_dataset.init_graph(
   edge_index=test_edge_dict,
   graph_mode='ZERO_COPY'
@@ -221,22 +223,23 @@ model = Model(
 ).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
+batch_edge_type = ('user', 'to', 'item') if edge_dir == 'in' else ('item', 'rev_ to', 'user')
 
 def train():
   model.train()
-
   total_loss = total_examples = 0
   for batch in tqdm.tqdm(train_loader):
+    
     batch = batch.to(device)
     optimizer.zero_grad()
 
     pred = model(
       batch.x_dict,
       batch.edge_index_dict,
-      batch['item', 'rev_to', 'user'].edge_label_index,
+      batch[batch_edge_type].edge_label_index,
     )
     loss = F.binary_cross_entropy_with_logits(
-      pred, batch['item', 'rev_to', 'user'].edge_label)
+      pred, batch[batch_edge_type].edge_label)
 
     loss.backward()
     optimizer.step()
@@ -257,9 +260,9 @@ def test(loader):
     pred = model(
       batch.x_dict,
       batch.edge_index_dict,
-      batch['item', 'rev_to', 'user'].edge_label_index,
+      batch[batch_edge_type].edge_label_index,
     ).sigmoid().view(-1).cpu()
-    target = batch['item', 'rev_to', 'user'].edge_label.long().cpu()
+    target = batch[batch_edge_type].edge_label.long().cpu()
 
     preds.append(pred)
     targets.append(target)
@@ -270,7 +273,7 @@ def test(loader):
   return roc_auc_score(target, pred)
 
 
-for epoch in range(1, 21):
+for epoch in range(1, 5):
   loss = train()
   test_auc = test(test_loader)
 

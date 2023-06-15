@@ -133,6 +133,7 @@ class LinkNeighborLoader(LinkLoader):
         with_edge=with_edge,
         with_neg=with_neg,
         device=device,
+        edge_dir=data._edge_dir
       )
 
     super().__init__(
@@ -145,5 +146,6 @@ class LinkNeighborLoader(LinkLoader):
       batch_size=batch_size,
       shuffle=shuffle,
       drop_last=drop_last,
+      edge_dir=data._edge_dir,
       **kwargs,
     )
