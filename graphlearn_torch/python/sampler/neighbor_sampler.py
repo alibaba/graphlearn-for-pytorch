@@ -134,7 +134,7 @@ class NeighborSampler(BaseSampler):
     else:
       nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
     if nbrs.numel() == 0:
-      nbrs, nbrs_num = input_seeds, torch.ones_like(input_seeds)
+      nbrs, nbrs_num = input_seeds, torch.ones_like(input_seeds)  # test 
       if self.with_edge:
         edge_ids = -1 * nbrs_num
     return NeighborOutput(nbrs, nbrs_num, edge_ids)

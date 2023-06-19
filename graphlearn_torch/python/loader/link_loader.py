@@ -178,7 +178,7 @@ class LinkLoader(object):
                         )
     else: # hetero
       x_dict = {}
-      x_dict = {ntype : self.data.get_node_feature(ntype)[ids] for ntype, ids in sampler_out.node.items()}
+      x_dict = {ntype : self.data.get_node_feature(ntype)[ids.to(torch.int64)] for ntype, ids in sampler_out.node.items()}
       edge_attr_dict = {}
       if sampler_out.edge is not None:
         for etype, eids in sampler_out.edge.items():
@@ -187,7 +187,7 @@ class LinkLoader(object):
           elif self._edge_dir == 'in':
             efeat = self.data.get_edge_feature(etype)
           if efeat is not None:
-            edge_attr_dict[etype] = efeat[eids]
+            edge_attr_dict[etype] = efeat[eids.to(torch.int64)]
 
       res_data = to_hetero_data(sampler_out,
                                 node_feat_dict=x_dict,

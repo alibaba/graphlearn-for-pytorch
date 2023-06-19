@@ -23,11 +23,11 @@ class GraphTestCase(unittest.TestCase):
   def setUp(self):
     """
     input graph:
-      r/c	0	1	2	3	4	5
-       0	0	1				
-       1  	2		3		
-       2 		  4	5	6	
-       3 	  				7
+      r/c 0 1 2 3 4 5
+       0  0 1
+       1    2   3
+       2      4 5 6
+       3            7
        4
        5
     """

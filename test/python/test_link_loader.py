@@ -216,7 +216,7 @@ class LinkLoaderTestCase(unittest.TestCase):
 
     loader1 = LinkNeighborLoader(
       hetero_dataset,
-      num_neighbors=[3] * 2,
+      num_neighbors=[3],
       edge_label_index=('paper', 'to', 'author'),
       batch_size=20,
       neg_sampling=self.bin_neg_sampling,
@@ -237,7 +237,7 @@ class LinkLoaderTestCase(unittest.TestCase):
     
     loader2 = LinkNeighborLoader(
       hetero_dataset,
-      num_neighbors=[3] * 2,
+      num_neighbors=[3]*2,
       edge_label_index=('author', 'to', 'institute'),
       batch_size=20,
       neg_sampling=self.bin_neg_sampling,
