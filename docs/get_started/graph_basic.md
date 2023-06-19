@@ -6,7 +6,7 @@ We will introduce the basic concepts and graph operations of GLT.
 
 ## Graph and Feature
 
-GLT describes the graph topologcial data in CSR or CSC
+GLT describes the graph topo data in CSR or CSC
 format by an instance of [`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology).
 The [`graphlearn_torch.data.graph.Graph`](graphlearn_torch.data.graph.Graph) uses
 [`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology) as input data and stores the data

@@ -147,11 +147,11 @@ class RandomSamplerTestCase(unittest.TestCase):
        with_edge=True,
        edge_dir='in'
     )
-    # sample from 'user' will raise exception
-    with self.assertRaises(RuntimeError):
-      sampler_input = glt.sampler.NodeSamplerInput(
-        node=torch.tensor([1,5,9,13,17,21,25,29]), input_type=self.user_ntype)
-      sample_out = node_sampler.sample_from_nodes(sampler_input)
+    # sample from 'user' can't get no other nodes
+    sampler_input = glt.sampler.NodeSamplerInput(
+      node=torch.tensor([1,5,9,13,17,21,25,29]), input_type=self.user_ntype)
+    sample_out = node_sampler.sample_from_nodes(sampler_input)
+    self.assertTrue(len(sample_out.num_sampled_edges) == 0 and sample_out.node['user'].numel() == 8)
     
     # sampler from 'item', we can get 'user' and 'item'
     sampler_input = glt.sampler.NodeSamplerInput(

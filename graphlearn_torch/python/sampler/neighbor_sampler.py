@@ -244,7 +244,7 @@ class NeighborSampler(BaseSampler):
             if output.edge is not None:
               edge_dict[etype] = output.edge
       if len(nbr_dict) == 0:
-        raise RuntimeError('No neighbors sampled.')
+        continue
       nodes_dict, rows_dict, cols_dict = inducer.induce_next(nbr_dict)
       merge_dict(nodes_dict, out_nodes)
       merge_dict(rows_dict, out_rows)

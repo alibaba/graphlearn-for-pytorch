@@ -112,9 +112,9 @@ def to_hetero_data(
 
   # update meta data
   input_type = hetero_sampler_out.input_type
-  # if edge_dir == 'out', we need to reverse the edge type
-  temp_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
   if isinstance(hetero_sampler_out.metadata, dict):
+    # if edge_dir == 'out', we need to reverse the edge type
+    temp_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
     for k, v in hetero_sampler_out.metadata.items():
       if k == 'edge_label_index':
         if edge_dir == 'out':
