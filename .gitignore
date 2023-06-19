@@ -4,6 +4,7 @@ _build/
 /dist/
 /graphlearn_torch.egg-info/
 /data/
+/examples/data/
 CMakeFiles/
 *.cmake
 __pycache__/
