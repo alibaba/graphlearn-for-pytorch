@@ -224,7 +224,7 @@ model = Model(
 ).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-batch_edge_type = ('user', 'to', 'item') if edge_dir == 'in' else ('item', 'rev_ to', 'user')
+batch_edge_type = ('user', 'to', 'item') if edge_dir == 'in' else ('item', 'rev_to', 'user')
 
 def train():
   model.train()
