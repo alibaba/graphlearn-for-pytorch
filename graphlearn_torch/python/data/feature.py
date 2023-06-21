@@ -84,7 +84,7 @@ class Feature(object):
       (Default: ``torch.float32``).
 
   Example:
-    >>> feat_tensor, id2index = sort_by_in_degree(feat_tensor, csr_topo)
+    >>> feat_tensor, id2index = sort_by_in_degree(feat_tensor, topo)
     >>> # suppose you have 8 GPUs.
     >>> # if there is no NVLink.
     >>> device_groups = [DeviceGroup(i, [i]) for i in range(8)]

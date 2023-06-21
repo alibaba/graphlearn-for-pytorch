@@ -25,9 +25,12 @@ class RandomNegativeSampler(object):
     graph: A ``graphlearn_torch.data.Graph`` object.
     mode: Execution mode of sampling, 'CUDA' means sampling on
       GPU, 'CPU' means sampling on CPU.
+    edge_dir: The direction of edges to be sampled, determines 
+      the order of rows and columns returned.
   """
-  def __init__(self, graph, mode='CUDA'):
+  def __init__(self, graph, mode='CUDA', edge_dir='out'):
     self._mode = mode
+    self._edge_dir = edge_dir
     if mode == 'CUDA':
       self._sampler = pywrap.CUDARandomNegativeSampler(graph.graph_handler)
     else:
@@ -47,5 +50,8 @@ class RandomNegativeSampler(object):
     Returns:
       negative edge_index(non-strict when padding is True).
     """
-    rows, cols = self._sampler.sample(req_num, trials_num, padding)
+    if self._edge_dir == 'out':
+      rows, cols = self._sampler.sample(req_num, trials_num, padding)
+    elif self._edge_dir == 'in':
+      cols, rows = self._sampler.sample(req_num, trials_num, padding)
     return torch.stack([rows, cols], dim=0)

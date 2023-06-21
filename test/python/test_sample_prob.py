@@ -21,7 +21,7 @@ import torch
 import torch_geometric.transforms as T
 from torch_geometric.datasets import OGB_MAG
 
-from graphlearn_torch.data import CSRTopo, Graph
+from graphlearn_torch.data import Topology, Graph
 from graphlearn_torch.sampler import NeighborSampler, NodeSamplerInput
 
 
@@ -51,7 +51,7 @@ class SampleProbTestCase(unittest.TestCase):
     self.ids = torch.randperm(self.node_dict[self.input_type].size(0))[:5]
 
     for etype, eidx in edge_dict.items():
-      csr_dict[etype] = CSRTopo(edge_index=eidx)
+      csr_dict[etype] = Topology(edge_index=eidx)
       self.graph_dict[etype] = Graph(csr_topo=csr_dict[etype])
       self.req_nums[etype] = [5, 5]
       # print(f"{etype}: #row={self.graph_dict[etype].row_count} \

@@ -16,7 +16,7 @@
 import unittest
 import torch
 
-from graphlearn_torch.data import CSRTopo, DeviceGroup, Feature, sort_by_in_degree
+from graphlearn_torch.data import Topology, DeviceGroup, Feature, sort_by_in_degree
 from graphlearn_torch.utils import tensor_equal_with_device
 
 
@@ -31,7 +31,7 @@ class FeatureTestCase(unittest.TestCase):
     cols = torch.cat([torch.randint(128*3, (128*3,)),
                       torch.randint(128*3, (128*3,)),
                       torch.randint(128*3, (128*3,))])
-    self.csr_topo = CSRTopo(edge_index=torch.stack([rows, cols]))
+    self.csr_topo = Topology(edge_index=torch.stack([rows, cols]))
     self.input = torch.tensor([10, 20, 200, 210, 300, 310], dtype=torch.int64,
                               device= torch.device('cuda:0'))
     attr = torch.ones(2, 128, dtype=torch.float32,

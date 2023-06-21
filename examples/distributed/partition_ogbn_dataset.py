@@ -60,7 +60,7 @@ def partition_dataset(ogbn_dataset: str,
     torch.save(test_idx[pidx], osp.join(test_idx_partitions_dir, f'partition{pidx}.pt'))
 
   print('-- Initializing graph ...')
-  csr_topo = glt.data.CSRTopo(edge_index=data.edge_index, layout='COO')
+  csr_topo = glt.data.Topology(edge_index=data.edge_index, input_layout='COO')
   graph = glt.data.Graph(csr_topo, mode='ZERO_COPY')
 
   print('-- Sampling hotness ...')

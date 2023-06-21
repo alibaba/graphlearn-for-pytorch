@@ -55,7 +55,7 @@ def _prepare_dataset(rank: int):
     eids = [10, 11, 12, 13, 14, 15, 16]
   edge_index = torch.tensor([rows, cols], dtype=torch.int64)
   edge_ids = torch.tensor(eids, dtype=torch.int64)
-  csr_topo = glt.data.CSRTopo(edge_index=edge_index, edge_ids=edge_ids)
+  csr_topo = glt.data.Topology(edge_index=edge_index, edge_ids=edge_ids)
   graph = glt.data.Graph(csr_topo, 'ZERO_COPY', device=0)
   # feature
   device_group_list = [glt.data.DeviceGroup(0, [0]),
