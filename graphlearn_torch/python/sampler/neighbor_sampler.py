@@ -133,10 +133,6 @@ class NeighborSampler(BaseSampler):
       nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
     else:
       nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
-    if nbrs.numel() == 0:
-      nbrs, nbrs_num = input_seeds, torch.ones_like(input_seeds)  # test 
-      if self.with_edge:
-        edge_ids = -1 * nbrs_num
     return NeighborOutput(nbrs, nbrs_num, edge_ids)
 
   def sample_from_nodes(
@@ -233,6 +229,8 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[-1], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
+            if output is None:
+              continue
             nbr_dict[reverse_edge_type(etype)] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
               edge_dict[reverse_edge_type(etype)] = output.edge
@@ -240,6 +238,8 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[0], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
+            if output is None:
+              continue
             nbr_dict[etype] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
               edge_dict[etype] = output.edge
