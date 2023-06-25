@@ -229,6 +229,8 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[-1], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
+            if output is None:
+              continue
             nbr_dict[reverse_edge_type(etype)] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
               edge_dict[reverse_edge_type(etype)] = output.edge
@@ -236,6 +238,8 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[0], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
+            if output is None:
+              continue
             nbr_dict[etype] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
               edge_dict[etype] = output.edge
