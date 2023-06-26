@@ -280,6 +280,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
               self._sample_one_hop(srcs, req_num, etype))
         for etype, task in task_dict.items():
           output: NeighborOutput = await task
+          if output is None:
+            continue
           nbr_dict[etype] = [src_dict[etype[0]], output.nbr, output.nbr_num]
           if output.edge is not None:
             edge_dict[etype] = output.edge
@@ -598,7 +600,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
                                         args=(p_ids.cpu(), num_nbr, etype)))
     # Without remote sampling results.
     if len(remote_orders_list) == 0:
-      return partition_results[0].output
+      if len(partition_results) > 0:
+        return partition_results[0].output
+      else:
+        return None
     # With remote sampling results.
     res_fut_list = await wrap_torch_future(torch.futures.collect_all(futs))
     for i, res_fut in enumerate(res_fut_list):

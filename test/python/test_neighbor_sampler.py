@@ -16,7 +16,7 @@
 import unittest
 import torch
 
-from graphlearn_torch.data import CSRTopo, Graph
+from graphlearn_torch.data import Topology, Graph
 from graphlearn_torch.sampler import NeighborSampler, NegativeSampling, EdgeSamplerInput
 from graphlearn_torch.utils import tensor_equal_with_device
 
@@ -32,7 +32,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     """
     indptr = torch.tensor([0, 2, 4, 6, 7, 7, 7], dtype=torch.int64)
     indices = torch.tensor([0, 1, 1, 3, 2, 4, 5], dtype=torch.int64)
-    self.csr_topo = CSRTopo(edge_index=(indptr, indices),  layout='CSR')
+    self.csr_topo = Topology(edge_index=(indptr, indices), input_layout='CSR')
     self.input_seeds = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     self.num_neighbors = [2]
 

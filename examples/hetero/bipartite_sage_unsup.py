@@ -81,7 +81,9 @@ for ntype in train_data.node_types:
 # Add the generated item<>item relationships for high-order information:
 train_edge_dict[('item', 'to', 'item')] = item_to_item_edge_index
 
-train_dataset = glt.data.Dataset()
+edge_dir = 'out' # 'in' for in-bound sampling, 'out' for out-boung sampling
+
+train_dataset = glt.data.Dataset(edge_dir=edge_dir)
 train_dataset.init_graph(
   edge_index=train_edge_dict,
   graph_mode='ZERO_COPY'
@@ -99,9 +101,9 @@ for ntype in test_data.node_types:
   test_feature_dict[ntype] = test_data[ntype].x.clone(memory_format=torch.contiguous_format)
 
 # Add the generated item<>item relationships for high-order information:
-test_edge_dict[('item', 'to', 'item')] = item_to_item_edge_index
+test_edge_dict[('item', 'to', 'item')] = item_to_item_edge_index.clone()
 
-test_dataset = glt.data.Dataset()
+test_dataset = glt.data.Dataset(edge_dir=edge_dir)
 test_dataset.init_graph(
   edge_index=test_edge_dict,
   graph_mode='ZERO_COPY'
@@ -209,8 +211,9 @@ class Model(torch.nn.Module):
         edge_index_dict[('item', 'to', 'item')],
     )
     z_dict['user'] = self.user_encoder(x_dict, edge_index_dict)
-
-    return self.decoder(z_dict['item'], z_dict['user'], edge_label_index)
+    if edge_dir == 'out':
+      return self.decoder(z_dict['item'], z_dict['user'], edge_label_index)
+    return self.decoder(z_dict['user'], z_dict['item'], edge_label_index)
 
 
 model = Model(
@@ -221,6 +224,7 @@ model = Model(
 ).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
+batch_edge_type = ('user', 'to', 'item') if edge_dir == 'in' else ('item', 'rev_to', 'user')
 
 def train():
   model.train()
@@ -233,10 +237,10 @@ def train():
     pred = model(
       batch.x_dict,
       batch.edge_index_dict,
-      batch['item', 'rev_to', 'user'].edge_label_index,
+      batch[batch_edge_type].edge_label_index,
     )
     loss = F.binary_cross_entropy_with_logits(
-      pred, batch['item', 'rev_to', 'user'].edge_label)
+      pred, batch[batch_edge_type].edge_label)
 
     loss.backward()
     optimizer.step()
@@ -257,9 +261,9 @@ def test(loader):
     pred = model(
       batch.x_dict,
       batch.edge_index_dict,
-      batch['item', 'rev_to', 'user'].edge_label_index,
+      batch[batch_edge_type].edge_label_index,
     ).sigmoid().view(-1).cpu()
-    target = batch['item', 'rev_to', 'user'].edge_label.long().cpu()
+    target = batch[batch_edge_type].edge_label.long().cpu()
 
     preds.append(pred)
     targets.append(target)

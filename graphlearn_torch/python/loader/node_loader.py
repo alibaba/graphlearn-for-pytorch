@@ -96,8 +96,7 @@ class NodeLoader(object):
                          node_feats=x, edge_feats=edge_attr)
     else: # hetero
       x_dict = {}
-      for ntype, ids in sampler_out.node.items():
-        x_dict[ntype] = self.data.get_node_feature(ntype)[ids]
+      x_dict = {ntype : self.data.get_node_feature(ntype)[ids] for ntype, ids in sampler_out.node.items()}
       input_t_ids = sampler_out.node[self._input_type]
       y_dict = {self._input_type: self.input_t_label[input_t_ids]} \
         if self.input_t_label is not None else None
@@ -109,5 +108,6 @@ class NodeLoader(object):
             edge_attr_dict[etype] = efeat[eids]
       res_data = to_hetero_data(sampler_out, batch_label_dict=y_dict,
                                 node_feat_dict=x_dict,
-                                edge_feat_dict=edge_attr_dict)
+                                edge_feat_dict=edge_attr_dict,
+                                edge_dir=self.data._edge_dir)
     return res_data

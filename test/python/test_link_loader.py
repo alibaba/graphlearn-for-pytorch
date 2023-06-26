@@ -180,6 +180,80 @@ class LinkLoaderTestCase(unittest.TestCase):
       assert batch['author'].dst_neg_index.size(0) == 20
       assert batch['author'].dst_neg_index.size(1) == 3
 
+  def test_hetero_link_neighbor_loader_with_insampling(self):
+    hetero_data, hetero_dataset = HeteroData(), Dataset(edge_dir='in')
+
+    hetero_data['paper'].x = torch.arange(100, dtype=torch.float32)
+    hetero_data['author'].x = torch.arange(100, 300, dtype=torch.float32)
+    hetero_data['institute'].x = torch.arange(300, 350, dtype=torch.float32)
+
+    hetero_data['paper', 'to', 'author'].edge_index = get_edge_index(100, 200, 1000)
+    hetero_data['paper', 'to', 'author'].edge_attr = torch.arange(500, 1500, dtype=torch.float32)
+    hetero_data['author', 'to', 'institute'].edge_index = get_edge_index(200, 50, 100)
+    hetero_data['author', 'to', 'institute'].edge_attr = torch.arange(1500, 1600, dtype=torch.float32)
+
+    edge_dict, node_feature_dict, edge_feature_dict = {}, {}, {}
+    for etype in hetero_data.edge_types:
+      edge_dict[etype] = hetero_data[etype]['edge_index']
+      edge_feature_dict[etype] = hetero_data[etype]['edge_attr']
+    for ntype in hetero_data.node_types:
+      node_feature_dict[ntype] = hetero_data[ntype].x.clone(memory_format=torch.contiguous_format)
+
+    hetero_dataset.init_graph(
+      edge_index=edge_dict,
+      graph_mode='CUDA',
+      device=0)
+
+    hetero_dataset.init_node_features(
+      node_feature_data=node_feature_dict,
+      device_group_list=[DeviceGroup(0, [0])],
+      device=0)
+
+    hetero_dataset.init_edge_features(
+      edge_feature_data=edge_feature_dict,
+      device_group_list=[DeviceGroup(0, [0])],
+      device=0)
+
+    loader1 = LinkNeighborLoader(
+      hetero_dataset,
+      num_neighbors=[3],
+      edge_label_index=('paper', 'to', 'author'),
+      batch_size=20,
+      neg_sampling=self.bin_neg_sampling,
+      with_edge=True,
+      shuffle=True,
+    )
+
+    assert str(loader1) == 'LinkNeighborLoader()'
+
+    for batch in loader1:
+      self.assertTrue(set(batch.node_types) == set(['paper', 'author']))
+      assert isinstance(batch, HeteroData)
+      batch_p2a = batch['paper', 'to', 'author']
+      assert batch_p2a.edge_label_index.size(1) == 40
+      assert torch.all(batch['paper', 'to', 'author'].edge_label[:20] == 1)
+      assert torch.all(batch['paper', 'to', 'author'].edge_label[20:] == 0)
+      assert batch_p2a.edge.size(0) == batch_p2a.edge_attr.size(0)
+    
+    loader2 = LinkNeighborLoader(
+      hetero_dataset,
+      num_neighbors=[3]*2,
+      edge_label_index=('author', 'to', 'institute'),
+      batch_size=20,
+      neg_sampling=self.bin_neg_sampling,
+      with_edge=True,
+      shuffle=True,
+    )
+
+    for batch in loader2:
+      self.assertTrue(set(batch.node_types) == set(['author', 'institute', 'paper']))
+      assert isinstance(batch, HeteroData)
+      batch_p2a = batch['author', 'to', 'institute']
+      assert batch_p2a.edge_label_index.size(1) == 40
+      assert torch.all(batch['author', 'to', 'institute'].edge_label[:20] == 1)
+      assert torch.all(batch['author', 'to', 'institute'].edge_label[20:] == 0)
+      assert batch_p2a.edge.size(0) == batch_p2a.edge_attr.size(0)
+
 
 if __name__ == "__main__":
   unittest.main()

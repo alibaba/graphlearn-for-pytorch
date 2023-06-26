@@ -6,10 +6,10 @@ We will introduce the basic concepts and graph operations of GLT.
 
 ## Graph and Feature
 
-GLT describes the graph topologcial data in CSR
-format by an instance of [`graphlearn_torch.data.graph.CSRTopo`](graphlearn_torch.data.graph.CSRTopo).
+GLT describes the graph topo data in CSR or CSC
+format by an instance of [`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology).
 The [`graphlearn_torch.data.graph.Graph`](graphlearn_torch.data.graph.Graph) uses
-[`graphlearn_torch.data.graph.CSRTopo`](graphlearn_torch.data.graph.CSRTopo) as input data and stores the data
+[`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology) as input data and stores the data
 into either CPU memory or GPU memory according to different `mode`.
 
 Node features are described by an instance of
@@ -28,7 +28,7 @@ and pinned memory.
 
 ``` python
 import torch
-from graphlearn_torch.data import CSRTopo, DeviceGroup, Feature, Graph
+from graphlearn_torch.data import Topology, DeviceGroup, Feature, Graph
 # graph topology:
 # 0
 # | \
@@ -37,7 +37,7 @@ from graphlearn_torch.data import CSRTopo, DeviceGroup, Feature, Graph
 edge_index = torch.tensor([[0, 0, 1, 2],
                             [1, 2, 0, 0]], dtype=torch.long)
 x = torch.tensor([[0.0, 1.0], [0.1, 1.1], [0.2, 1.2]], dtype=torch.float)
-csr_topo = CSRTopo(edge_index)
+csr_topo = Topology(edge_index, layout='CSR')
 graph = Graph(csr_topo, mode='ZERO_COPY', device=0)
 # The 20% feature data is stored in GPU 0 and the remaining 80% is in
 # pinned memory.
@@ -57,14 +57,14 @@ each input node.
 
 ``` python
 import torch
-from graphlearn_torch.data import CSRTopo, Graph
+from graphlearn_torch.data import Topology, Graph
 from graphlearn_torch.sampler import NeighborSampler
 # 0
 # | \
 # 1  2
 edge_index = torch.tensor([[0, 0, 1, 2],
                            [1, 2, 0, 0]], dtype=torch.long)
-csr_topo = CSRTopo(edge_index)
+csr_topo = Topology(edge_index, layout='CSR')
 graph = Graph(csr_topo, mode='ZERO_COPY', device=0)
 sampler = NeighborSampler(graph, [2])
 input_seeds = torch.tensor([0, 1, 2], dtype=torch.long)

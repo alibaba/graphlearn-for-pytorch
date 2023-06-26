@@ -12,47 +12,54 @@ the feature data is described by an instance of
 
 
 ## 1. Graph
-A graph can be described by a 2D edge_index Tensor or a CSR matrix.
-GLT implements the class [`graphlearn_torch.data.graph.CSRTopo`](graphlearn_torch.data.graph.CSRTopo)
-to represent the input data of a graph, which supports both edge_index or CSR matrix format.
+A graph can be described by a 2D edge_index Tensor, a CSR matrix, or a CSC matrix.
+GLT implements the class [`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology)
+to represent the input data of a graph, which supports edge_index tensor, CSR martix and CSC matrix format.
 Then the graph object is described by an instance of
 [`graphlearn_torch.data.graph.Graph`](graphlearn_torch.data.graph.Graph),
-which takes `CSRTopo` as input and stores the graph data in CPU memory,
+which takes `Topology` as input and stores the graph data in CPU memory,
 pinned memory or GPU memory according to corresponding mode.
 Based on `Graph`, GLT provides graph operations(both cpu and cuda versions are available)
 like neighbor sampling, negative sampling and subgraph sampling.
 
 
-### 1.1 CSRTopo
+### 1.1 Topology
 
 The graph topology data is formed into
-[`graphlearn_torch.data.graph.CSRTopo`](graphlearn_torch.data.graph.CSRTopo)
-object from edge index (with the format of 'COO', 'CSC' or "CSR' derectly),
+[`graphlearn_torch.data.graph.Topology`](graphlearn_torch.data.graph.Topology)
+object from edge index (with the format of 'COO', 'CSC' or 'CSR' derectly),
 which will be used to build `Graph`.
-`CSRTopo` also supports the input `edge_ids` to represent edge ids and will
+`Topology` also supports the input `edge_ids` to represent edge ids and will
 assign ordinal indices to edges by input order by default.
+`Topology` uses `input_layout` to represent the input edge index format and 
+`layout` to represent the target edge index format. `input_layout` supports ‘COO’, 
+‘CSC’ and ‘CSR’ as input, and `layout` can select ‘CSC’ or ‘CSR’ format, 
+which depends on whether the sampling method is in-bound or out-bound.
 
 ``` python
-class CSRTopo(object):
-  r"""Graph topology in CSR format.
+class Topology(object):
+  r""" Graph topology with support for CSC and CSR formats.
 
   Args:
     edge_index (a 2D torch.Tensor or numpy.ndarray, or a tuple): The edge
-      index for graph topology.
+      index for graph topology, in the order of first row and then column. 
     edge_ids (torch.Tensor or numpy.ndarray, optional): The edge ids for
       graph edges. If set to ``None``, it will be aranged by the edge size.
       (default: ``None``)
-    layout (str): The edge layout representation for the input edge index,
+    input_layout (str): The edge layout representation for the input edge index,
       should be 'COO' (rows and cols uncompressed), 'CSR' (rows compressed)
       or 'CSC' (columns compressed). (default: 'COO')
+    layout ('CSR' or 'CSC'): The target edge layout representation for 
+      the output. (default: 'CSR')
   """
-  def __init__(self, edge_index, edge_ids=None, layout='COO'):
+  def __init__(self, edge_index, edge_ids, input_layout = 'COO', 
+               layout: Literal['CSR', 'CSC'] = 'CSR')
 ```
 
 ### 1.2 Graph
 
 The [`graphlearn_torch.data.graph.Graph`](graphlearn_torch.data.graph.Graph)
-takes `CSRTopo` as input and supports three storage modes:
+takes `Topology` as input and supports three storage modes:
   - `CPU`: graph data are stored in the CPU memory and graph
     operations are also executed on CPU.
   - `ZERO_COPY`: graph data are stored in the pinned CPU memory and graph
@@ -65,13 +72,13 @@ class Graph(object):
   r""" A graph object used for graph operations such as sampling.
 
   Args:
-    csr_topo (CSRTopo): An instance of ``CSRTopo`` with graph topology data.
+    csr_topo (Topology): An instance of ``Topology`` with graph topology data.
     mode (str): The graph operation mode, must be 'CPU', 'ZERO_COPY' or 'CUDA'.
       (Default: 'ZERO_COPY').
     device (int, optional): The target cuda device rank to perform graph
       operations.
   """
-  def __init__(self, csr_topo: CSRTopo, mode = 'ZERO_COPY',
+  def __init__(self, csr_topo: Topology, mode = 'ZERO_COPY',
                device: Optional[int] = None):
 ```
 

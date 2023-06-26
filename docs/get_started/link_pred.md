@@ -46,6 +46,8 @@ GPU memory capacity.
 The node features are sorted by in-degrees of nodes and then split into two parts
 according to `split_ratio`. The node features with higher in-degrees are stored
 in GPU memory, and the remaining part is stored in pinned memory for UVA.
+The `edge_dir` can be `in` or `out` indicating the direction of edges to be sampled, 
+which will determine whether `layout` in `Topology` is `CSC` or `CSR`.
 
 Then, we use a link neigbor loader [`graphlearn_torch.loader.link_neighbor_loader.LinkNeighborLoader`](graphlearn_torch.loader.link_neighbor_loader.LinkNeighborLoader) with very similar API with PyG's `LinkNeighborLoader`. The default negative sampling ratio is 1.0 and you can config it by initialising `NegativeSampling` with ratio.
 
