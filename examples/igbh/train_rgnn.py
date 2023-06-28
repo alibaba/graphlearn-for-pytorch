@@ -129,12 +129,12 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='10,15')
+  parser.add_argument('--fan_out', type=str, default='10,10')
   parser.add_argument('--batch_size', type=int, default=5120)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.001)
+  parser.add_argument('--learning_rate', type=int, default=0.01)
   parser.add_argument('--epochs', type=int, default=20)
-  parser.add_argument('--num_layers', type=int, default=6)
+  parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
   parser.add_argument("--cpu_mode", action="store_true",
@@ -146,7 +146,7 @@ if __name__ == '__main__':
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983)
   # init graphlearn_torch Dataset.
-  glt_dataset = glt.data.Dataset()
+  glt_dataset = glt.data.Dataset(edge_dir='in')
   glt_dataset.init_graph(
     edge_index=igbh_dataset.edge_dict,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU'
