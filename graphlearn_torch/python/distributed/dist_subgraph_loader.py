@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional
+from typing import Optional, Literal
 
 import torch
 
@@ -70,6 +70,7 @@ class DistSubGraphLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
@@ -79,9 +80,10 @@ class DistSubGraphLoader(DistLoader):
       input_type, input_seeds = None, input_nodes
     input_data = NodeSamplerInput(node=input_seeds, input_type=input_type)
 
+    # TODO: currently only support out-sample
     sampling_config = SamplingConfig(
       SamplingType.SUBGRAPH, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg=False
+      drop_last, with_edge, collect_features, with_neg=False, edge_dir=edge_dir
     )
 
     super().__init__(

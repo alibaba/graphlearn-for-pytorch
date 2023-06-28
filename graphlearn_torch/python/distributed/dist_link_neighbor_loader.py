@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional
+from typing import Optional, Literal
 
 import torch
 
@@ -112,6 +112,7 @@ class DistLinkNeighborLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
@@ -145,7 +146,7 @@ class DistLinkNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.LINK, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg
+      drop_last, with_edge, collect_features, with_neg, edge_dir
     )
 
     super().__init__(

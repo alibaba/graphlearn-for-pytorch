@@ -69,6 +69,7 @@ def partition_dataset(path: str,
     num_nodes=node_num,
     edge_index=data.edge_dict,
     node_feat=data.feat_dict,
+    edge_assign_strategy='by_dst',
     chunk_size=chunk_size,
   )
   partitioner.partition()

@@ -88,6 +88,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     batch_size=batch_size,
     shuffle=True,
     drop_last=False,
+    edge_dir='in',
     collect_features=True,
     to_device=current_device,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
@@ -109,6 +110,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     input_nodes=('paper', val_idx),
     batch_size=batch_size,
     shuffle=False,
+    edge_dir='in',
     collect_features=True,
     to_device=current_device,
     worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
@@ -126,6 +128,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     input_nodes=('paper', test_idx),
     batch_size=batch_size,
     shuffle=False,
+    edge_dir='in',
     collect_features=True,
     to_device=current_device,
     worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
@@ -255,13 +258,13 @@ if __name__ == '__main__':
       help="The number of traning processes per node.")
   parser.add_argument("--master_addr", type=str, default='localhost',
       help="The master address for RPC initialization.")
-  parser.add_argument("--training_pg_master_port", type=int, default=11111,
+  parser.add_argument("--training_pg_master_port", type=int, default=12111,
       help="The port used for PyTorch's process group initialization across training processes.")
-  parser.add_argument("--train_loader_master_port", type=int, default=11112,
+  parser.add_argument("--train_loader_master_port", type=int, default=12112,
       help="The port used for RPC initialization across all sampling workers of train loader.")
-  parser.add_argument("--val_loader_master_port", type=int, default=11113,
+  parser.add_argument("--val_loader_master_port", type=int, default=12113,
       help="The port used for RPC initialization across all sampling workers of val loader.")
-  parser.add_argument("--test_loader_master_port", type=int, default=11114,
+  parser.add_argument("--test_loader_master_port", type=int, default=12114,
       help="The port used for RPC initialization across all sampling workers of test loader.")
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
@@ -275,7 +278,7 @@ if __name__ == '__main__':
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
-  dataset = glt.distributed.DistDataset()
+  dataset = glt.distributed.DistDataset(edge_dir='in')
   dataset.load(
     root_dir=osp.join(args.path, f'{args.dataset_size}-partitions'),
     partition_idx=data_pidx,

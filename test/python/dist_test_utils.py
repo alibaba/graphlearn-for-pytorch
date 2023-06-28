@@ -15,6 +15,7 @@
 
 import torch
 import graphlearn_torch as glt
+from typing import Literal
 
 
 # options for dataset generation
@@ -84,7 +85,7 @@ def _prepare_dataset(rank: int):
   )
 
 
-def _prepare_hetero_dataset(rank: int):
+def _prepare_hetero_dataset(rank: int, edge_dir: Literal['in', 'out'] = 'out'):
 # partition
   node_pb = torch.tensor(
     [v % 2 for v in range(0, vnum_total)],
@@ -182,5 +183,5 @@ def _prepare_hetero_dataset(rank: int):
   return glt.distributed.DistDataset(
     2, rank,
     graph_dict, node_feature_dict, edge_feature_dict, node_label_dict,
-    node_pb_dict, edge_pb_dict
+    node_pb_dict, edge_pb_dict, edge_dir=edge_dir
   )

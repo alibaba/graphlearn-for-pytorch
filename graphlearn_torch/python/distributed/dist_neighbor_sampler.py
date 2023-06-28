@@ -16,7 +16,7 @@
 import math
 import queue
 from dataclasses import dataclass
-from typing import List, Optional, Union, Tuple
+from typing import List, Literal, Optional, Union, Tuple
 
 import torch
 
@@ -27,7 +27,7 @@ from ..sampler import (
   NeighborOutput, SamplerOutput, HeteroSamplerOutput,
   NeighborSampler
 )
-from ..typing import EdgeType, as_str, NumNeighbors
+from ..typing import EdgeType, as_str, NumNeighbors, reverse_edge_type
 from ..utils import (
     get_available_device, ensure_device, merge_dict, id2idx,
     merge_hetero_sampler_output, format_hetero_sampler_output,
@@ -109,6 +109,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
                num_neighbors: Optional[NumNeighbors] = None,
                with_edge: bool = False,
                with_neg: bool = False,
+               edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                channel: Optional[ChannelBase] = None,
                concurrency: int = 1,
@@ -118,6 +119,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     self.max_input_size = 0
     self.with_edge = with_edge
     self.with_neg = with_neg
+    self.edge_dir = edge_dir
     self.collect_features = collect_features
     self.channel = channel
     self.concurrency = concurrency
@@ -156,7 +158,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
     self.sampler = NeighborSampler(
       self.dist_graph.local_graph, self.num_neighbors,
-      self.device, self.with_edge, self.with_neg
+      self.device, self.with_edge, self.with_neg, self.edge_dir
     )
     self.inducer_pool = queue.Queue(maxsize=self.concurrency)
 
@@ -273,11 +275,17 @@ class DistNeighborSampler(ConcurrentEventLoop):
       for i in range(self.num_hops):
         task_dict, nbr_dict, edge_dict = {}, {}, {}
         for etype in self.edge_types:
-          srcs = src_dict.get(etype[0], None)
           req_num = self.num_neighbors[etype][i]
-          if srcs is not None:
-            task_dict[etype] = self._loop.create_task(
-              self._sample_one_hop(srcs, req_num, etype))
+          if self.edge_dir == 'in':
+            srcs = src_dict.get(etype[-1], None)
+            if srcs is not None:
+              task_dict[reverse_edge_type(etype)] = self._loop.create_task(
+                self._sample_one_hop(srcs, req_num, etype))
+          elif self.edge_dir == 'out':
+            srcs = src_dict.get(etype[0], None)
+            if srcs is not None:
+              task_dict[etype] = self._loop.create_task(
+                self._sample_one_hop(srcs, req_num, etype))
         for etype, task in task_dict.items():
           output: NeighborOutput = await task
           if output is None:
@@ -381,7 +389,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         dst = torch.cat([dst, dst_neg], dim=0)
         if edge_label is None:
             edge_label = torch.ones(num_pos, device=self.device)
-        size = (num_neg, ) + edge_label.size()[1:]
+        size = (src_neg.size()[0], ) + edge_label.size()[1:]
         edge_neg_label = edge_label.new_zeros(size)
         edge_label = torch.cat([edge_label, edge_neg_label])
       elif neg_sampling.is_triplet():
@@ -412,9 +420,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
       if len(temp_out) == 2:
         out = merge_hetero_sampler_output(temp_out[0],
                                           temp_out[1],
-                                          device=self.device)
+                                          device=self.device,
+                                          edge_dir=self.edge_dir)
       else:
-        out = format_hetero_sampler_output(temp_out[0])
+        out = format_hetero_sampler_output(temp_out[0], edge_dir=self.edge_dir)
 
       # edge_label
       if neg_sampling is None or neg_sampling.is_binary():
@@ -573,7 +582,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
     device = self.device
     srcs = srcs.to(device)
     orders = torch.arange(srcs.size(0), dtype=torch.long, device=device)
-    src_ntype = etype[0] if etype is not None else None
+    if self.edge_dir == 'out':
+      src_ntype = etype[0] if etype is not None else None
+    elif self.edge_dir == 'in':
+      src_ntype = etype[-1] if etype is not None else None
     partition_ids = self.dist_graph.get_node_partitions(srcs, src_ntype)
     partition_ids = partition_ids.to(device)
 

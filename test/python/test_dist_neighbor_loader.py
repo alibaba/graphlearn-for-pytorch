@@ -128,7 +128,7 @@ def _check_hetero_sample_result(data):
 def run_test_as_worker(world_size: int, rank: int,
                        master_port: int, sampling_master_port: int,
                        dataset: glt.distributed.DistDataset,
-                       input_nodes: glt.InputNodes, check_fn,
+                       input_nodes: glt.InputNodes, check_fn, edge_dir='out',
                        collocated = False):
   # Initialize worker group context
   glt.distributed.init_worker_group(
@@ -171,6 +171,7 @@ def run_test_as_worker(world_size: int, rank: int,
     shuffle=True,
     drop_last=False,
     with_edge=True,
+    edge_dir=edge_dir,
     collect_features=True,
     to_device=torch.device('cuda', rank % device_num),
     worker_options=worker_options
@@ -179,7 +180,7 @@ def run_test_as_worker(world_size: int, rank: int,
   # run testing
   for epoch in range(0, 2):
     for res in dist_loader:
-      check_fn(res)
+      check_fn(res, edge_dir)
       time.sleep(0.1)
     glt.distributed.barrier()
     print(f'[Trainer {dist_context.rank}] epoch {epoch} finished.')
@@ -210,7 +211,7 @@ def run_test_as_server(num_servers: int, num_clients: int, server_rank: int,
 
 def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
                        master_port: int, sampling_master_port: int,
-                       input_nodes: glt.InputNodes, check_fn):
+                       input_nodes: glt.InputNodes, check_fn, edge_dir='out'):
     print(f'[Client {client_rank}] Initializing client ...')
     glt.distributed.init_client(
       num_servers=num_servers,
@@ -244,6 +245,7 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
       shuffle=True,
       drop_last=False,
       with_edge=True,
+      edge_dir=edge_dir,
       collect_features=True,
       to_device=torch.device('cuda', client_rank % device_num),
       worker_options=options
@@ -269,11 +271,15 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.dataset1 = _prepare_dataset(rank=1)
     self.input_nodes0 = torch.arange(vnum_per_partition)
     self.input_nodes1 = torch.arange(vnum_per_partition) + vnum_per_partition
-
-    self.hetero_dataset0 = _prepare_hetero_dataset(rank=0)
-    self.hetero_dataset1 = _prepare_hetero_dataset(rank=1)
-    self.hetero_input_nodes0 = (user_ntype, self.input_nodes0)
-    self.hetero_input_nodes1 = (user_ntype, self.input_nodes1)
+    self.edge_dir = 'in'
+    self.hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir=self.edge_dir)
+    self.hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir=self.edge_dir)
+    if self.edge_dir == 'out':
+      self.hetero_input_nodes0 = (user_ntype, self.input_nodes0)
+      self.hetero_input_nodes1 = (user_ntype, self.input_nodes1)
+    elif self.edge_dir == 'in':
+      self.hetero_input_nodes0 = (item_ntype, self.input_nodes0)
+      self.hetero_input_nodes1 = (item_ntype, self.input_nodes1)
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
 
@@ -283,12 +289,12 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, True)
+            self.dataset0, self.input_nodes0, _check_sample_result, self.edge_dir, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, True)
+            self.dataset1, self.input_nodes1, _check_sample_result, self.edge_dir, True)
     )
     w0.start()
     w1.start()
@@ -301,12 +307,12 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, False)
+            self.dataset0, self.input_nodes0, _check_sample_result, self.edge_dir, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, False)
+            self.dataset1, self.input_nodes1, _check_sample_result, self.edge_dir, False)
     )
     w0.start()
     w1.start()
@@ -320,13 +326,13 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
             self.hetero_dataset0, self.hetero_input_nodes0,
-            _check_hetero_sample_result, True)
+            _check_hetero_sample_result, self.edge_dir, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
             self.hetero_dataset1, self.hetero_input_nodes1,
-            _check_hetero_sample_result, True)
+            _check_hetero_sample_result, self.edge_dir, True)
     )
     w0.start()
     w1.start()
@@ -340,13 +346,13 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
             self.hetero_dataset0, self.hetero_input_nodes0,
-            _check_hetero_sample_result, False)
+            _check_hetero_sample_result, self.edge_dir, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
             self.hetero_dataset1, self.hetero_input_nodes1,
-            _check_hetero_sample_result, False)
+            _check_hetero_sample_result, self.edge_dir, False)
     )
     w0.start()
     w1.start()
@@ -367,12 +373,12 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     client0 = mp_context.Process(
       target=run_test_as_client,
       args=(2, 2, 0, self.master_port, self.sampling_master_port,
-            self.input_nodes0, _check_sample_result)
+            self.input_nodes0, _check_sample_result, self.edge_dir)
     )
     client1 = mp_context.Process(
       target=run_test_as_client,
       args=(2, 2, 1, self.master_port, self.sampling_master_port,
-            self.input_nodes1, _check_sample_result)
+            self.input_nodes1, _check_sample_result, self.edge_dir)
     )
     server0.start()
     server1.start()

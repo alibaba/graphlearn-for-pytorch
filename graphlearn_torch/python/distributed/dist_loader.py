@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 import torch
 from torch_geometric.data import Data, HeteroData
@@ -121,6 +121,7 @@ class DistLoader(object):
     self.drop_last = sampling_config.drop_last
     self.with_edge = sampling_config.with_edge
     self.collect_features = sampling_config.collect_features
+    self.edge_dir = sampling_config.edge_dir
     self.sampling_config = sampling_config
     self.to_device = get_available_device(to_device)
     self.worker_options = worker_options
@@ -364,7 +365,8 @@ class DistLoader(object):
                                    input_type=self._input_type,
                                    device=self.to_device,
                                    metadata=metadata)
-      res_data = to_hetero_data(output, batch_label_dict, nfeat_dict, efeat_dict)
+      res_data = to_hetero_data(
+        output, batch_label_dict, nfeat_dict, efeat_dict, self.edge_dir)
 
     # Homogeneous sampling results
     else:
