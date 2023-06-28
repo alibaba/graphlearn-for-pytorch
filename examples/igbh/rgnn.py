@@ -57,9 +57,6 @@ class RGNN(torch.nn.Module):
 
   def forward(self, x_dict, edge_index_dict):
     for i, conv in enumerate(self.convs):
-      for key in list(edge_index_dict.keys()):
-        if edge_index_dict[key].shape[1] == 0:
-          del edge_index_dict[key]
       x_dict = conv(x_dict, edge_index_dict)
       if i != len(self.convs) - 1:
         x_dict = {key: F.leaky_relu(x) for key, x in x_dict.items()}
