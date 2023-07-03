@@ -30,8 +30,7 @@ from ..sampler import (
 from ..typing import EdgeType, as_str, NumNeighbors, reverse_edge_type
 from ..utils import (
     get_available_device, ensure_device, merge_dict, id2idx,
-    merge_hetero_sampler_output, format_hetero_sampler_output,
-    count_dict, convert_to_tensor
+    merge_hetero_sampler_output, format_hetero_sampler_output, count_dict
 )
 
 from .dist_dataset import DistDataset
@@ -92,9 +91,13 @@ class DistNeighborSampler(ConcurrentEventLoop):
   Args:
     data (DistDataset): The graph and feature data with partition info.
     num_neighbors (NumNeighbors): The number of sampling neighbors on each hop.
-    with_edge (bool): Whether to sample with edge ids. (default: ``None``).
+    with_edge (bool): Whether to sample with edge ids. (default: False).
+    with_neg (bool): Whether to do negative sampling. (default: False)
+    edge_dir (str:["in", "out"]): The edge direction for sampling.
+      Can be either :str:`"out"` or :str:`"in"`.
+      (default: :str:`"out"`)
     collect_features (bool): Whether collect features for sampled results.
-      (default: ``None``).
+      (default: False).
     channel (ChannelBase, optional): The message channel to send sampled
       results. If set to `None`, the sampled results will be returned
       directly with `sample_from_nodes`. (default: ``None``).
@@ -286,6 +289,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
             if srcs is not None:
               task_dict[etype] = self._loop.create_task(
                 self._sample_one_hop(srcs, req_num, etype))
+
         for etype, task in task_dict.items():
           output: NeighborOutput = await task
           if output is None:
@@ -293,6 +297,9 @@ class DistNeighborSampler(ConcurrentEventLoop):
           nbr_dict[etype] = [src_dict[etype[0]], output.nbr, output.nbr_num]
           if output.edge is not None:
             edge_dict[etype] = output.edge
+
+        if len(nbr_dict) == 0:
+          continue
         nodes_dict, rows_dict, cols_dict = inducer.induce_next(nbr_dict)
         merge_dict(nodes_dict, out_nodes)
         merge_dict(rows_dict, out_rows)
@@ -315,6 +322,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         input_type=input_type,
         metadata={}
       )
+
     else:
       srcs = inducer.init_node(input_seeds)
       out_nodes, out_edges = [], []
@@ -680,12 +688,20 @@ class DistNeighborSampler(ConcurrentEventLoop):
       if self.dist_edge_feature is not None and self.with_edge:
         efeat_fut_dict = {}
         for etype in self.edge_types:
-          eids = result_map.get(f'{as_str(etype)}.eids', None).to(torch.long)
+          if self.edge_dir == 'out':
+            eids = result_map.get(f'{as_str(etype)}.eids', None)
+          elif self.edge_dir == 'in':
+            eids = result_map.get(
+              f'{as_str(reverse_edge_type(etype))}.eids', None)
           if eids is not None:
+            eids = eids.to(torch.long)
             efeat_fut_dict[etype] = self.dist_edge_feature.async_get(eids, etype)
         for etype, fut in efeat_fut_dict.items():
           efeats = await wrap_torch_future(fut)
-          result_map[f'{as_str(etype)}.efeats'] = efeats
+          if self.edge_dir == 'out':
+            result_map[f'{as_str(etype)}.efeats'] = efeats
+          elif self.edge_dir == 'in':
+            result_map[f'{as_str(reverse_edge_type(etype))}.efeats'] = efeats
     else:
       result_map['ids'] = output.node
       result_map['rows'] = output.row

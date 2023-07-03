@@ -27,6 +27,7 @@ def partition_dataset(path: str,
                       chunk_size: int,
                       dataset_size: str='tiny',
                       in_memory: bool=True,
+                      edge_assign_strategy: str='by_src',
                       use_label_2K: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
   data = IGBHeteroDataset(path, dataset_size, in_memory, use_label_2K)
@@ -69,7 +70,7 @@ def partition_dataset(path: str,
     num_nodes=node_num,
     edge_index=data.edge_dict,
     node_feat=data.feat_dict,
-    edge_assign_strategy='by_dst',
+    edge_assign_strategy=edge_assign_strategy,
     chunk_size=chunk_size,
   )
   partitioner.partition()
@@ -92,6 +93,8 @@ if __name__ == '__main__':
       help="Number of partitions")
   parser.add_argument("--chunk_size", type=int, default=10000,
       help="Chunk size for feature partitioning.")
+  parser.add_argument("--edge_assign_strategy", type=str, default='by_src',
+      help="edge assign strategy can be either 'by_src' or 'by_dst'")
 
   args = parser.parse_args()
 
@@ -101,5 +104,6 @@ if __name__ == '__main__':
     chunk_size=args.chunk_size,
     dataset_size=args.dataset_size,
     in_memory=args.in_memory,
+    edge_assign_strategy=args.edge_assign_strategy
     use_label_2K=args.num_classes==2983,
   )

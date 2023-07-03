@@ -107,12 +107,6 @@ class DistLoader(object):
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
     self.data = data
-    if self.data is not None:
-      self.num_data_partitions = self.data.num_partitions
-      self.data_partition_idx = self.data.partition_idx
-      self._set_ntypes_and_etypes(
-        self.data.get_node_types(), self.data.get_edge_types()
-      )
     self.input_data = input_data
     self.sampling_type = sampling_config.sampling_type
     self.num_neighbors = sampling_config.num_neighbors
@@ -127,6 +121,13 @@ class DistLoader(object):
     self.worker_options = worker_options
     if self.worker_options is None:
       self.worker_options = CollocatedDistSamplingWorkerOptions()
+
+    if self.data is not None:
+      self.num_data_partitions = self.data.num_partitions
+      self.data_partition_idx = self.data.partition_idx
+      self._set_ntypes_and_etypes(
+        self.data.get_node_types(), self.data.get_edge_types()
+      )
 
     self._input_type = self.input_data.input_type
     self._input_len = len(self.input_data)
@@ -281,8 +282,12 @@ class DistLoader(object):
     if self._edge_types is not None:
       for etype in self._edge_types:
         rev_etype = reverse_edge_type(etype)
-        self._reversed_edge_types.append(rev_etype)
-        self._etype_str_to_rev[as_str(etype)] = rev_etype
+        if self.edge_dir == 'out':
+          self._reversed_edge_types.append(rev_etype)
+          self._etype_str_to_rev[as_str(etype)] = rev_etype
+        elif self.edge_dir == 'in':
+          self._reversed_edge_types.append(etype)
+          self._etype_str_to_rev[as_str(rev_etype)] = etype
 
   def _collate_fn(
     self,

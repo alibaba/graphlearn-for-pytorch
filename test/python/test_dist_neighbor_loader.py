@@ -23,7 +23,7 @@ from dist_test_utils import *
 from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
 
 
-def _check_sample_result(data):
+def _check_sample_result(data, edge_dir):
   tc = unittest.TestCase()
   tc.assertEqual(data.batch_size, 5)
   device = data.node.device
@@ -57,79 +57,103 @@ def _check_sample_result(data):
   tc.assertEqual(data.num_sampled_edges.size(0), 2)
   tc.assertNotEqual(data.num_sampled_edges[1].item(), 0)
 
-def _check_hetero_sample_result(data):
-  tc = unittest.TestCase()
-  tc.assertEqual(data[user_ntype].batch_size, 5)
-  device = data[user_ntype].node.device
-  user_label = torch.arange(vnum_total).to(device)
-  tc.assertTrue(glt.utils.tensor_equal_with_device(
-    data[user_ntype].y, user_label[data[user_ntype].node]
-  ))
-  for i, v in enumerate(data[user_ntype].node):
-    expect_feat = int(v) % 2 + torch.zeros(512, device=device, dtype=torch.float32)
-    tc.assertTrue(glt.utils.tensor_equal_with_device(
-      data.x_dict[user_ntype][i], expect_feat
-    ))
-  for i, v in enumerate(data[item_ntype].node):
-    expect_feat = (int(v) % 2) * 2 + torch.zeros(
-      256, device=device, dtype=torch.float32
-    )
-    tc.assertTrue(glt.utils.tensor_equal_with_device(
-      data.x_dict[item_ntype][i], expect_feat
-    ))
-  rev_u2i_etype = glt.reverse_edge_type(u2i_etype)
-  rev_i2i_etype = glt.reverse_edge_type(i2i_etype)
-  tc.assertTrue(data[rev_u2i_etype].edge is not None)
-  tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
-  for i, e in enumerate(data[rev_u2i_etype].edge):
-    expect_feat = ((int(e) // degree) % 2) + torch.ones(
-      10, device=device, dtype=torch.float32
-    )
-    tc.assertTrue(glt.utils.tensor_equal_with_device(
-      data.edge_attr_dict[rev_u2i_etype][i], expect_feat
-    ))
-  tc.assertTrue(data[rev_i2i_etype].edge is not None)
-  tc.assertTrue(data[rev_i2i_etype].edge_attr is not None)
-  for i, e in enumerate(data[rev_i2i_etype].edge):
-    expect_feat = ((int(e) // degree) % 2) * 2 + torch.ones(
-      5, device=device, dtype=torch.float32
-    )
-    tc.assertTrue(glt.utils.tensor_equal_with_device(
-      data.edge_attr_dict[rev_i2i_etype][i], expect_feat
-    ))
-  rev_u2i_rows = data[item_ntype].node[data.edge_index_dict[rev_u2i_etype][0]]
-  rev_u2i_cols = data[user_ntype].node[data.edge_index_dict[rev_u2i_etype][1]]
-  tc.assertEqual(rev_u2i_rows.size(0), rev_u2i_cols.size(0))
-  for i in range(rev_u2i_rows.size(0)):
-    tc.assertTrue(
-      (int(rev_u2i_rows[i]) == ((int(rev_u2i_cols[i]) + 1) % vnum_total) or
-      int(rev_u2i_rows[i]) == ((int(rev_u2i_cols[i]) + 2) % vnum_total))
-    )
-  rev_i2i_rows = data[item_ntype].node[data.edge_index_dict[rev_i2i_etype][0]]
-  rev_i2i_cols = data[item_ntype].node[data.edge_index_dict[rev_i2i_etype][1]]
-  tc.assertEqual(rev_i2i_rows.size(0), rev_i2i_cols.size(0))
-  for i in range(rev_i2i_rows.size(0)):
-    tc.assertTrue(
-      int(rev_i2i_rows[i]) == ((int(rev_i2i_cols[i]) + 2) % vnum_total) or
-      int(rev_i2i_rows[i]) == ((int(rev_i2i_cols[i]) + 3) % vnum_total)
-    )
 
-  tc.assertEqual(data.num_sampled_nodes['item'][0].item(), 0)
-  tc.assertNotEqual(data.num_sampled_nodes['item'][1].item(), 0)
-  tc.assertNotEqual(data.num_sampled_nodes['item'][2].item(), 0)
-  tc.assertEqual(data.num_sampled_nodes['user'][0].item(), 5)
-  tc.assertEqual(data.num_sampled_nodes['user'][1].item(), 0)
-  tc.assertEqual(data.num_sampled_nodes['user'][2].item(), 0)
-  tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][0].item(), 10)
-  tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][1].item(), 0)
-  tc.assertEqual(data.num_sampled_edges['item', 'i2i', 'item'][0].item(), 0)
-  tc.assertNotEqual(data.num_sampled_edges['item', 'i2i', 'item'][1].item(), 0)
+def _check_hetero_sample_result(data, edge_dir):
+  tc = unittest.TestCase()
+  if edge_dir == 'out':
+    tc.assertEqual(data[user_ntype].batch_size, 5)
+    device = data[user_ntype].node.device
+    user_label = torch.arange(vnum_total).to(device)
+    tc.assertTrue(glt.utils.tensor_equal_with_device(
+      data[user_ntype].y, user_label[data[user_ntype].node]
+    ))
+    for i, v in enumerate(data[user_ntype].node):
+      expect_feat = int(v) % 2 + torch.zeros(512, device=device, dtype=torch.float32)
+      tc.assertTrue(glt.utils.tensor_equal_with_device(
+        data.x_dict[user_ntype][i], expect_feat
+      ))
+    for i, v in enumerate(data[item_ntype].node):
+      expect_feat = (int(v) % 2) * 2 + torch.zeros(
+        256, device=device, dtype=torch.float32
+      )
+      tc.assertTrue(glt.utils.tensor_equal_with_device(
+        data.x_dict[item_ntype][i], expect_feat
+      ))
+    rev_u2i_etype = glt.reverse_edge_type(u2i_etype)
+    rev_i2i_etype = glt.reverse_edge_type(i2i_etype)
+    tc.assertTrue(data[rev_u2i_etype].edge is not None)
+    tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
+    for i, e in enumerate(data[rev_u2i_etype].edge):
+      expect_feat = ((int(e) // degree) % 2) + torch.ones(
+        10, device=device, dtype=torch.float32
+      )
+      tc.assertTrue(glt.utils.tensor_equal_with_device(
+        data.edge_attr_dict[rev_u2i_etype][i], expect_feat
+      ))
+    tc.assertTrue(data[rev_i2i_etype].edge is not None)
+    tc.assertTrue(data[rev_i2i_etype].edge_attr is not None)
+    for i, e in enumerate(data[rev_i2i_etype].edge):
+      expect_feat = ((int(e) // degree) % 2) * 2 + torch.ones(
+        5, device=device, dtype=torch.float32
+      )
+      tc.assertTrue(glt.utils.tensor_equal_with_device(
+        data.edge_attr_dict[rev_i2i_etype][i], expect_feat
+      ))
+    rev_u2i_rows = data[item_ntype].node[data.edge_index_dict[rev_u2i_etype][0]]
+    rev_u2i_cols = data[user_ntype].node[data.edge_index_dict[rev_u2i_etype][1]]
+    tc.assertEqual(rev_u2i_rows.size(0), rev_u2i_cols.size(0))
+    for i in range(rev_u2i_rows.size(0)):
+      tc.assertTrue(
+        (int(rev_u2i_rows[i]) == ((int(rev_u2i_cols[i]) + 1) % vnum_total) or
+        int(rev_u2i_rows[i]) == ((int(rev_u2i_cols[i]) + 2) % vnum_total))
+      )
+    rev_i2i_rows = data[item_ntype].node[data.edge_index_dict[rev_i2i_etype][0]]
+    rev_i2i_cols = data[item_ntype].node[data.edge_index_dict[rev_i2i_etype][1]]
+    tc.assertEqual(rev_i2i_rows.size(0), rev_i2i_cols.size(0))
+    for i in range(rev_i2i_rows.size(0)):
+      tc.assertTrue(
+        int(rev_i2i_rows[i]) == ((int(rev_i2i_cols[i]) + 2) % vnum_total) or
+        int(rev_i2i_rows[i]) == ((int(rev_i2i_cols[i]) + 3) % vnum_total)
+      )
+
+    tc.assertEqual(data.num_sampled_nodes['item'][0].item(), 0)
+    tc.assertNotEqual(data.num_sampled_nodes['item'][1].item(), 0)
+    tc.assertNotEqual(data.num_sampled_nodes['item'][2].item(), 0)
+    tc.assertEqual(data.num_sampled_nodes['user'][0].item(), 5)
+    tc.assertEqual(data.num_sampled_nodes['user'][1].item(), 0)
+    tc.assertEqual(data.num_sampled_nodes['user'][2].item(), 0)
+    tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][0].item(), 10)
+    tc.assertEqual(data.num_sampled_edges['item', 'rev_u2i', 'user'][1].item(), 0)
+    tc.assertEqual(data.num_sampled_edges['item', 'i2i', 'item'][0].item(), 0)
+    tc.assertNotEqual(data.num_sampled_edges['item', 'i2i', 'item'][1].item(), 0)
+  else:
+    tc.assertEqual(data['num_sampled_nodes']['item'].size(0), 3)
+    tc.assertEqual(data['num_sampled_nodes']['user'].size(0), 3)
+    tc.assertEqual(
+      data['num_sampled_edges'][('user', 'u2i', 'item')].size(0), 2)
+    tc.assertEqual(
+      data['num_sampled_edges'][('item', 'i2i', 'item')].size(0), 2)
+    tc.assertTrue(data[('user', 'u2i', 'item')].edge_attr.size(1), 10)
+    tc.assertTrue(data[('item', 'i2i', 'item')].edge_attr.size(1), 5)
+
+    u2i_row = data['user'].node[data[('user', 'u2i', 'item')].edge_index[0]]
+    u2i_col = data['item'].node[data[('user', 'u2i', 'item')].edge_index[1]]
+    i2i_row = data['item'].node[data[('item', 'i2i', 'item')].edge_index[0]]
+    i2i_col = data['item'].node[data[('item', 'i2i', 'item')].edge_index[1]]
+    tc.assertEqual(u2i_row.size(0), u2i_col.size(0))
+    tc.assertEqual(i2i_row.size(0), i2i_row.size(0))
+    tc.assertTrue(torch.all(
+      ((u2i_row+2)%vnum_total == u2i_col) + ((u2i_row+1)%vnum_total == u2i_col))
+    )
+    tc.assertTrue(torch.all(
+      ((i2i_row+2)%vnum_total == i2i_col) + ((i2i_row+3)%vnum_total == i2i_col))
+    )
 
 def run_test_as_worker(world_size: int, rank: int,
                        master_port: int, sampling_master_port: int,
                        dataset: glt.distributed.DistDataset,
-                       input_nodes: glt.InputNodes, check_fn, edge_dir='out',
-                       collocated = False):
+                       input_nodes: glt.InputNodes, check_fn,
+                       collocated = False, edge_dir='out'):
   # Initialize worker group context
   glt.distributed.init_worker_group(
     world_size, rank, 'dist-neighbor-loader-test'
@@ -254,7 +278,7 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
     print(f'[Client {client_rank}] Running tests ...')
     for epoch in range(0, 2):
       for res in dist_loader:
-        check_fn(res)
+        check_fn(res, edge_dir)
         time.sleep(0.1)
       glt.distributed.barrier()
       print(f'[Client {client_rank}] epoch {epoch} finished.')
@@ -271,15 +295,16 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.dataset1 = _prepare_dataset(rank=1)
     self.input_nodes0 = torch.arange(vnum_per_partition)
     self.input_nodes1 = torch.arange(vnum_per_partition) + vnum_per_partition
-    self.edge_dir = 'in'
-    self.hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir=self.edge_dir)
-    self.hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir=self.edge_dir)
-    if self.edge_dir == 'out':
-      self.hetero_input_nodes0 = (user_ntype, self.input_nodes0)
-      self.hetero_input_nodes1 = (user_ntype, self.input_nodes1)
-    elif self.edge_dir == 'in':
-      self.hetero_input_nodes0 = (item_ntype, self.input_nodes0)
-      self.hetero_input_nodes1 = (item_ntype, self.input_nodes1)
+
+    self.in_hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir='in')
+    self.in_hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir='in')
+    self.out_hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir='out')
+    self.out_hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir='out')
+
+    self.out_hetero_input_nodes0 = (user_ntype, self.input_nodes0)
+    self.out_hetero_input_nodes1 = (user_ntype, self.input_nodes1)
+    self.in_hetero_input_nodes0 = (item_ntype, self.input_nodes0)
+    self.in_hetero_input_nodes1 = (item_ntype, self.input_nodes1)
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
 
@@ -289,12 +314,12 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, self.edge_dir, True)
+            self.dataset0, self.input_nodes0, _check_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, self.edge_dir, True)
+            self.dataset1, self.input_nodes1, _check_sample_result, True)
     )
     w0.start()
     w1.start()
@@ -307,52 +332,92 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, self.edge_dir, False)
+            self.dataset0, self.input_nodes0, _check_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, self.edge_dir, False)
+            self.dataset1, self.input_nodes1, _check_sample_result, False)
     )
     w0.start()
     w1.start()
     w0.join()
     w1.join()
 
-  def test_hetero_collocated(self):
+  def test_hetero_out_sample_collocated(self):
     print("\n--- DistNeighborLoader Test (heterogeneous, collocated) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.hetero_dataset0, self.hetero_input_nodes0,
-            _check_hetero_sample_result, self.edge_dir, True)
+            self.out_hetero_dataset0, self.out_hetero_input_nodes0,
+            _check_hetero_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.hetero_dataset1, self.hetero_input_nodes1,
-            _check_hetero_sample_result, self.edge_dir, True)
+            self.out_hetero_dataset1, self.out_hetero_input_nodes1,
+            _check_hetero_sample_result, True)
     )
     w0.start()
     w1.start()
     w0.join()
     w1.join()
 
-  def test_hetero_mp(self):
+  def test_hetero_out_sample_mp(self):
     print("\n--- DistNeighborLoader Test (heterogeneous, multiprocessing) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.hetero_dataset0, self.hetero_input_nodes0,
-            _check_hetero_sample_result, self.edge_dir, False)
+            self.out_hetero_dataset0, self.out_hetero_input_nodes0,
+            _check_hetero_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.hetero_dataset1, self.hetero_input_nodes1,
-            _check_hetero_sample_result, self.edge_dir, False)
+            self.out_hetero_dataset1, self.out_hetero_input_nodes1,
+            _check_hetero_sample_result, False)
+    )
+    w0.start()
+    w1.start()
+    w0.join()
+    w1.join()
+
+  def test_hetero_in_sample_collocated(self):
+    print("\n--- DistNeighborLoader Test (in-sample, heterogeneous, collocated) ---")
+    mp_context = torch.multiprocessing.get_context('spawn')
+    w0 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 0, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset0, self.in_hetero_input_nodes0,
+            _check_hetero_sample_result, True, 'in')
+    )
+    w1 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 1, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset1, self.in_hetero_input_nodes1,
+            _check_hetero_sample_result, True, 'in')
+    )
+    w0.start()
+    w1.start()
+    w0.join()
+    w1.join()
+
+  def test_hetero_in_sample_mp(self):
+    print("\n--- DistNeighborLoader Test (in-sample, heterogeneous, multiprocessing) ---")
+    mp_context = torch.multiprocessing.get_context('spawn')
+    w0 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 0, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset0, self.in_hetero_input_nodes0,
+            _check_hetero_sample_result, False, 'in')
+    )
+    w1 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 1, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset1, self.in_hetero_input_nodes1,
+            _check_hetero_sample_result, False, 'in')
     )
     w0.start()
     w1.start()
@@ -373,12 +438,12 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     client0 = mp_context.Process(
       target=run_test_as_client,
       args=(2, 2, 0, self.master_port, self.sampling_master_port,
-            self.input_nodes0, _check_sample_result, self.edge_dir)
+            self.input_nodes0, _check_sample_result)
     )
     client1 = mp_context.Process(
       target=run_test_as_client,
       args=(2, 2, 1, self.master_port, self.sampling_master_port,
-            self.input_nodes1, _check_sample_result, self.edge_dir)
+            self.input_nodes1, _check_sample_result)
     )
     server0.start()
     server1.start()

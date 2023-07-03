@@ -84,6 +84,9 @@ class DistLinkNeighborLoader(DistLoader):
       batch will be smaller. (default: ``False``).
     with_edge (bool): Set to ``True`` to sample with edge ids and also include
       them in the sampled results. (default: ``False``).
+    edge_dir (str:["in", "out"]): The edge direction for sampling.
+      Can be either :str:`"out"` or :str:`"in"`.
+      (default: :str:`"out"`)
     collect_features (bool): Set to ``True`` to collect features for nodes
       of each sampled subgraph. (default: ``False``).
     to_device (torch.device, optional): The target device that the sampled
