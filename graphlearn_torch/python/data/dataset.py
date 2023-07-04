@@ -41,7 +41,7 @@ class Dataset(object):
     self.node_features = node_features
     self.edge_features = edge_features
     self.node_labels = squeeze(convert_to_tensor(node_labels))
-    self._edge_dir = edge_dir
+    self.edge_dir = edge_dir
 
   def init_graph(
     self,
@@ -90,7 +90,7 @@ class Dataset(object):
             edge_index=e_idx,
             edge_ids=edge_ids.get(etype, None),
             input_layout=layout[etype],
-            layout='CSR' if self._edge_dir == 'out' else 'CSC',
+            layout='CSR' if self.edge_dir == 'out' else 'CSC',
           )
         self.graph = {}
         for etype, topo in topo_dict.items():
@@ -99,7 +99,7 @@ class Dataset(object):
           self.graph[etype] = g
       else:
         # homogeneous.
-        topo = Topology(edge_index, edge_ids, input_layout=layout, layout='CSR' if self._edge_dir == 'out' else 'CSC')
+        topo = Topology(edge_index, edge_ids, input_layout=layout, layout='CSR' if self.edge_dir == 'out' else 'CSC')
         self.graph = Graph(topo, graph_mode, device)
         self.graph.lazy_init()
 
@@ -157,7 +157,7 @@ class Dataset(object):
             topo_rev = self.graph.topo
           else:
             row, col, eids = self.graph.topo.to_coo()
-            topo_rev = Topology((col, row), eids, input_layout='COO', layout='CSR' if self._edge_dir == 'out' else 'CSC')
+            topo_rev = Topology((col, row), eids, input_layout='COO', layout='CSR' if self.edge_dir == 'out' else 'CSC')
           node_feature_data, id2idx = \
             sort_func(node_feature_data, split_ratio, topo_rev)
       self.node_features = _build_features(

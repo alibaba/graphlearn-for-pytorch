@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional
+from typing import Optional, Literal
 
 import torch
 
@@ -49,6 +49,9 @@ class DistNeighborLoader(DistLoader):
       batch will be smaller. (default: ``False``).
     with_edge (bool): Set to ``True`` to sample with edge ids and also include
       them in the sampled results. (default: ``False``).
+    edge_dir (str:["in", "out"]): The edge direction for sampling.
+      Can be either :str:`"out"` or :str:`"in"`.
+      (default: :str:`"out"`)
     collect_features (bool): Set to ``True`` to collect features for nodes
       of each sampled subgraph. (default: ``False``).
     to_device (torch.device, optional): The target device that the sampled
@@ -75,6 +78,7 @@ class DistNeighborLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
@@ -86,7 +90,7 @@ class DistNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.NODE, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg=False
+      drop_last, with_edge, collect_features, with_neg=False, edge_dir=edge_dir
     )
 
     super().__init__(
