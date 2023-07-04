@@ -30,7 +30,6 @@ from ..utils import share_memory
 class DistDataset(Dataset):
   r""" Graph and feature dataset with distributed partition info.
 
-
   """
   def __init__(
     self,

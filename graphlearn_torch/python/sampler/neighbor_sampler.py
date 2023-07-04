@@ -51,7 +51,7 @@ class NeighborSampler(BaseSampler):
     self.with_edge = with_edge
     self.with_neg = with_neg
     self.strategy = strategy
-    self._edge_dir = edge_dir
+    self.edge_dir = edge_dir
     self._subgraph_op = None
     self._sampler = None
     self._neg_sampler = None
@@ -101,7 +101,7 @@ class NeighborSampler(BaseSampler):
         self._neg_sampler = RandomNegativeSampler(
           graph=self.graph,
           mode=self.device.type.upper(),
-          edge_dir=self._edge_dir
+          edge_dir=self.edge_dir
         )
       else: # hetero
         self._neg_sampler = {}
@@ -109,7 +109,7 @@ class NeighborSampler(BaseSampler):
           self._neg_sampler[etype] = RandomNegativeSampler(
             graph=g,
             mode=self.device.type.upper(),
-            edge_dir=self._edge_dir
+            edge_dir=self.edge_dir
           )
 
   def lazy_init_subgraph_op(self):
@@ -225,7 +225,7 @@ class NeighborSampler(BaseSampler):
       for etype in self.edge_types:
         req_num = self.num_neighbors[etype][i]
         # out sampling needs dst_type==seed_type, in sampling needs src_type==seed_type
-        if self._edge_dir == 'in':
+        if self.edge_dir == 'in':
           src = src_dict.get(etype[-1], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
@@ -234,7 +234,7 @@ class NeighborSampler(BaseSampler):
             nbr_dict[reverse_edge_type(etype)] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
               edge_dict[reverse_edge_type(etype)] = output.edge
-        elif self._edge_dir == 'out':
+        elif self.edge_dir == 'out':
           src = src_dict.get(etype[0], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
@@ -357,9 +357,9 @@ class NeighborSampler(BaseSampler):
         out = merge_hetero_sampler_output(temp_out[0],
                                           temp_out[1],
                                           device=self.device,
-                                          edge_dir=self._edge_dir)
+                                          edge_dir=self.edge_dir)
       else:
-        out = format_hetero_sampler_output(temp_out[0], edge_dir=self._edge_dir)
+        out = format_hetero_sampler_output(temp_out[0], edge_dir=self.edge_dir)
       # edge_label
       if neg_sampling is None or neg_sampling.is_binary():
         if input_type[0] != input_type[-1]:

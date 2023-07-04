@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union, Literal
 
 import torch
 
@@ -347,6 +347,7 @@ class SamplingConfig:
   with_edge: bool
   collect_features: bool
   with_neg: bool
+  edge_dir: Literal['in', 'out']
 
 
 class BaseSampler(ABC):
