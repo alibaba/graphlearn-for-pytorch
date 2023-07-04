@@ -114,16 +114,16 @@ def to_hetero_data(
   input_type = hetero_sampler_out.input_type
   if isinstance(hetero_sampler_out.metadata, dict):
     # if edge_dir == 'out', we need to reverse the edge type
-    temp_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
+    res_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
     for k, v in hetero_sampler_out.metadata.items():
       if k == 'edge_label_index':
         if edge_dir == 'out':
-          data[temp_edge_type]['edge_label_index'] = \
+          data[res_edge_type]['edge_label_index'] = \
             torch.stack((v[1], v[0]), dim=0)
         else:
-          data[temp_edge_type]['edge_label_index'] = v
+          data[res_edge_type]['edge_label_index'] = v
       elif k == 'edge_label':
-        data[temp_edge_type]['edge_label'] = v
+        data[res_edge_type]['edge_label'] = v
       elif k == 'src_index':
         data[input_type[0]]['src_index'] = v
       elif k in ['dst_pos_index', 'dst_neg_index']:

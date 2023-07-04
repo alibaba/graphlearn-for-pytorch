@@ -115,7 +115,7 @@ class LinkLoader(object):
     self.link_sampler = link_sampler
     self.neg_sampling = NegativeSampling.cast(neg_sampling)
     self.device = device
-    self._edge_dir = edge_dir
+    self.edge_dir = edge_dir
 
     if (self.neg_sampling is not None and self.neg_sampling.is_binary()
         and edge_label is not None and edge_label.min() == 0):
@@ -182,9 +182,9 @@ class LinkLoader(object):
       edge_attr_dict = {}
       if sampler_out.edge is not None:
         for etype, eids in sampler_out.edge.items():
-          if self._edge_dir == 'out':
+          if self.edge_dir == 'out':
             efeat = self.data.get_edge_feature(reverse_edge_type(etype))
-          elif self._edge_dir == 'in':
+          elif self.edge_dir == 'in':
             efeat = self.data.get_edge_feature(etype)
           if efeat is not None:
             edge_attr_dict[etype] = efeat[eids.to(torch.int64)]
@@ -192,7 +192,7 @@ class LinkLoader(object):
       res_data = to_hetero_data(sampler_out,
                                 node_feat_dict=x_dict,
                                 edge_feat_dict=edge_attr_dict,
-                                edge_dir=self._edge_dir,
+                                edge_dir=self.edge_dir,
                                )
     return res_data
 

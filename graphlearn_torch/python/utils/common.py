@@ -69,7 +69,9 @@ def index_select(data, index):
   return data[index]
 
 
-def merge_hetero_sampler_output(in_sample: Any, out_sample: Any, device, edge_dir: Literal['in', 'out']='out'):
+def merge_hetero_sampler_output(
+    in_sample: Any, out_sample: Any, device,
+    edge_dir: Literal['in', 'out']='out'):
   def subid2gid(sample):
     for k, v in sample.row.items():
       sample.row[k] = sample.node[k[0]][v]

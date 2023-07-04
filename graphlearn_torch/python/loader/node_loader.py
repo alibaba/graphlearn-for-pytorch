@@ -109,5 +109,5 @@ class NodeLoader(object):
       res_data = to_hetero_data(sampler_out, batch_label_dict=y_dict,
                                 node_feat_dict=x_dict,
                                 edge_feat_dict=edge_attr_dict,
-                                edge_dir=self.data._edge_dir)
+                                edge_dir=self.data.edge_dir)
     return res_data
