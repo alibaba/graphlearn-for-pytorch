@@ -22,7 +22,7 @@ import graphlearn_torch as glt
 from dist_test_utils import *
 from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
 
-def _check_sample_result(data):
+def _check_sample_result(data, edge_dir='out'):
   tc = unittest.TestCase()
 
   if 'src_index' in data:
@@ -62,63 +62,132 @@ def _check_sample_result(data):
     ))
 
 
-def _check_hetero_sample_result(data):
+def _check_hetero_sample_result(data, edge_dir='out'):
   tc = unittest.TestCase()
+  if edge_dir == 'out':
+    if len(data[user_ntype]) > 2:
+      # triplet negative sampling
+      tc.assertEqual(data[user_ntype].node.size(0), 5)
+      tc.assertEqual(data[user_ntype].src_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_pos_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_neg_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_neg_index.size(1), 2)
+      tc.assertEqual(data[rev_u2i_etype].edge.size(0), 10)
+      tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
+      tc.assertTrue(data[i2i_etype].edge_attr is not None)
+      tc.assertLess(max(data[user_ntype].src_index), 5)
+      tc.assertLess(max(data[rev_u2i_etype].edge_index[1]), 5)
 
-  if len(data[user_ntype]) > 2:
-    # triplet negative sampling
-    tc.assertEqual(data[user_ntype].node.size(0), 5)
-    tc.assertEqual(data[user_ntype].src_index.size(0), 5)
-    tc.assertEqual(data[item_ntype].dst_pos_index.size(0), 5)
-    tc.assertEqual(data[item_ntype].dst_neg_index.size(0), 5)
-    tc.assertEqual(data[item_ntype].dst_neg_index.size(1), 2)
-    tc.assertEqual(data[rev_u2i_etype].edge.size(0), 10)
-    tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
-    tc.assertTrue(data[i2i_etype].edge_attr is not None)
-    tc.assertLess(max(data[user_ntype].src_index), 5)
-    tc.assertLess(max(data[rev_u2i_etype].edge_index[1]), 5)
+      pos_index = torch.stack(
+        (data[user_ntype].node[data[user_ntype].src_index],
+        data[item_ntype].node[data[item_ntype].dst_pos_index]
+      ))
+      tc.assertTrue(torch.all(
+        ((pos_index[0]+1)%40==pos_index[1]) + ((pos_index[0]+2)%40==pos_index[1])
+      ))
 
-    pos_index = torch.stack(
-      (data[user_ntype].node[data[user_ntype].src_index],
-       data[item_ntype].node[data[item_ntype].dst_pos_index]
-    ))
-    tc.assertTrue(torch.all(
-      ((pos_index[0]+1)%40==pos_index[1]) + ((pos_index[0]+2)%40==pos_index[1])
-    ))
+    else:
+      # binary negative sampling
+      tc.assertLessEqual(data[user_ntype].node.size(0), 10)
+      tc.assertEqual(data[rev_u2i_etype].edge_label_index.size(0), 2)
+      tc.assertEqual(data[rev_u2i_etype].edge_label_index.size(1), 10)
+      tc.assertEqual(data[rev_u2i_etype].edge_label.size(0), 10)
+      tc.assertEqual(max(data[rev_u2i_etype].edge_label), 1)
+      tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
+      tc.assertTrue(data[i2i_etype].edge_attr is not None)
 
-  else:
-    # binary negative sampling
-    tc.assertLessEqual(data[user_ntype].node.size(0), 10)
-    tc.assertEqual(data[rev_u2i_etype].edge_label_index.size(0), 2)
-    tc.assertEqual(data[rev_u2i_etype].edge_label_index.size(1), 10)
-    tc.assertEqual(data[rev_u2i_etype].edge_label.size(0), 10)
-    tc.assertEqual(max(data[rev_u2i_etype].edge_label), 1)
-    tc.assertTrue(data[rev_u2i_etype].edge_attr is not None)
-    tc.assertTrue(data[i2i_etype].edge_attr is not None)
+      out_index = data[rev_u2i_etype].edge_label_index
+      pos_index = torch.stack(
+        (data[item_ntype].node[out_index[0,:int(out_index.size(1)/2)]],
+        data[user_ntype].node[out_index[1,:int(out_index.size(1)/2)]])
+      )
+      neg_index = torch.stack(
+        (data[item_ntype].node[out_index[0,int(out_index.size(1)/2):]],
+        data[user_ntype].node[out_index[1,int(out_index.size(1)/2):]])
+      )
 
-    out_index = data[rev_u2i_etype].edge_label_index
-    pos_index = torch.stack(
-      (data[item_ntype].node[out_index[0,:int(out_index.size(1)/2)]],
-       data[user_ntype].node[out_index[1,:int(out_index.size(1)/2)]])
-    )
-    neg_index = torch.stack(
-      (data[item_ntype].node[out_index[0,int(out_index.size(1)/2):]],
-       data[user_ntype].node[out_index[1,int(out_index.size(1)/2):]])
-    )
+      tc.assertTrue(torch.all(
+        ((pos_index[1]+1)%40==pos_index[0]) + ((pos_index[1]+2)%40==pos_index[0])
+      ))
+      tc.assertEqual(neg_index.size(0), pos_index.size(0))
+      tc.assertEqual(neg_index.size(1), pos_index.size(1))
 
-    tc.assertTrue(torch.all(
-      ((pos_index[1]+1)%40==pos_index[0]) + ((pos_index[1]+2)%40==pos_index[0])
-    ))
-    tc.assertEqual(neg_index.size(0), pos_index.size(0))
-    tc.assertEqual(neg_index.size(1), pos_index.size(1))
+      sub_edge_index = data[rev_u2i_etype].edge_index
+      glob_edge_index = torch.stack((data[item_ntype].node[sub_edge_index[0]],
+                                    data[user_ntype].node[sub_edge_index[1]]))
+      tc.assertTrue(torch.all(
+        ((glob_edge_index[1]+1)%40==glob_edge_index[0]) +
+        ((glob_edge_index[1]+2)%40==glob_edge_index[0])
+      ))
 
-    sub_edge_index = data[rev_u2i_etype].edge_index
-    glob_edge_index = torch.stack((data[item_ntype].node[sub_edge_index[0]],
-                                   data[user_ntype].node[sub_edge_index[1]]))
-    tc.assertTrue(torch.all(
-      ((glob_edge_index[1]+1)%40==glob_edge_index[0]) +
-      ((glob_edge_index[1]+2)%40==glob_edge_index[0])
-    ))
+  elif edge_dir == 'in':
+    if len(data[user_ntype]) > 2:
+      tc.assertTrue(data[u2i_etype].edge_attr.size(1), 10)
+      tc.assertTrue(data[i2i_etype].edge_attr.size(1), 5)
+      tc.assertEqual(data[user_ntype].src_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_pos_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_neg_index.size(0), 5)
+      tc.assertEqual(data[item_ntype].dst_neg_index.size(1), 2)
+      u2i_row = data[user_ntype].node[data[u2i_etype].edge_index[0]]
+      u2i_col = data[item_ntype].node[data[u2i_etype].edge_index[1]]
+      i2i_row = data[item_ntype].node[data[i2i_etype].edge_index[0]]
+      i2i_col = data[item_ntype].node[data[i2i_etype].edge_index[1]]
+      pos_index = torch.stack(
+        (data[user_ntype].node[data[user_ntype].src_index],
+         data[item_ntype].node[data[item_ntype].dst_pos_index])
+      )
+
+      tc.assertTrue(torch.all(
+        ((u2i_row+1)%vnum_total == u2i_col) + ((u2i_row+2)%vnum_total == u2i_col)
+      ))
+      tc.assertTrue(torch.all(
+        ((i2i_row+1)%vnum_total == i2i_col) + ((i2i_row+2)%vnum_total == i2i_col)
+      ))
+      tc.assertTrue(torch.all(
+        ((pos_index[0]+1)%vnum_total==pos_index[1]) + ((pos_index[0]+2)%vnum_total==pos_index[1])
+      ))
+
+    else:
+      tc.assertEqual(max(data[u2i_etype].edge_label), 1)
+      tc.assertTrue(data[u2i_etype].edge_attr.size(1), 10)
+      tc.assertTrue(data[i2i_etype].edge_attr.size(1), 5)
+      tc.assertEqual(data[u2i_etype].edge_label_index.size(0), 2)
+      tc.assertEqual(data[u2i_etype].edge_label_index.size(1), 10)
+      tc.assertEqual(data[u2i_etype].edge_label.size(0), 10)
+      u2i_row = data[user_ntype].node[data[u2i_etype].edge_index[0]]
+      u2i_col = data[item_ntype].node[data[u2i_etype].edge_index[1]]
+      i2i_row = data[item_ntype].node[data[i2i_etype].edge_index[0]]
+      i2i_col = data[item_ntype].node[data[i2i_etype].edge_index[1]]
+      out_index = data[u2i_etype].edge_label_index
+      pos_index = torch.stack(
+        (data[user_ntype].node[out_index[0,:int(out_index.size(1)/2)]],
+        data[item_ntype].node[out_index[1,:int(out_index.size(1)/2)]])
+      )
+      neg_index = torch.stack(
+        (data[user_ntype].node[out_index[0,int(out_index.size(1)/2):]],
+        data[item_ntype].node[out_index[1,int(out_index.size(1)/2):]])
+      )
+
+      tc.assertTrue(torch.all(
+        ((u2i_row+1)%vnum_total == u2i_col) + ((u2i_row+2)%vnum_total == u2i_col)
+      ))
+      tc.assertTrue(torch.all(
+        ((i2i_row+1)%vnum_total == i2i_col) + ((i2i_row+2)%vnum_total == i2i_col)
+      ))
+
+      tc.assertTrue(torch.all(
+        ((pos_index[0]+1)%vnum_total==pos_index[1]) +
+        ((pos_index[0]+2)%vnum_total==pos_index[1])
+      ))
+      tc.assertEqual(neg_index.size(0), pos_index.size(0))
+      tc.assertEqual(neg_index.size(1), pos_index.size(1))
+      sub_edge_index = data[u2i_etype].edge_index
+      glob_edge_index = torch.stack((data[user_ntype].node[sub_edge_index[0]],
+                                    data[item_ntype].node[sub_edge_index[1]]))
+      tc.assertTrue(torch.all(
+        ((glob_edge_index[0]+1)%vnum_total==glob_edge_index[1]) +
+        ((glob_edge_index[0]+2)%vnum_total==glob_edge_index[1])
+      ))
 
 
 def run_test_as_worker(world_size: int, rank: int,
@@ -126,7 +195,7 @@ def run_test_as_worker(world_size: int, rank: int,
                        dataset: glt.distributed.DistDataset,
                        neg_sampling: glt.sampler.NegativeSampling,
                        input_edges: glt.InputEdges, check_fn,
-                       collocated = False):
+                       collocated = False, edge_dir='out'):
   # Initialize worker group context
   glt.distributed.init_worker_group(
     world_size, rank, 'dist-neighbor-loader-test'
@@ -169,6 +238,7 @@ def run_test_as_worker(world_size: int, rank: int,
     shuffle=True,
     drop_last=False,
     with_edge=True,
+    edge_dir=edge_dir,
     collect_features=True,
     to_device=torch.device('cuda', rank % device_num),
     worker_options=worker_options
@@ -177,7 +247,7 @@ def run_test_as_worker(world_size: int, rank: int,
   # run testing
   for epoch in range(0, 2):
     for res in dist_loader:
-      check_fn(res)
+      check_fn(res, edge_dir)
       time.sleep(0.1)
     glt.distributed.barrier()
     print(f'[Trainer {dist_context.rank}] epoch {epoch} finished.')
@@ -244,6 +314,7 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
       shuffle=True,
       drop_last=False,
       with_edge=True,
+      edge_dir='out',
       collect_features=True,
       to_device=torch.device('cuda', client_rank % device_num),
       worker_options=options
@@ -274,9 +345,10 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
       (torch.arange(vnum_per_partition)+vnum_per_partition,
       (torch.arange(vnum_per_partition)+vnum_per_partition+1)%vnum_total)
     ).to(dtype=torch.long)
-
-    self.hetero_dataset0 = _prepare_hetero_dataset(rank=0)
-    self.hetero_dataset1 = _prepare_hetero_dataset(rank=1)
+    self.out_hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir='out')
+    self.out_hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir='out')
+    self.in_hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir='in')
+    self.in_hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir='in')
     self.hetero_input_edges0 = (u2i_etype, self.input_edges0)
     self.hetero_input_edges1 = (u2i_etype, self.input_edges1)
     self.bin_neg_sampling = glt.sampler.NegativeSampling('binary')
@@ -285,7 +357,7 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
 
-  def test_homo_collocated(self):
+  def test_homo_out_sample_collocated(self):
     print("\n--- DistLinkNeighborLoader Test (homogeneous, collocated) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
@@ -303,37 +375,39 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
     w0.join()
     w1.join()
 
-  def test_homo_mp(self):
+  def test_homo_out_sample_mp(self):
     print("\n--- DistLinkNeighborLoader Test (homogeneous, multiprocessing) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.tri_neg_sampling, self.input_edges0, _check_sample_result, False)
+            self.dataset0, self.tri_neg_sampling, self.input_edges0,
+            _check_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.tri_neg_sampling, self.input_edges1, _check_sample_result, False)
+            self.dataset1, self.tri_neg_sampling, self.input_edges1,
+            _check_sample_result, False)
     )
     w0.start()
     w1.start()
     w0.join()
     w1.join()
 
-  def test_hetero_collocated(self):
+  def test_hetero_out_sample_collocated(self):
     print("\n--- DistLinkNeighborLoader Test (heterogeneous, collocated) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.hetero_dataset0, self.tri_neg_sampling, self.hetero_input_edges0,
+            self.out_hetero_dataset0, self.tri_neg_sampling, self.hetero_input_edges0,
             _check_hetero_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.hetero_dataset1, self.tri_neg_sampling, self.hetero_input_edges1,
+            self.out_hetero_dataset1, self.tri_neg_sampling, self.hetero_input_edges1,
             _check_hetero_sample_result, True)
     )
     w0.start()
@@ -341,20 +415,60 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
     w0.join()
     w1.join()
 
-  def test_hetero_mp(self):
+  def test_hetero_out_sample_mp(self):
     print("\n--- DistLinkNeighborLoader Test (heterogeneous, multiprocessing) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.hetero_dataset0, self.bin_neg_sampling, self.hetero_input_edges0,
+            self.out_hetero_dataset0, self.bin_neg_sampling, self.hetero_input_edges0,
             _check_hetero_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.hetero_dataset1, self.bin_neg_sampling, self.hetero_input_edges1,
+            self.out_hetero_dataset1, self.bin_neg_sampling, self.hetero_input_edges1,
             _check_hetero_sample_result, False)
+    )
+    w0.start()
+    w1.start()
+    w0.join()
+    w1.join()
+
+  def test_hetero_in_sample_collocated(self):
+    print("\n--- DistLinkNeighborLoader Test (in-sample, heterogeneous, collocated) ---")
+    mp_context = torch.multiprocessing.get_context('spawn')
+    w0 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 0, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset0, self.tri_neg_sampling, self.hetero_input_edges0,
+            _check_hetero_sample_result, True, 'in')
+    )
+    w1 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 1, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset1, self.tri_neg_sampling, self.hetero_input_edges1,
+            _check_hetero_sample_result, True, 'in')
+    )
+    w0.start()
+    w1.start()
+    w0.join()
+    w1.join()
+
+  def test_hetero_in_sample_mp(self):
+    print("\n--- DistLinkNeighborLoader Test (in-sample, heterogeneous, multiprocessing) ---")
+    mp_context = torch.multiprocessing.get_context('spawn')
+    w0 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 0, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset0, self.bin_neg_sampling, self.hetero_input_edges0,
+            _check_hetero_sample_result, False, 'in')
+    )
+    w1 = mp_context.Process(
+      target=run_test_as_worker,
+      args=(2, 1, self.master_port, self.sampling_master_port,
+            self.in_hetero_dataset1, self.bin_neg_sampling, self.hetero_input_edges1,
+            _check_hetero_sample_result, False, 'in')
     )
     w0.start()
     w1.start()

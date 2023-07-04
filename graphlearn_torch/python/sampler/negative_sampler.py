@@ -30,7 +30,7 @@ class RandomNegativeSampler(object):
   """
   def __init__(self, graph, mode='CUDA', edge_dir='out'):
     self._mode = mode
-    self._edge_dir = edge_dir
+    self.edge_dir = edge_dir
     if mode == 'CUDA':
       self._sampler = pywrap.CUDARandomNegativeSampler(graph.graph_handler)
     else:
@@ -50,8 +50,8 @@ class RandomNegativeSampler(object):
     Returns:
       negative edge_index(non-strict when padding is True).
     """
-    if self._edge_dir == 'out':
+    if self.edge_dir == 'out':
       rows, cols = self._sampler.sample(req_num, trials_num, padding)
-    elif self._edge_dir == 'in':
+    elif self.edge_dir == 'in':
       cols, rows = self._sampler.sample(req_num, trials_num, padding)
     return torch.stack([rows, cols], dim=0)
