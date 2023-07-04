@@ -139,6 +139,7 @@ if __name__ == '__main__':
   parser.add_argument('--log_every', type=int, default=5)
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
+  parser.add_argument("--edge_dir", type=str, default='in')
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   device = torch.device('cuda' if args.with_gpu else 'cpu')
@@ -146,7 +147,7 @@ if __name__ == '__main__':
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983)
   # init graphlearn_torch Dataset.
-  glt_dataset = glt.data.Dataset(edge_dir='in')
+  glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
   glt_dataset.init_graph(
     edge_index=igbh_dataset.edge_dict,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU'
