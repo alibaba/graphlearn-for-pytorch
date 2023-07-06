@@ -66,6 +66,8 @@ class RpcSamplingCallee(RpcCalleeBase):
   def call(self, *args, **kwargs):
     ensure_device(self.device)
     output = self.sampler.sample_one_hop(*args, **kwargs)
+    if output is None:
+      return torch.tensor([], torch.device('cpu'), dtype=torch.int64)
     return output.to(torch.device('cpu'))
 
 class RpcSubGraphCallee(RpcCalleeBase):
@@ -292,7 +294,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
         for etype, task in task_dict.items():
           output: NeighborOutput = await task
-          if output is None:
+          if output.nbr.numel():
             continue
           nbr_dict[etype] = [src_dict[etype[0]], output.nbr, output.nbr_num]
           if output.edge is not None:
@@ -623,16 +625,17 @@ class DistNeighborSampler(ConcurrentEventLoop):
       if len(partition_results) > 0:
         return partition_results[0].output
       else:
-        return None
+        return torch.tensor([], device=self.device, dtype=torch.int64)
     # With remote sampling results.
-    res_fut_list = await wrap_torch_future(torch.futures.collect_all(futs))
-    for i, res_fut in enumerate(res_fut_list):
-      partition_results.append(
-        PartialNeighborOutput(
-          index=remote_orders_list[i],
-          output=res_fut.wait().to(device)
+    if not len(futs) == 0:
+      res_fut_list = await wrap_torch_future(torch.futures.collect_all(futs))
+      for i, res_fut in enumerate(res_fut_list):
+        partition_results.append(
+          PartialNeighborOutput(
+            index=remote_orders_list[i],
+            output=res_fut.wait().to(device)
+          )
         )
-      )
     return self._stitch_sample_results(srcs, partition_results)
 
   async def _colloate_fn(
