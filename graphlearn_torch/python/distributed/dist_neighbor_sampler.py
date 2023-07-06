@@ -294,7 +294,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
         for etype, task in task_dict.items():
           output: NeighborOutput = await task
-          if output.nbr.numel():
+          if output.nbr.numel() == 0:
             continue
           nbr_dict[etype] = [src_dict[etype[0]], output.nbr, output.nbr_num]
           if output.edge is not None:
@@ -334,6 +334,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
       # Sample subgraph.
       for req_num in self.num_neighbors:
         output: NeighborOutput = await self._sample_one_hop(srcs, req_num, None)
+        if output.nbr.numel() == 0:
+          break
         nodes, rows, cols = \
           inducer.induce_next(srcs, output.nbr, output.nbr_num)
         out_nodes.append(nodes)
