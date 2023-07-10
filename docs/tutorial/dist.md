@@ -667,4 +667,4 @@ a distributed dataset when creating the `DistNeighborLoader`, as all dataset
 partitions are managed by server nodes.
 
 The complete example of distributed training in the server-client mode can be
-found [here](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/examples/distributed/dist_train_sage_supervised_with_server.py)
+found [here](https://github.com/alibaba/graphlearn-for-pytorch/blob/main/examples/distributed/server_client_mode)
