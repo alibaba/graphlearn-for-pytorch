@@ -104,6 +104,6 @@ if __name__ == '__main__':
     chunk_size=args.chunk_size,
     dataset_size=args.dataset_size,
     in_memory=args.in_memory,
-    edge_assign_strategy=args.edge_assign_strategy
+    edge_assign_strategy=args.edge_assign_strategy,
     use_label_2K=args.num_classes==2983,
   )

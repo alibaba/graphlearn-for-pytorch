@@ -133,6 +133,11 @@ class NeighborSampler(BaseSampler):
       nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
     else:
       nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
+    if nbrs.numel() == 0:
+      nbrs = torch.tensor([], dtype=torch.int64 ,device=self.device)
+      nbrs_num = torch.zeros_like(input_seeds, dtype=torch.int64, device=self.device)
+      edge_ids = torch.tensor([], device=self.device, dtype=torch.int64) \
+        if self.with_edge else None
     return NeighborOutput(nbrs, nbrs_num, edge_ids)
 
   def sample_from_nodes(
@@ -174,6 +179,8 @@ class NeighborSampler(BaseSampler):
     out_nodes.append(srcs)
     for req_num in self.num_neighbors:
       out_nbrs = self.sample_one_hop(srcs, req_num)
+      if out_nbrs.nbr.numel() == 0:
+        break
       nodes, rows, cols = inducer.induce_next(
         srcs, out_nbrs.nbr, out_nbrs.nbr_num)
       out_nodes.append(nodes)
@@ -229,7 +236,7 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[-1], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
-            if output is None:
+            if output.nbr.numel() == 0:
               continue
             nbr_dict[reverse_edge_type(etype)] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
@@ -238,7 +245,7 @@ class NeighborSampler(BaseSampler):
           src = src_dict.get(etype[0], None)
           if src is not None:
             output = self.sample_one_hop(src, req_num, etype)
-            if output is None:
+            if output.nbr.numel() == 0:
               continue
             nbr_dict[etype] = [src, output.nbr, output.nbr_num]
             if output.edge is not None:
