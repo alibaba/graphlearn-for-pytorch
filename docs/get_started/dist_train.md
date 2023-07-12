@@ -188,4 +188,4 @@ CUDA_VISIBLE_DEVICES=2,3 python dist_train_sage_supervised.py \
 ```
 
 The complete code of the above example can be found in `examples/distributed/dist_train_sage_supervised.py`.
-An example of distributed training in server-client mode can be found in `examples/distributed/dist_train_sage_supervised_with_server.py`.
+An example of distributed training in server-client mode can be found in `examples/distributed/server_client_mode`.
