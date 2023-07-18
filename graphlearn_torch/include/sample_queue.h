@@ -43,6 +43,7 @@ public:
 
   void Enqueue(const TensorMap& msg);
   TensorMap Dequeue();
+  bool Empty();
 
 private:
   std::unique_ptr<ShmQueue> shmq_;

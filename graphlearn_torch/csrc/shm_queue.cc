@@ -227,6 +227,10 @@ ShmData ShmQueue::Dequeue() {
   return {shm_read_ptr, shm_data_size, block_id, meta_};
 }
 
+bool ShmQueue::Empty() {
+  return meta_->read_block_id_ == meta_->write_block_id_;
+}
+
 void ShmQueue::PinMemory() {
 #ifdef WITH_CUDA
   cudaHostRegister(meta_.get(), shm_size_, cudaHostRegisterMapped);

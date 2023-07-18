@@ -125,6 +125,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::class_<SampleQueue>(m, "SampleQueue")
     .def(py::init<size_t, size_t>(), py::arg("capacity"), py::arg("buf_size"))
     .def("pin_memory", &SampleQueue::PinMemory)
+    .def("empty", &SampleQueue::Empty)
     .def("send", &SampleQueue::Enqueue, py::arg("msg"),
          py::call_guard<py::gil_scoped_release>())
     .def("receive", &SampleQueue::Dequeue,

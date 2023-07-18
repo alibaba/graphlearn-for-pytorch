@@ -46,6 +46,7 @@ def run_receiver(_, channel):
     tc.assertEqual(received_map['from_cuda'].device, torch.device('cpu'))
     tc.assertTrue(torch.equal(received_map['from_cuda'],
                               torch.arange(i, dtype=torch.int32)))
+  tc.assertTrue(channel.empty())
 
 
 class SampleQueueCase(unittest.TestCase):

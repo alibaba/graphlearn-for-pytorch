@@ -29,4 +29,8 @@ TensorMap SampleQueue::Dequeue() {
   return TensorMapSerializer::Load(std::move(shm_data));
 }
 
+bool SampleQueue::Empty() {
+  return shmq_->Empty();
+}
+
 }  // namespace graphlearn_torch

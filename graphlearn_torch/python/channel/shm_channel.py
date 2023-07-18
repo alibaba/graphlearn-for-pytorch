@@ -52,6 +52,11 @@ class ShmChannel(ChannelBase):
     """
     self._queue.pin_memory()
 
+  def empty(self) -> bool:
+    r""" Whether the queue is empty.
+    """
+    return self._queue.empty()
+
   def send(self, msg: SampleMessage, **kwargs):
     self._queue.send(msg)
 

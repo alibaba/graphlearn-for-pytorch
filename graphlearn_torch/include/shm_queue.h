@@ -207,6 +207,8 @@ public:
   /// \return `ShmData`
   ShmData Dequeue();
 
+  bool Empty();
+
   /// Pin memory on child processes.
   void PinMemory();
 
