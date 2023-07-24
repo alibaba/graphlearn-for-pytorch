@@ -190,14 +190,14 @@ if __name__ == '__main__':
       help='size of the datasets')
   parser.add_argument('--num_classes', type=int, default=19,
       choices=[19, 2983], help='number of classes')
-  parser.add_argument('--in_memory', type=int, default=0,
+  parser.add_argument('--in_memory', type=int, default=1,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
   # Model
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='1,1')
-  parser.add_argument('--batch_size', type=int, default=64)
+  parser.add_argument('--fan_out', type=str, default='10,10')
+  parser.add_argument('--batch_size', type=int, default=5120)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=int, default=0.01)
   parser.add_argument('--epochs', type=int, default=20)
@@ -216,14 +216,12 @@ if __name__ == '__main__':
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
   glt_dataset.init_graph(
     edge_index=igbh_dataset.edge_dict,
-    # graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
-    graph_mode='CPU',
-    directed=True
+    graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
   )
-  print(igbh_dataset.feat_dict['institute'].size(0))
+
   glt_dataset.init_node_features(
     node_feature_data=igbh_dataset.feat_dict,
-    with_gpu=False
+    with_gpu=True
   )
   glt_dataset.init_node_labels(node_label_data={'paper': igbh_dataset.label})
 
@@ -231,7 +229,6 @@ if __name__ == '__main__':
   val_idx = igbh_dataset.val_idx.share_memory_()
   test_idx = igbh_dataset.test_idx.share_memory_()
   
-  print(train_idx)
   print('--- Launching training processes ...\n')
   world_size = torch.cuda.device_count()
   torch.multiprocessing.spawn(
