@@ -109,7 +109,7 @@ extensions.append(cpp_extension.CppExtension(
 setup(
   name='graphlearn-torch',
   version=_VERSION,
-  author='Baole Ai',
+  author='Baole Ai, Wenting Shen, Li Su, Shuxian Hu, Zhibin Jia, Hongyi Zhang',
   description='Graph Learning for PyTorch (GraphLearn-for-PyTorch)',
   url="https://github.com/alibaba/graphlearn-for-pytorch",
   python_requires='>=3.6',
