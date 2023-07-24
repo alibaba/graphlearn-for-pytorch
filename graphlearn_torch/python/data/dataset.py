@@ -224,12 +224,12 @@ class Dataset(object):
 
   def share_ipc(self):
     self.node_labels = share_memory(self.node_labels)
-    return self.graph, self.node_features, self.edge_features, self.node_labels
+    return self.graph, self.node_features, self.edge_features, self.node_labels, self.edge_dir
 
   @classmethod
   def from_ipc_handle(cls, ipc_handle):
-    graph, node_features, edge_features, node_labels = ipc_handle
-    return cls(graph, node_features, edge_features, node_labels)
+    graph, node_features, edge_features, node_labels, edge_dir = ipc_handle
+    return cls(graph, node_features, edge_features, node_labels, edge_dir)
 
   def get_graph(self, etype: Optional[EdgeType] = None):
     if isinstance(self.graph, Graph):
