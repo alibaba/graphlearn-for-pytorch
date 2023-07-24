@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 from torch.utils import cpp_extension
 
 # This version string should be updated when releasing a new version.
-_VERSION = '0.2.0'
+_VERSION = '0.2.1'
 
 RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
@@ -109,7 +109,7 @@ extensions.append(cpp_extension.CppExtension(
 setup(
   name='graphlearn-torch',
   version=_VERSION,
-  author='Baole Ai',
+  author='GLT Team',
   description='Graph Learning for PyTorch (GraphLearn-for-PyTorch)',
   url="https://github.com/alibaba/graphlearn-for-pytorch",
   python_requires='>=3.6',
