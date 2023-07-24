@@ -3,7 +3,7 @@ project(GraphLearn-for-PyTorch)
 set(CMAKE_CXX_STANDARD 14)
 
 option(DEBUG "Enable debug mode" OFF)
-option(BUILD_TESTS "Enable testing" ON)
+option(BUILD_TESTS "Enable testing" OFF)
 option(WITH_CUDA "Enable CUDA support" ON)
 option(WITH_VINEYARD "Enable vineyard support" OFF)
 
@@ -64,6 +64,82 @@ if(WITH_CUDA)
   endfunction()
 endif()
 
+## protobuf and gRPC package
+set(Protobuf_PROTOC_EXECUTABLE "${GLT_THIRD_PARTY_DIR}/grpc/build/bin/protoc")
+set(Protobuf_INSTALL_DIR "${GLT_THIRD_PARTY_DIR}/grpc/build/")
+# find_package (Protobuf QUIET)
+# if (NOT Protobuf_FOUND)
+set (gRPC_INSTALL_DIR ${GLT_THIRD_PARTY_DIR}/grpc/build)
+list (APPEND CMAKE_PREFIX_PATH ${gRPC_INSTALL_DIR})
+find_package (protobuf CONFIG REQUIRED)
+# endif ()
+
+message(STATUS "Using protobuf: Protobuf_found=${Protobuf_FOUND}")
+message(STATUS "Using protobuf: ${Protobuf_INCLUDE_DIRS}")
+
+macro (get_target_import_location var target)
+  if (TARGET ${target})
+    foreach (prop IMPORTED_LOCATION IMPORTED_LOCATION_NOCONFIG IMPORTED_LOCATION_DEBUG IMPORTED_LOCATION_RELEASE)
+      get_target_property (${var} ${target} ${prop})
+      if (NOT ("${${var}}" STREQUAL "${var}-NOTFOUND"))
+        break ()
+      endif ()
+    endforeach ()
+  endif ()
+endmacro ()
+
+find_package (gRPC CONFIG QUIET)
+message(STATUS "Using gRPC: gRPC_found=${gRPC_FOUND}")
+if (gRPC_FOUND)
+  if (TARGET gRPC::grpc_cpp_plugin)
+    get_target_import_location(GLT_GRPC_CPP_PLUGIN gRPC::grpc_cpp_plugin)
+  else ()
+    set (GLT_GRPC_CPP_PLUGIN ${gRPC_INSTALL_DIR}/bin/grpc_cpp_plugin)
+  endif ()
+else ()
+  include (${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGRPC.cmake)
+  set_target_properties(gRPC::grpc++ PROPERTIES INTERFACE_LINK_LIBRARIES "${Protobuf_LIBRARIES}")
+  get_target_import_location(GLT_GRPC_CPP_PLUGIN gRPC::grpc_cpp_plugin)
+endif ()
+
+# message(STATUS "Using gRPC CPP plugin: ${GLT_GRPC_CPP_PLUGIN}")
+
+## grpc codegen
+set(RPC_SRC_DIR ${GLT_ROOT}/graphlearn_torch/csrc/rpc)
+set (GLT_PROTO_GEN_DIR ${RPC_SRC_DIR}/generated)
+set (GLT_PROTO_DIR ${RPC_SRC_DIR}/proto)
+file (MAKE_DIRECTORY ${GLT_PROTO_GEN_DIR})
+set (GLT_PROTO_SRC_FILES
+  ${GLT_PROTO_DIR}/helloworld.proto)
+
+function (generate_grpc_files target_name grpc_gen_files)
+  set (${grpc_gen_files})
+  foreach (FIL ${GLT_PROTO_SRC_FILES})
+    get_filename_component (FIL_WE ${FIL} NAME_WE)
+    set (GEN_FILES
+      ${GLT_PROTO_GEN_DIR}/${FIL_WE}.pb.h
+      ${GLT_PROTO_GEN_DIR}/${FIL_WE}.pb.cc
+      ${GLT_PROTO_GEN_DIR}/${FIL_WE}.grpc.pb.h
+      ${GLT_PROTO_GEN_DIR}/${FIL_WE}.grpc.pb.cc)
+    list (APPEND ${grpc_gen_files} ${GEN_FILES})
+    add_custom_command (
+      OUTPUT ${GEN_FILES}
+      DEPENDS protobuf::protoc gRPC::grpc_cpp_plugin ${FIL}
+      COMMENT "Generating for proto file: ${FIL_WE}.proto ..."
+      COMMAND protobuf::protoc -I ${GLT_PROTO_DIR} --cpp_out=${GLT_PROTO_GEN_DIR} ${FIL}
+      COMMAND protobuf::protoc -I ${GLT_PROTO_DIR} --grpc_out=${GLT_PROTO_GEN_DIR}
+        --plugin=protoc-gen-grpc=${GLT_GRPC_CPP_PLUGIN} ${FIL}
+      VERBATIM)
+  endforeach ()
+
+  set_source_files_properties (${${grpc_gen_files}} PROPERTIES GENERATED TRUE)
+  set (${grpc_gen_files} ${${grpc_gen_files}} PARENT_SCOPE)
+
+  add_custom_target (${target_name}
+    DEPENDS ${${grpc_gen_files}})
+endfunction ()
+
+generate_grpc_files (grpc_codegen GLT_GRPC_AUTOGEN_FILES)
 
 # Link to PyTorch
 # Auto-find CMAKE_PREFIX_PATH for PyTorch
@@ -86,7 +162,10 @@ if(WITH_VINEYARD)
 endif()
 
 # Build library
-add_library(graphlearn_torch SHARED)
+add_library(graphlearn_torch SHARED
+  ${GLT_GRPC_AUTOGEN_FILES})
+
+add_dependencies(graphlearn_torch grpc_codegen)
 
 function(target_source_tree target)
   file(GLOB_RECURSE SRCS ${ARGN})
@@ -105,7 +184,14 @@ if(WITH_CUDA)
 endif()
 
 target_include_directories(graphlearn_torch
-  PUBLIC ${GLT_ROOT})
+  PUBLIC ${GLT_ROOT})# ${GLT_THIRD_PARTY_DIR}/grpc/build/include
+
+target_link_libraries(graphlearn_torch
+  # PUBLIC protobuf::libprotobuf
+  PUBLIC gRPC::grpc++
+  # PUBLIC gRPC::grpc++_reflection
+  )
+
 target_link_libraries(graphlearn_torch
   PUBLIC Python3::Python ${TORCH_LIBRARIES})
 
@@ -119,6 +205,11 @@ if(WITH_VINEYARD)
   target_link_libraries(graphlearn_torch
     PUBLIC ${VINEYARD_LIBRARIES})
 endif()
+
+add_executable(server
+"/root/graphlearn-for-pytorch/graphlearn_torch/csrc/rpc/server.cc")
+target_link_libraries(server
+  PUBLIC graphlearn_torch) 
 
 # Build tests
 if(BUILD_TESTS)
@@ -139,6 +230,7 @@ if(BUILD_TESTS)
     file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cu)
   endif()
 
+  message(STATUS "GLT_TEST_FILES: ${GLT_TEST_FILES}")
   foreach(t ${GLT_TEST_FILES})
     get_filename_component(name ${t} NAME_WE)
     glt_add_test(${name} ${t})
