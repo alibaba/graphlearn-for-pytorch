@@ -30,11 +30,16 @@ in the training script below.
 
 Note that in `dataset.py`, we have converted the graph into an undirected graph.
 
-## 2. Single node and single GPU training:
+## 2. Single node training:
 ```
 python train_rgnn.py --model='rgat' --dataset_size='tiny' --num_classes=19
 ```
-The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
+The script uses a single GPU, please add `--cpu_mode` if you want to use CPU only.
+
+To train the model using multiple GPUs:
+```
+CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19
+```
 
 ## 3. Distributed (multi nodes) examples
 
