@@ -220,6 +220,8 @@ class DistMpSamplingProducer(object):
     """
     if self.sampling_config.shuffle:
       seeds_indexes = self._get_seeds_indexes()
+      for rank in range(self.num_workers):
+        seeds_indexes[rank].share_memory_()
     else:
       seeds_indexes = [None] * self.num_workers
 
