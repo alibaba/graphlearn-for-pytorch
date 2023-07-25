@@ -94,10 +94,8 @@ def run_client_proc(num_servers: int, num_clients: int, client_rank: int, datase
     to_device=current_device,
     worker_options=glt.distributed.RemoteDistSamplingWorkerOptions(
       server_rank=target_server_rank,
-      num_workers=1,
-      worker_devices=[
-        torch.device('cuda', (client_rank // num_servers) // target_server_device_count)
-      ],
+      num_workers=2,
+      worker_devices=[torch.device('cuda', i % target_server_device_count) for i in range(2)],
       worker_concurrency=4,
       master_addr=master_addr,
       master_port=train_loader_master_port,
