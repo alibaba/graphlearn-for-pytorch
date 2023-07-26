@@ -14,6 +14,7 @@
 # ==============================================================================
 
 import atexit
+import time
 import collections
 import functools
 import logging
@@ -289,8 +290,10 @@ def init_rpc(master_addr: str,
     global _rpc_current_group_worker_names
     _rpc_current_group_worker_names = set(_rpc_worker_names[ctx.role])
 
-    global_barrier(timeout=15) # TODO(hongyi): some may hang here
-
+    global_barrier(timeout=rpc_timeout) 
+    # TODO(hongyi): without this line, some process may hang when calling 
+    # global barrier
+    time.sleep(1) 
 
 def shutdown_rpc(graceful=True):
   r""" Shutdown rpc agent on the current process.
