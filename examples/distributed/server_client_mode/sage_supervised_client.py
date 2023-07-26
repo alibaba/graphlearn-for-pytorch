@@ -117,7 +117,7 @@ def run_client_proc(
   print(f'-- [Client {client_rank}] Creating testing dataloader ...')
   test_loader = glt.distributed.DistNeighborLoader(
     data=None,
-    num_neighbors=[2, 2, 2],
+    num_neighbors=[15, 10, 5],
     input_nodes=test_path,
     batch_size=batch_size,
     shuffle=False,
