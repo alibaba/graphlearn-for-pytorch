@@ -15,9 +15,10 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict
-
 import torch
+from .. import py_graphlearn_torch as pywrap
 
+QueueTimeoutError =  pywrap.QueueTimeoutError
 
 # A `SampleMessage` contains all possible results from a sampler, including
 # subgraph data, features and user defined metas.

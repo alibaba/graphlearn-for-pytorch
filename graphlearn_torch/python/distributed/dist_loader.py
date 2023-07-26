@@ -14,23 +14,20 @@
 # ==============================================================================
 
 from typing import List, Optional, Union
-
+import concurrent
 import torch
 from torch_geometric.data import Data, HeteroData
 
 from ..channel import SampleMessage, ShmChannel, RemoteReceivingChannel
 from ..loader import to_data, to_hetero_data
 from ..sampler import (
-  NodeSamplerInput, EdgeSamplerInput,
-  SamplerOutput, HeteroSamplerOutput,
-  SamplingConfig, SamplingType
+  NodeSamplerInput, EdgeSamplerInput, RemoteSamplerInput, SamplerOutput,
+  HeteroSamplerOutput, SamplingConfig, SamplingType
 )
-from ..typing import (
-  NodeType, EdgeType, as_str, reverse_edge_type
-)
+from ..typing import (NodeType, EdgeType, as_str, reverse_edge_type)
 from ..utils import get_available_device, ensure_device, python_exit_status
 
-from .dist_client import request_server
+from .dist_client import request_server, async_request_server
 from .dist_context import get_context
 from .dist_dataset import DistDataset
 from .dist_options import (
@@ -80,9 +77,10 @@ class DistLoader(object):
     data (DistDataset, optional): The ``DistDataset`` object of a partition of
       graph data and feature data, along with distributed patition books. The
       input dataset must be provided in non-server distribution mode.
-    input_data (NodeSamplerInput or EdgeSamplerInput): The input data for
-      which neighbors or subgraphs are sampled to create mini-batches. In
-      heterogeneous graphs.
+    input_data (NodeSamplerInput or EdgeSamplerInput or RemoteSamplerInput): 
+      The input data for which neighbors or subgraphs are sampled to create 
+      mini-batches. In heterogeneous graphs, needs to be passed as a tuple that
+      holds the node type and node indices.
     sampling_config (SamplingConfig): The Configuration info for sampling.
     to_device (torch.device, optional): The target device that the sampled
       results should be copied to. If set to ``None``, the current cuda device
@@ -100,12 +98,16 @@ class DistLoader(object):
       nodes, and a remote channel will be created for cross-machine message
       passing. (default: ``None``).
   """
-  def __init__(self,
-               data: Optional[DistDataset],
-               input_data: Union[NodeSamplerInput, EdgeSamplerInput],
-               sampling_config: SamplingConfig,
-               to_device: Optional[torch.device] = None,
-               worker_options: Optional[AllDistSamplingWorkerOptions] = None):
+
+  def __init__(
+    self,
+    data: Optional[DistDataset],
+    input_data: Union[NodeSamplerInput, EdgeSamplerInput, RemoteSamplerInput,
+                      List[RemoteSamplerInput]],
+    sampling_config: SamplingConfig,
+    to_device: Optional[torch.device] = None,
+    worker_options: Optional[AllDistSamplingWorkerOptions] = None
+  ):
     self.data = data
     self.input_data = input_data
     self.sampling_type = sampling_config.sampling_type
@@ -122,6 +124,16 @@ class DistLoader(object):
     if self.worker_options is None:
       self.worker_options = CollocatedDistSamplingWorkerOptions()
 
+    self._is_collocated_worker = isinstance(
+      self.worker_options, CollocatedDistSamplingWorkerOptions
+    )
+    self._is_mp_worker = isinstance(
+      self.worker_options, MpDistSamplingWorkerOptions
+    )
+    self._is_remote_worker = isinstance(
+      self.worker_options, RemoteDistSamplingWorkerOptions
+    )
+
     if self.data is not None:
       self.num_data_partitions = self.data.num_partitions
       self.data_partition_idx = self.data.partition_idx
@@ -129,98 +141,122 @@ class DistLoader(object):
         self.data.get_node_types(), self.data.get_edge_types()
       )
 
-    self._input_type = self.input_data.input_type
-    self._input_len = len(self.input_data)
-    self._num_expected = self._input_len // self.batch_size
-    if not self.drop_last and self._input_len % self.batch_size != 0:
-      self._num_expected += 1
     self._num_recv = 0
+    self._epoch = 0
 
     current_ctx = get_context()
     if current_ctx is None:
-      raise RuntimeError(f"'{self.__class__.__name__}': the distributed "
-                         f"context of has not been initialized.")
-
-    if isinstance(self.worker_options, CollocatedDistSamplingWorkerOptions):
-      if not current_ctx.is_worker():
-        raise RuntimeError(f"'{self.__class__.__name__}': only supports "
-                           f"launching a collocated sampler with a non-server "
-                           f"distribution mode, current role of distributed "
-                           f"context is {current_ctx.role}.")
-      if self.data is None:
-        raise ValueError(f"'{self.__class__.__name__}': missing input dataset "
-                         f"when launching a collocated sampler.")
-
-      # Launch collocated producer
-      self._worker_mode = 'collocated'
-      self._with_channel = False
-
-      self._collocated_producer = DistCollocatedSamplingProducer(
-        self.data, self.input_data, self.sampling_config,
-        self.worker_options, self.to_device
+      raise RuntimeError(
+        f"'{self.__class__.__name__}': the distributed "
+        f"context of has not been initialized."
       )
-      self._collocated_producer.init()
 
-    elif isinstance(self.worker_options, MpDistSamplingWorkerOptions):
-      if not current_ctx.is_worker():
-        raise RuntimeError(f"'{self.__class__.__name__}': only supports "
-                           f"launching multiprocessing sampling workers with "
-                           f"a non-server distribution mode, current role of "
-                           f"distributed context is {current_ctx.role}.")
-      if self.data is None:
-        raise ValueError(f"'{self.__class__.__name__}': missing input dataset "
-                         f"when launching multiprocessing sampling workers.")
-
-      # Launch multiprocessing sampling workers
-      self._worker_mode = 'mp'
-      self._with_channel = True
-      self.worker_options._set_worker_ranks(current_ctx)
-
-      self._channel = ShmChannel(self.worker_options.channel_capacity,
-                                 self.worker_options.channel_size)
-      if self.worker_options.pin_memory:
-        self._channel.pin_memory()
-
-      self._mp_producer = DistMpSamplingProducer(
-        self.data, self.input_data, self.sampling_config,
-        self.worker_options, self._channel
-      )
-      self._mp_producer.init()
-
-    elif isinstance(self.worker_options, RemoteDistSamplingWorkerOptions):
+    if self._is_remote_worker:
       if not current_ctx.is_client():
-        raise RuntimeError(f"'{self.__class__.__name__}': `DistNeighborLoader` "
-                           f"must be used on a client worker process.")
+        raise RuntimeError(
+          f"'{self.__class__.__name__}': `DistNeighborLoader` "
+          f"must be used on a client worker process."
+        )
+      self._num_expected = float(
+        'inf'
+      )  # for remote worker, end of epoch is determined by server
 
       # Launch remote sampling workers
-      self._worker_mode = 'remote'
       self._with_channel = True
-      self.worker_options._set_worker_ranks(current_ctx)
 
-      self._server_rank = self.worker_options.server_rank
-      if self._server_rank is None:
-        self._server_rank = current_ctx.rank % current_ctx.num_servers()
+      self._server_rank_list = self.worker_options.server_rank \
+        if isinstance(self.worker_options.server_rank, List) else [self.worker_options.server_rank]
+      self._input_data_list = self.input_data if isinstance(
+        self.input_data, List
+      ) else [self.input_data]
+
+      self._input_type = self._input_data_list[0].input_type
 
       self.num_data_partitions, self.data_partition_idx, ntypes, etypes = \
-        request_server(self._server_rank, DistServer.get_dataset_meta)
+        request_server(self._server_rank_list[0], DistServer.get_dataset_meta)
       self._set_ntypes_and_etypes(ntypes, etypes)
 
-      self._producer_id = request_server(
-        self._server_rank,
-        DistServer.create_sampling_producer,
-        self.input_data.to(torch.device('cpu')),
-        self.sampling_config,
-        self.worker_options
-      )
+      self._producer_id_list = []
+      futures = []
+      for input_data in self._input_data_list:
+        if not isinstance(input_data, RemoteSamplerInput):
+          input_data = input_data.to(torch.device('cpu'))
 
+      with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(request_server, server_rank, DistServer.create_sampling_producer, input_data, self.sampling_config, self.worker_options) \
+                         for server_rank, input_data in zip(self._server_rank_list, self._input_data_list)]
+        
+      for future in futures:
+        producer_id = future.result()
+        self._producer_id_list.append(producer_id)
       self._channel = RemoteReceivingChannel(
-        self._server_rank, self._producer_id,
-        self._num_expected, self.worker_options.prefetch_size
+        self._server_rank_list, self._producer_id_list,
+        self.worker_options.prefetch_size
       )
-
     else:
-      raise ValueError(f"'{self.__class__.__name__}': found invalid "
-                       f"worker options type '{type(worker_options)}'")
+      self._input_len = len(self.input_data)
+      self._input_type = self.input_data.input_type
+      self._num_expected = self._input_len // self.batch_size
+      if not self.drop_last and self._input_len % self.batch_size != 0:
+        self._num_expected += 1
+
+      if self._is_collocated_worker:
+        if not current_ctx.is_worker():
+          raise RuntimeError(
+            f"'{self.__class__.__name__}': only supports "
+            f"launching a collocated sampler with a non-server "
+            f"distribution mode, current role of distributed "
+            f"context is {current_ctx.role}."
+          )
+        if self.data is None:
+          raise ValueError(
+            f"'{self.__class__.__name__}': missing input dataset "
+            f"when launching a collocated sampler."
+          )
+
+        # Launch collocated producer
+        self._with_channel = False
+
+        self._collocated_producer = DistCollocatedSamplingProducer(
+          self.data, self.input_data, self.sampling_config, self.worker_options,
+          self.to_device
+        )
+        self._collocated_producer.init()
+
+      elif self._is_mp_worker:
+        if not current_ctx.is_worker():
+          raise RuntimeError(
+            f"'{self.__class__.__name__}': only supports "
+            f"launching multiprocessing sampling workers with "
+            f"a non-server distribution mode, current role of "
+            f"distributed context is {current_ctx.role}."
+          )
+        if self.data is None:
+          raise ValueError(
+            f"'{self.__class__.__name__}': missing input dataset "
+            f"when launching multiprocessing sampling workers."
+          )
+
+        # Launch multiprocessing sampling workers
+        self._with_channel = True
+        self.worker_options._set_worker_ranks(current_ctx)
+
+        self._channel = ShmChannel(
+          self.worker_options.channel_capacity, self.worker_options.channel_size
+        )
+        if self.worker_options.pin_memory:
+          self._channel.pin_memory()
+
+        self._mp_producer = DistMpSamplingProducer(
+          self.data, self.input_data, self.sampling_config, self.worker_options,
+          self._channel
+        )
+        self._mp_producer.init()
+      else:
+        raise ValueError(
+          f"'{self.__class__.__name__}': found invalid "
+          f"worker options type '{type(worker_options)}'"
+        )
 
     self._shutdowned = False
 
@@ -232,17 +268,17 @@ class DistLoader(object):
   def shutdown(self):
     if self._shutdowned:
       return
-    if self._worker_mode == 'collocated':
+    if self._is_collocated_worker:
       self._collocated_producer.shutdown()
-    elif self._worker_mode == 'mp':
+    elif self._is_mp_worker:
       self._mp_producer.shutdown()
     else:
       if rpc_is_initialized() is True:
-        request_server(
-          self._server_rank,
-          DistServer.destroy_sampling_producer,
-          self._producer_id
-        )
+        for server_rank, producer_id in zip(self._server_rank_list, self._producer_id_list):
+          request_server(
+            server_rank, DistServer.destroy_sampling_producer,
+            producer_id
+          )
     self._shutdowned = True
 
   def __next__(self):
@@ -260,17 +296,20 @@ class DistLoader(object):
 
   def __iter__(self):
     self._num_recv = 0
-    if self._worker_mode == 'collocated':
+    if self._is_collocated_worker:
       self._collocated_producer.reset()
-    elif self._worker_mode == 'mp':
+    elif self._is_mp_worker:
       self._mp_producer.produce_all()
     else:
-      request_server(
-        self._server_rank,
-        DistServer.start_new_epoch_sampling,
-        self._producer_id
-      )
+      for server_rank, producer_id in zip(self._server_rank_list, self._producer_id_list):
+        request_server(
+          server_rank, 
+          DistServer.start_new_epoch_sampling,
+          producer_id,
+          self._epoch
+        )
       self._channel.reset()
+    self._epoch += 1
     return self
 
   def _set_ntypes_and_etypes(self, node_types: List[NodeType],

@@ -24,9 +24,13 @@ void SampleQueue::Enqueue(const TensorMap& msg) {
   });
 }
 
-TensorMap SampleQueue::Dequeue() {
-  auto shm_data = shmq_->Dequeue();
+TensorMap SampleQueue::Dequeue(unsigned int timeout_ms) {
+  auto shm_data = shmq_->Dequeue(timeout_ms);
   return TensorMapSerializer::Load(std::move(shm_data));
+}
+
+bool SampleQueue::Empty() {
+  return shmq_->Empty();
 }
 
 }  // namespace graphlearn_torch

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from .base import SampleMessage, ChannelBase
+from .base import SampleMessage, ChannelBase, QueueTimeoutError
 from .mp_channel import MpChannel
 from .shm_channel import ShmChannel
 from .remote_channel import RemoteReceivingChannel

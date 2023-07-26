@@ -289,7 +289,7 @@ def init_rpc(master_addr: str,
     global _rpc_current_group_worker_names
     _rpc_current_group_worker_names = set(_rpc_worker_names[ctx.role])
 
-    global_barrier(timeout=rpc_timeout)
+    global_barrier(timeout=15) # TODO(hongyi): some may hang here
 
 
 def shutdown_rpc(graceful=True):

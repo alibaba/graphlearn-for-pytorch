@@ -21,9 +21,11 @@ import torch
 import torch.distributed
 
 
-def run_server_proc(num_servers: int, num_clients: int, server_rank: int,
-                    dataset: glt.distributed.DistDataset, master_addr: str,
-                    server_client_port: int):
+def run_server_proc(
+  num_servers: int, num_clients: int, server_rank: int,
+  dataset: glt.distributed.DistDataset, master_addr: str,
+  server_client_port: int
+):
   print(f'-- [Server {server_rank}] Initializing server ...')
   glt.distributed.init_server(
     num_servers=num_servers,
@@ -33,7 +35,8 @@ def run_server_proc(num_servers: int, num_clients: int, server_rank: int,
     master_addr=master_addr,
     master_port=server_client_port,
     num_rpc_threads=16,
-    server_group_name='dist-train-supervised-sage-server')
+    server_group_name='dist-train-supervised-sage-server'
+  )
 
   print(f'-- [Server {server_rank}] Waiting for exit ...')
   glt.distributed.wait_and_shutdown_server()
@@ -43,7 +46,8 @@ def run_server_proc(num_servers: int, num_clients: int, server_rank: int,
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
-    description="Arguments for distributed training of supervised SAGE with servers.")
+    description="Arguments for distributed training of supervised SAGE with servers."
+  )
   parser.add_argument(
     "--dataset",
     type=str,
@@ -57,10 +61,10 @@ if __name__ == '__main__':
     help="The root directory (relative path) of partitioned ogbn dataset.",
   )
   parser.add_argument(
-    "--num_server_dataset_partitions",
+    "--num_dataset_partitions",
     type=int,
     default=2,
-    help="The number of server partitions of the dataset.",
+    help="The number of partitions of the dataset.",
   )
   parser.add_argument(
     "--num_server_nodes",
@@ -113,17 +117,23 @@ if __name__ == '__main__':
   print(f'* dataset root dir: {args.dataset_root_dir}')
   print(f'* total server nodes: {args.num_server_nodes}')
   print(f'* node rank: {args.node_rank}')
-  print(f'* number of server processes per server node: {args.num_server_procs_per_node}')
-  print(f'* number of client processes per client node: {args.num_client_procs_per_node}')
+  print(
+    f'* number of server processes per server node: {args.num_server_procs_per_node}'
+  )
+  print(
+    f'* number of client processes per client node: {args.num_client_procs_per_node}'
+  )
   print(f'* master addr: {args.master_addr}')
   print(f'* server-client master port: {args.server_client_master_port}')
 
-  print(f'* number of server dataset partitions: {args.num_server_dataset_partitions}')
+  print(f'* number of dataset partitions: {args.num_dataset_partitions}')
 
   num_servers = args.num_server_nodes * args.num_server_procs_per_node
   num_clients = args.num_client_nodes * args.num_client_procs_per_node
-  root_dir = osp.join(osp.dirname(osp.realpath(__file__)), args.dataset_root_dir)
-  data_pidx = args.node_rank % args.num_server_dataset_partitions
+  root_dir = osp.join(
+    osp.dirname(osp.realpath(__file__)), args.dataset_root_dir
+  )
+  data_pidx = args.node_rank % args.num_dataset_partitions
 
   mp_context = torch.multiprocessing.get_context('spawn')
 
@@ -133,7 +143,10 @@ if __name__ == '__main__':
     root_dir=osp.join(root_dir, f'{args.dataset}-partitions'),
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY',
-    whole_node_label_file=osp.join(root_dir, f'{args.dataset}-label', 'label.pt'))
+    whole_node_label_file=osp.join(
+      root_dir, f'{args.dataset}-label', 'label.pt'
+    )
+  )
 
   print('--- Launching server processes ...')
   server_procs = []
@@ -141,8 +154,11 @@ if __name__ == '__main__':
     server_rank = args.node_rank * args.num_server_procs_per_node + local_proc_rank
     sproc = mp_context.Process(
       target=run_server_proc,
-      args=(num_servers, num_clients, server_rank, dataset, args.master_addr,
-            args.server_client_master_port))
+      args=(
+        num_servers, num_clients, server_rank, dataset, args.master_addr,
+        args.server_client_master_port
+      )
+    )
     server_procs.append(sproc)
   for sproc in server_procs:
     sproc.start()
