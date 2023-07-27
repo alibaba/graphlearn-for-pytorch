@@ -55,8 +55,8 @@ def test(model, test_loader, dataset_name):
 
 
 def run_client_proc(
-  num_servers: int, num_clients: int, client_rank: int, server_rank: List[int],
-  dataset_name: str, train_path: List[str], test_path: List[str], epochs: int,
+  num_servers: int, num_clients: int, client_rank: int, server_rank_list: List[int],
+  dataset_name: str, train_path_list: List[str], test_path_list: List[str], epochs: int,
   batch_size: int, master_addr: str, server_client_port: int,
   training_pg_master_port: int, train_loader_master_port: int,
   test_loader_master_port: int
@@ -86,21 +86,23 @@ def run_client_proc(
     init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port)
   )
 
+  # TODO(hongyi): handle the case that different servers have different device count
   server_device_count = glt.distributed.request_server(
-    server_rank=server_rank[0], func=torch.cuda.device_count)
+    server_rank=server_rank_list[0], func=torch.cuda.device_count)
+
   # Create distributed neighbor loader on remote server for training.
   print(f'-- [Client {client_rank}] Creating training dataloader ...')
   train_loader = glt.distributed.DistNeighborLoader(
     data=None,
     num_neighbors=[15, 10, 5],
-    input_nodes=train_path,
+    input_nodes=train_path_list,
     batch_size=batch_size,
     shuffle=True,
     collect_features=True,
     to_device=current_device,
     worker_options=glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=server_rank,
-      num_workers=2,
+      server_rank=server_rank_list,
+      num_workers=server_device_count,
       worker_devices=[
         torch.device(f'cuda:{i}') for i in range(server_device_count)
       ],
@@ -118,14 +120,14 @@ def run_client_proc(
   test_loader = glt.distributed.DistNeighborLoader(
     data=None,
     num_neighbors=[15, 10, 5],
-    input_nodes=test_path,
+    input_nodes=test_path_list,
     batch_size=batch_size,
     shuffle=False,
     collect_features=True,
     to_device=current_device,
     worker_options=glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=server_rank,
-      num_workers=2,
+      server_rank=server_rank_list,
+      num_workers=server_device_count,
       worker_devices=[
         torch.device(f'cuda:{i}') for i in range(server_device_count)
       ],

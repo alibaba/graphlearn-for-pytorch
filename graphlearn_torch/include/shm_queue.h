@@ -205,7 +205,7 @@ public:
 
   /// Dequeue a message on child process.
   /// \return `ShmData`
-  ShmData Dequeue(unsigned int timeout_ms);
+  ShmData Dequeue(unsigned int timeout_ms = 0);
 
   bool Empty();
 

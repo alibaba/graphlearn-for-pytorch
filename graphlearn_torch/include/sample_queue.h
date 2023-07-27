@@ -42,7 +42,7 @@ public:
   }
 
   void Enqueue(const TensorMap& msg);
-  TensorMap Dequeue(unsigned int timeout_ms);
+  TensorMap Dequeue(unsigned int timeout_ms = 0);
   bool Empty();
 
 private:

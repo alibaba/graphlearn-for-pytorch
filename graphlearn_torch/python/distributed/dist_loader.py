@@ -27,7 +27,7 @@ from ..sampler import (
 from ..typing import (NodeType, EdgeType, as_str, reverse_edge_type)
 from ..utils import get_available_device, ensure_device, python_exit_status
 
-from .dist_client import request_server, async_request_server
+from .dist_client import request_server
 from .dist_context import get_context
 from .dist_dataset import DistDataset
 from .dist_options import (
@@ -166,9 +166,8 @@ class DistLoader(object):
 
       self._server_rank_list = self.worker_options.server_rank \
         if isinstance(self.worker_options.server_rank, List) else [self.worker_options.server_rank]
-      self._input_data_list = self.input_data if isinstance(
-        self.input_data, List
-      ) else [self.input_data]
+      self._input_data_list = self.input_data \
+        if isinstance(self.input_data, List) else [self.input_data]
 
       self._input_type = self._input_data_list[0].input_type
 

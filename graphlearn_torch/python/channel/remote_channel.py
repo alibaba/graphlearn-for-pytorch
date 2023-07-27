@@ -44,17 +44,16 @@ class RemoteReceivingChannel(ChannelBase):
                                                       List) else [server_rank]
     self.producer_id_list = producer_id if isinstance(producer_id,
                                                       List) else [producer_id]
-    self.prefetch_size_list = [prefetch_size] * len(self.server_rank_list)
+    self.prefetch_size = prefetch_size
 
     assert len(self.server_rank_list) == len(self.producer_id_list)
-    assert len(self.server_rank_list) == len(self.prefetch_size_list)
 
     self.num_request_list = [0] * len(self.server_rank_list)
     self.num_received_list = [0] * len(self.server_rank_list)
     self.server_end_of_epoch = [False] * len(self.server_rank_list)
     self.global_end_of_epoch = False
 
-    self.queue = queue.Queue(maxsize=sum(self.prefetch_size_list))
+    self.queue = queue.Queue(maxsize=self.prefetch_size * len(self.server_rank_list))
 
   def reset(self):
     r""" Reset all states to start a new epoch consuming.
@@ -82,7 +81,8 @@ class RemoteReceivingChannel(ChannelBase):
       self._request_some()
     msg, end_of_epoch, local_server_idx = self.queue.get()
     self.num_received_list[local_server_idx] += 1
-  
+    
+    # server guarantees that when end_of_epoch is true, msg must be None
     while end_of_epoch:
       self.server_end_of_epoch[local_server_idx] = True
       if sum(self.server_end_of_epoch) == len(self.server_rank_list):
@@ -119,7 +119,7 @@ class RemoteReceivingChannel(ChannelBase):
       if not self.server_end_of_epoch[local_server_idx]:
         for _ in range(
           self.num_received_list[local_server_idx] +
-          self.prefetch_size_list[local_server_idx] -
+          self.prefetch_size -
           self.num_request_list[local_server_idx]
         ):
           fut = async_request_server(

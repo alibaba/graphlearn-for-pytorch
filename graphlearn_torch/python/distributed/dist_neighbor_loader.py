@@ -21,7 +21,7 @@ from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig, RemoteNode
 from ..typing import InputNodes, NumNeighbors
 
 from .dist_dataset import DistDataset
-from .dist_options import AllDistSamplingWorkerOptions
+from .dist_options import AllDistSamplingWorkerOptions, RemoteDistSamplingWorkerOptions
 from .dist_loader import DistLoader
 
 
@@ -87,17 +87,18 @@ class DistNeighborLoader(DistLoader):
       input_type, input_seeds = input_nodes
     else:
       input_type, input_seeds = None, input_nodes
-
-    if isinstance(input_seeds, torch.Tensor):
-      input_data = NodeSamplerInput(node=input_seeds, input_type=input_type)
-    elif isinstance(input_seeds, List):
-      input_data = []
-      for elem in input_seeds:
-        input_data.append(RemoteNodeSamplerInput(node_path=elem, input_type=input_type))
-    elif isinstance(input_seeds, str):
-      input_data = RemoteNodeSamplerInput(node_path=input_seeds, input_type=input_type)
+    
+    if isinstance(worker_options, RemoteDistSamplingWorkerOptions):
+      if isinstance(input_seeds, List):
+        input_data = []
+        for elem in input_seeds:
+          input_data.append(RemoteNodeSamplerInput(node_path=elem, input_type=input_type))
+      elif isinstance(input_seeds, str):
+        input_data = RemoteNodeSamplerInput(node_path=input_seeds, input_type=input_type)
+      else:
+        raise ValueError("Invalid input seeds")
     else:
-      raise ValueError
+      input_data = NodeSamplerInput(node=input_seeds, input_type=input_type)
 
     sampling_config = SamplingConfig(
       SamplingType.NODE, num_neighbors, batch_size, shuffle,

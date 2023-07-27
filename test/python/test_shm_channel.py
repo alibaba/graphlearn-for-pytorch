@@ -47,7 +47,7 @@ def run_receiver(_, channel):
     tc.assertTrue(torch.equal(received_map['from_cuda'],
                               torch.arange(i, dtype=torch.int32)))
   try:
-    channel.recv()
+    channel.recv(10)
   except QueueTimeoutError as e:
     print('Expected Error', e)
   tc.assertTrue(channel.empty())

@@ -60,5 +60,7 @@ class ShmChannel(ChannelBase):
   def send(self, msg: SampleMessage, **kwargs):
     self._queue.send(msg)
 
-  def recv(self, timeout_ms=100, **kwargs) -> SampleMessage:
+  def recv(self, timeout_ms=None, **kwargs) -> SampleMessage:
+    if timeout_ms is None:
+      timeout_ms = 0
     return self._queue.receive(timeout_ms=timeout_ms)
