@@ -234,7 +234,7 @@ class NeighborSampler(BaseSampler):
         # out sampling needs dst_type==seed_type, in sampling needs src_type==seed_type
         if self.edge_dir == 'in':
           src = src_dict.get(etype[-1], None)
-          if src is not None:
+          if src is not None and src.numel() > 0:
             output = self.sample_one_hop(src, req_num, etype)
             if output.nbr.numel() == 0:
               continue
@@ -243,7 +243,7 @@ class NeighborSampler(BaseSampler):
               edge_dict[reverse_edge_type(etype)] = output.edge
         elif self.edge_dir == 'out':
           src = src_dict.get(etype[0], None)
-          if src is not None:
+          if src is not None and src.numel() > 0:
             output = self.sample_one_hop(src, req_num, etype)
             if output.nbr.numel() == 0:
               continue
