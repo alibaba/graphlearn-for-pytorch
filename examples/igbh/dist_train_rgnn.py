@@ -97,7 +97,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       worker_concurrency=2,
       master_addr=master_addr,
       master_port=train_loader_master_port,
-      channel_size='2GB',
+      channel_size='8GB',
       pin_memory=True,
       rpc_timeout=rpc_timeout,
     )
@@ -113,9 +113,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
-    worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
+    worker_options = glt.distributed.MpDistSamplingWorkerOptions(
+      num_workers=1,
+      worker_devices=[current_device],
+      worker_concurrency=1,
       master_addr=master_addr,
       master_port=val_loader_master_port,
+      channel_size='4GB',
+      pin_memory=True,
       rpc_timeout=rpc_timeout,
     )
   )
@@ -131,9 +136,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
-    worker_options = glt.distributed.CollocatedDistSamplingWorkerOptions(
+    worker_options = glt.distributed.MpDistSamplingWorkerOptions(
+      num_workers=1,
+      worker_devices=[current_device],
+      worker_concurrency=1,
       master_addr=master_addr,
       master_port=test_loader_master_port,
+      channel_size='4GB',
+      pin_memory=True,
       rpc_timeout=rpc_timeout,
     )
   )
