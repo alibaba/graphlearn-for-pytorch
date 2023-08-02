@@ -67,7 +67,12 @@ class RpcSamplingCallee(RpcCalleeBase):
     ensure_device(self.device)
     output = self.sampler.sample_one_hop(*args, **kwargs)
     if output is None:
-      return torch.tensor([], torch.device('cpu'), dtype=torch.int64)
+      nbrs = torch.tensor([], dtype=torch.int64, device=torch.device('cpu'))
+      nbrs_num = torch.zeros_like(args[0], dtype=torch.int64,
+                                  device=torch.device('cpu'))
+      edge_ids = torch.tensor([], device=torch.device('cpu'), dtype=torch.int64) \
+        if self.with_edge else None
+      return NeighborOutput(nbrs, nbrs_num, edge_ids)
     return output.to(torch.device('cpu'))
 
 class RpcSubGraphCallee(RpcCalleeBase):
