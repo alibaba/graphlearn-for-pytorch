@@ -121,13 +121,17 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<const Graph*>())
     .def("node_subgraph", &CPUSubGraphOp::NodeSubGraph,
          py::arg("srcs"), py::arg("with_edge"));
+  
+  py::register_exception<QueueTimeoutError>(m, "QueueTimeoutError");
 
   py::class_<SampleQueue>(m, "SampleQueue")
     .def(py::init<size_t, size_t>(), py::arg("capacity"), py::arg("buf_size"))
     .def("pin_memory", &SampleQueue::PinMemory)
+    .def("empty", &SampleQueue::Empty,
+         py::call_guard<py::gil_scoped_release>())
     .def("send", &SampleQueue::Enqueue, py::arg("msg"),
          py::call_guard<py::gil_scoped_release>())
-    .def("receive", &SampleQueue::Dequeue,
+    .def("receive", &SampleQueue::Dequeue, py::arg("timeout_ms"),
          py::call_guard<py::gil_scoped_release>())
     .def(py::pickle(
         [](const SampleQueue& q) { // __getstate__

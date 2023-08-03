@@ -17,7 +17,7 @@ import unittest
 import torch
 import torch.multiprocessing as mp
 
-from graphlearn_torch.channel import ShmChannel
+from graphlearn_torch.channel import ShmChannel, QueueTimeoutError
 
 
 def run_sender(_, channel):
@@ -46,6 +46,11 @@ def run_receiver(_, channel):
     tc.assertEqual(received_map['from_cuda'].device, torch.device('cpu'))
     tc.assertTrue(torch.equal(received_map['from_cuda'],
                               torch.arange(i, dtype=torch.int32)))
+  try:
+    channel.recv(10)
+  except QueueTimeoutError as e:
+    print('Expected Error', e)
+  tc.assertTrue(channel.empty())
 
 
 class SampleQueueCase(unittest.TestCase):

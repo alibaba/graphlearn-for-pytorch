@@ -14,6 +14,7 @@
 # ==============================================================================
 
 import atexit
+import time
 import collections
 import functools
 import logging
@@ -289,8 +290,10 @@ def init_rpc(master_addr: str,
     global _rpc_current_group_worker_names
     _rpc_current_group_worker_names = set(_rpc_worker_names[ctx.role])
 
-    global_barrier(timeout=rpc_timeout)
-
+    global_barrier(timeout=rpc_timeout) 
+    # TODO(hongyi): in server-client mode, if "torch.distributed.init_process_group" follows "global_barrier", 
+    # some participants may randomly hang
+    time.sleep(1) 
 
 def shutdown_rpc(graceful=True):
   r""" Shutdown rpc agent on the current process.
