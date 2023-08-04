@@ -88,8 +88,8 @@ def _sampling_worker_loop(rank,
 
     dist_sampler = DistNeighborSampler(
       data, sampling_config.num_neighbors, sampling_config.with_edge,
-      sampling_config.with_neg, sampling_config.edge_dir,
-      sampling_config.collect_features, channel,
+      sampling_config.with_neg, sampling_config.with_weight,
+      sampling_config.edge_dir, sampling_config.collect_features, channel,
       worker_options.worker_concurrency, current_device
     )
     dist_sampler.start_loop()
@@ -307,6 +307,7 @@ class DistCollocatedSamplingProducer(object):
     self._collocated_sampler = DistNeighborSampler(
       self.data, self.sampling_config.num_neighbors,
       self.sampling_config.with_edge, self.sampling_config.with_neg,
+      self.sampling_config.with_weight,
       self.sampling_config.edge_dir, self.sampling_config.collect_features,
       channel=None, concurrency=1, device=self.device
     )

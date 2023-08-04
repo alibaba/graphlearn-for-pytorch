@@ -207,7 +207,7 @@ def get_edge_label_index(
   edge_type = None
   # # Need the edge index in COO for LinkNeighborLoader:
   def _get_edge_index(edge_type):
-    row, col, _ = data.get_graph(edge_type).topo.to_coo()
+    row, col, _, _ = data.get_graph(edge_type).topo.to_coo()
     return (row, col)
 
   if not isinstance(edge_label_index, Tuple):
@@ -224,6 +224,7 @@ def get_edge_label_index(
   edge_type, edge_label_index = convert_to_tensor(edge_label_index)
 
   if edge_label_index is None:
-    return edge_type, data.get_graph(edge_type).topo.to_coo()
+    row, col, _, _ = data.get_graph(edge_type).topo.to_coo()
+    return edge_type, (row, col)
 
   return edge_type, edge_label_index

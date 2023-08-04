@@ -156,8 +156,8 @@ class Dataset(object):
           if self._directed is None or not self._directed:
             topo_rev = self.graph.topo
           else:
-            row, col, eids = self.graph.topo.to_coo()
-            topo_rev = Topology((col, row), eids, input_layout='COO', layout='CSR' if self.edge_dir == 'out' else 'CSC')
+            row, col, eids, weights = self.graph.topo.to_coo()
+            topo_rev = Topology((col, row), eids, weights, input_layout='COO', layout='CSR' if self.edge_dir == 'out' else 'CSC')
           node_feature_data, id2idx = \
             sort_func(node_feature_data, split_ratio, topo_rev)
       self.node_features = _build_features(

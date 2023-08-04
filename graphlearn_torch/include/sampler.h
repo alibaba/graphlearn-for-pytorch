@@ -28,10 +28,16 @@ public:
   // return: (nbrs, nbrs_num)
   virtual std::tuple<torch::Tensor, torch::Tensor> Sample(
     const torch::Tensor& nodes, int32_t req_num) = 0;
+  
+  virtual std::tuple<torch::Tensor, torch::Tensor> WeightedSample(
+    const torch::Tensor& nodes, int32_t req_num) = 0;
 
   // return: (nbrs, nbrs_num, edge_ids)
   virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
   SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) = 0;
+
+  virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+  WeightedSampleWithEdge(const torch::Tensor& nodes, int32_t req_num) = 0;
 
 protected:
   const Graph* graph_;

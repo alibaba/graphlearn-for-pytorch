@@ -117,6 +117,7 @@ class LinkNeighborLoader(LinkLoader):
     edge_label: Optional[torch.Tensor] = None,
     neg_sampling: Optional[NegativeSampling] = None,
     with_edge: bool = False,
+    with_weight: bool = False,
     batch_size: int = 1,
     shuffle: bool = False,
     drop_last: bool = False,
@@ -132,6 +133,7 @@ class LinkNeighborLoader(LinkLoader):
         strategy=strategy,
         with_edge=with_edge,
         with_neg=with_neg,
+        with_weight=with_weight,
         device=device,
         edge_dir=data.edge_dir
       )

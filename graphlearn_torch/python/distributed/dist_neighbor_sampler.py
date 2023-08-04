@@ -119,6 +119,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
                num_neighbors: Optional[NumNeighbors] = None,
                with_edge: bool = False,
                with_neg: bool = False,
+               with_weight: bool = False,
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                channel: Optional[ChannelBase] = None,
@@ -129,6 +130,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     self.max_input_size = 0
     self.with_edge = with_edge
     self.with_neg = with_neg
+    self.with_weight = with_weight
     self.edge_dir = edge_dir
     self.collect_features = collect_features
     self.channel = channel
@@ -168,7 +170,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
     self.sampler = NeighborSampler(
       self.dist_graph.local_graph, self.num_neighbors,
-      self.device, self.with_edge, self.with_neg, self.edge_dir
+      self.device, self.with_edge, self.with_neg, self.with_weight, self.edge_dir
     )
     self.inducer_pool = queue.Queue(maxsize=self.concurrency)
 

@@ -43,6 +43,7 @@ class NeighborSampler(BaseSampler):
                device: torch.device=torch.device('cuda', 0),
                with_edge: bool=False,
                with_neg: bool=False,
+               with_weight: bool=False,
                strategy: str = 'random',
                edge_dir: Literal['in', 'out'] = 'out'):
     self.graph = graph
@@ -50,6 +51,7 @@ class NeighborSampler(BaseSampler):
     self.device = device
     self.with_edge = with_edge
     self.with_neg = with_neg
+    self.with_weight = with_weight
     self.strategy = strategy
     self.edge_dir = edge_dir
     self._subgraph_op = None
@@ -129,10 +131,17 @@ class NeighborSampler(BaseSampler):
     sampler = self._sampler[etype] if etype is not None else self._sampler
     input_seeds = input_seeds.to(self.device)
     edge_ids = None
-    if not self.with_edge:
-      nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
+    if self.with_weight:
+      if not self.with_edge:
+        nbrs, nbrs_num = sampler.weighted_sample(input_seeds, req_num)
+      else:
+        nbrs, nbrs_num, edge_ids = sampler.weighted_sample_with_edge(
+          input_seeds, req_num)
     else:
-      nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
+      if not self.with_edge:
+        nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
+      else:
+        nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
     if nbrs.numel() == 0:
       nbrs = torch.tensor([], dtype=torch.int64 ,device=self.device)
       nbrs_num = torch.zeros_like(input_seeds, dtype=torch.int64, device=self.device)

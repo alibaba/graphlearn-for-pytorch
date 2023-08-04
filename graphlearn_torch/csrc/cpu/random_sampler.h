@@ -31,6 +31,12 @@ public:
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
   SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) override;
 
+  std::tuple<torch::Tensor, torch::Tensor> WeightedSample(
+    const torch::Tensor& nodes, int32_t req_num) override;
+
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+  WeightedSampleWithEdge(const torch::Tensor& nodes, int32_t req_num) override;
+
 private:
   void FillNbrsNum(const int64_t* nodes, const int32_t bs,
     const int32_t req_num,  const int64_t row_count,
@@ -44,6 +50,17 @@ private:
       const int32_t bs, const int32_t req_num, const int64_t row_count,
       const int64_t* row_ptr, const int64_t* col_idx, const int64_t* edge_id,
       int64_t* out_nbrs, int64_t* out_eid);
+  
+  void CSRRowWiseSample(const int64_t* nodes, const int64_t* nbrs_offset,
+      const int32_t bs, const int32_t req_num, const int64_t row_count,
+      const int64_t* row_ptr, const int64_t* col_idx, const float* prob,
+      int64_t* out_nbrs);
+
+  void CSRRowWiseSample(const int64_t* nodes, const int64_t* nbrs_offset,
+      const int32_t bs, const int32_t req_num, const int64_t row_count,
+      const int64_t* row_ptr, const int64_t* col_idx, const float* prob,
+      const int64_t* edge_id, int64_t* out_nbrs, int64_t* out_eid);
+
 
   void UniformSample(const int64_t* col_begin, const int64_t* col_end,
       const int32_t req_num, int64_t* out_nbrs);
@@ -51,6 +68,15 @@ private:
   void UniformSample(const int64_t* col_begin, const int64_t* col_end,
       const int64_t* eid_begin, const int64_t* eid_end,
       const int32_t req_num, int64_t* out_nbrs, int64_t* out_eid);
+
+  void WeightedRandomSample(const int64_t* col_begin, const int64_t* col_end,
+      const int32_t req_num, const float* prob_begin, const float* prob_end,
+      int64_t* out_nbrs);
+
+  void WeightedRandomSample(const int64_t* col_begin, const int64_t* col_end,
+      const int64_t* eid_begin, const int64_t* eid_end,
+      const int32_t req_num, const float* prob_begin, const float* prob_end, 
+      int64_t* out_nbrs, int64_t* out_eid);
 };
 
 } // namespace graphlearn_torch

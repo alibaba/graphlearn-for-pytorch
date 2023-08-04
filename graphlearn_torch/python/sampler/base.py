@@ -347,6 +347,7 @@ class SamplingConfig:
   with_edge: bool
   collect_features: bool
   with_neg: bool
+  with_weight: bool
   edge_dir: Literal['in', 'out']
 
 
