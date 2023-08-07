@@ -25,8 +25,7 @@ from ogb.nodeproppred import PygNodePropPredDataset
 
 def partition_dataset(ogbn_dataset: str,
                       root_dir: str,
-                      num_server_partitions: int,
-                      num_client_partitions: int,
+                      num_partitions: int,
                       num_nbrs: glt.NumNeighbors,
                       chunk_size: int,
                       cache_ratio: float):
@@ -46,18 +45,19 @@ def partition_dataset(ogbn_dataset: str,
 
   print('-- Partitioning training idx ...')
   train_idx = split_idx['train']
-  train_idx = train_idx.split(train_idx.size(0) // num_client_partitions)
+  train_idx = train_idx.split(train_idx.size(0) // num_partitions)
   train_idx_partitions_dir = osp.join(root_dir, f'{ogbn_dataset}-train-partitions')
   glt.utils.ensure_dir(train_idx_partitions_dir)
-  for pidx in range(num_client_partitions):
+  for pidx in range(num_partitions):
+    print(train_idx[pidx].shape)
     torch.save(train_idx[pidx], osp.join(train_idx_partitions_dir, f'partition{pidx}.pt'))
 
   print('-- Partitioning test idx ...')
   test_idx = split_idx['test']
-  test_idx = test_idx.split(test_idx.size(0) // num_client_partitions)
+  test_idx = test_idx.split(test_idx.size(0) // num_partitions)
   test_idx_partitions_dir = osp.join(root_dir, f'{ogbn_dataset}-test-partitions')
   glt.utils.ensure_dir(test_idx_partitions_dir)
-  for pidx in range(num_client_partitions):
+  for pidx in range(num_partitions):
     torch.save(test_idx[pidx], osp.join(test_idx_partitions_dir, f'partition{pidx}.pt'))
 
   print('-- Initializing graph ...')
@@ -67,9 +67,8 @@ def partition_dataset(ogbn_dataset: str,
   print('-- Sampling hotness ...')
   glt_sampler = glt.sampler.NeighborSampler(graph, num_nbrs)
   node_probs = []
-  for ser_pidx in range(num_server_partitions):
-    seeds = [train_idx[i] for i in range(num_client_partitions) if i % num_server_partitions == ser_pidx]
-    seeds = torch.cat(seeds)
+  for pidx in range(num_partitions):
+    seeds = train_idx[pidx]
     prob = glt_sampler.sample_prob(seeds, node_num)
     node_probs.append(prob.cpu())
 
@@ -77,7 +76,7 @@ def partition_dataset(ogbn_dataset: str,
   partitions_dir = osp.join(root_dir, f'{ogbn_dataset}-partitions')
   freq_partitioner = glt.partition.FrequencyPartitioner(
     output_dir=partitions_dir,
-    num_parts=num_server_partitions,
+    num_parts=num_partitions,
     num_nodes=node_num,
     edge_index=data.edge_index,
     probs=node_probs,
@@ -109,18 +108,6 @@ if __name__ == '__main__':
     help="Number of partitions",
   )
   parser.add_argument(
-    "--num_server_partitions",
-    type=int,
-    default=-1,
-    help="Number of server partitions.",
-  )
-  parser.add_argument(
-    "--num_client_partitions",
-    type=int,
-    default=-1,
-    help="Number of client partitions.",
-  )
-  parser.add_argument(
     "--num_nbrs",
     type=ast.literal_eval,
     default='[15,10,5]',
@@ -140,12 +127,10 @@ if __name__ == '__main__':
   )
   args = parser.parse_args()
 
-  
   partition_dataset(
     ogbn_dataset=args.dataset,
     root_dir=osp.join(osp.dirname(osp.realpath(__file__)), args.root_dir),
-    num_server_partitions=args.num_server_partitions if args.num_server_partitions > 0 else args.num_partitions,
-    num_client_partitions=args.num_client_partitions if args.num_client_partitions > 0 else args.num_partitions,
+    num_partitions=args.num_partitions,
     num_nbrs=args.num_nbrs,
     chunk_size=args.chunk_size,
     cache_ratio=args.cache_ratio

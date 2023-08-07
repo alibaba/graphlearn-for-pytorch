@@ -120,6 +120,7 @@ TEST_F(ShmQueueTest, Functionality) {
 
     std::unordered_set<int> sent_msgs, received_msgs;
     for (int i = 0; i < 40; i++) {
+      EXPECT_FALSE(res_shq_->Empty());
       auto shm_data = res_shq_->Dequeue();
       auto* verify_msg = static_cast<const VerifyMsg*>(shm_data.Data());
       if (verify_msg->type == VerifyMsg::BehvType::Send) {
@@ -131,6 +132,13 @@ TEST_F(ShmQueueTest, Functionality) {
         received_msgs.insert(verify_msg->id);
       }
     }
+    try {
+      auto shm_data = res_shq_->Dequeue(10);
+    }
+    catch (const QueueTimeoutError& e) {
+      std::cout << "Expected QueueTimeoutError: " << e.what() << std::endl;
+    }
+    EXPECT_TRUE(res_shq_->Empty());
     EXPECT_EQ(sent_msgs.size(), 20);
     EXPECT_EQ(received_msgs.size(), 20);
   }

@@ -15,13 +15,15 @@
 
 import time
 import unittest
+import os
 
 import torch
 import graphlearn_torch as glt
 
 from dist_test_utils import *
 from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
-
+from parameterized import parameterized
+from typing import List
 
 def _check_sample_result(data, edge_dir):
   tc = unittest.TestCase()
@@ -212,7 +214,7 @@ def run_test_as_worker(world_size: int, rank: int,
   dist_loader.shutdown()
 
 
-def run_test_as_server(num_servers: int, num_clients: int, server_rank: int,
+def run_test_as_server(num_servers: int, num_clients: int, server_rank: List[int],
                        master_port: int, dataset: glt.distributed.DistDataset):
   print(f'[Server {server_rank}] Initializing server ...')
   glt.distributed.init_server(
@@ -233,7 +235,7 @@ def run_test_as_server(num_servers: int, num_clients: int, server_rank: int,
   print(f'[Server {server_rank}] Exited ...')
 
 
-def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
+def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, server_rank: List[int],
                        master_port: int, sampling_master_port: int,
                        input_nodes: glt.InputNodes, check_fn, edge_dir='out'):
     print(f'[Client {client_rank}] Initializing client ...')
@@ -248,9 +250,9 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
     )
 
     print(f'[Client {client_rank}] Creating DistNeighborLoader ...')
-    target_server_rank = client_rank % num_servers
+    
     options = glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=target_server_rank,
+      server_rank=server_rank,
       num_workers=sampling_nprocs,
       worker_devices=[torch.device('cuda', i % device_num)
                       for i in range(sampling_nprocs)],
@@ -259,7 +261,8 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
       master_port=sampling_master_port,
       rpc_timeout=10,
       num_rpc_threads=2,
-      prefetch_size=4
+      prefetch_size=2,
+      worker_key='unittest'
     )
     dist_loader = glt.distributed.DistNeighborLoader(
       data=None,
@@ -277,11 +280,13 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
 
     print(f'[Client {client_rank}] Running tests ...')
     for epoch in range(0, 2):
+      num_batches = 0
       for res in dist_loader:
+        num_batches += 1
         check_fn(res, edge_dir)
         time.sleep(0.1)
       glt.distributed.barrier()
-      print(f'[Client {client_rank}] epoch {epoch} finished.')
+      print(f'[Client {client_rank}] epoch {epoch} finished with {num_batches} batches.')
 
     print(f'[Client {client_rank}] Shutdowning ...')
     glt.distributed.shutdown_client()
@@ -290,11 +295,19 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int,
 
 
 class DistNeighborLoaderTestCase(unittest.TestCase):
+
+  input_nodes0_path = 'input_nodes0.pt'
+  input_nodes1_path = 'input_nodes1.pt'
+
   def setUp(self):
     self.dataset0 = _prepare_dataset(rank=0)
     self.dataset1 = _prepare_dataset(rank=1)
+
     self.input_nodes0 = torch.arange(vnum_per_partition)
     self.input_nodes1 = torch.arange(vnum_per_partition) + vnum_per_partition
+
+    torch.save(self.input_nodes0, self.input_nodes0_path)
+    torch.save(self.input_nodes1, self.input_nodes1_path)
 
     self.in_hetero_dataset0 = _prepare_hetero_dataset(rank=0, edge_dir='in')
     self.in_hetero_dataset1 = _prepare_hetero_dataset(rank=1, edge_dir='in')
@@ -307,6 +320,11 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.in_hetero_input_nodes1 = (item_ntype, self.input_nodes1)
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
+
+  def tearDown(self):
+    for file_path in [self.input_nodes0_path, self.input_nodes1_path]:
+      if os.path.exists(file_path):
+        os.remove(file_path)
 
   def test_homo_collocated(self):
     print("\n--- DistNeighborLoader Test (homogeneous, collocated) ---")
@@ -424,35 +442,46 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w0.join()
     w1.join()
 
-  def test_remote_mode(self):
+  @parameterized.expand([
+    ([[0],[1]], 2, 2),
+    ([[0, 1]], 1, 2),
+    ([[0, 1], [0, 1]], 2, 2),
+  ])
+  def test_remote_mode(self, servers_for_clients, num_clients, num_servers):
     print("\n--- DistNeighborLoader Test (server-client mode, remote) ---")
+    print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
+    for client_rank, servers in enumerate(servers_for_clients):
+      print(f'[Client {client_rank}] will connect servers {servers}')
+
+    self.dataset_list = [self.dataset0, self.dataset1]
+    self.input_nodes_list = [self.input_nodes0_path, self.input_nodes1_path]
+
     mp_context = torch.multiprocessing.get_context('spawn')
-    server0 = mp_context.Process(
-      target=run_test_as_server,
-      args=(2, 2, 0, self.master_port, self.dataset0)
-    )
-    server1 = mp_context.Process(
-      target=run_test_as_server,
-      args=(2, 2, 1, self.master_port, self.dataset1)
-    )
-    client0 = mp_context.Process(
-      target=run_test_as_client,
-      args=(2, 2, 0, self.master_port, self.sampling_master_port,
-            self.input_nodes0, _check_sample_result)
-    )
-    client1 = mp_context.Process(
-      target=run_test_as_client,
-      args=(2, 2, 1, self.master_port, self.sampling_master_port,
-            self.input_nodes1, _check_sample_result)
-    )
-    server0.start()
-    server1.start()
-    client0.start()
-    client1.start()
-    server0.join()
-    server1.join()
-    client0.join()
-    client1.join()
+
+    server_procs = []
+    for server_rank in range(num_servers):
+      server_procs.append(mp_context.Process(
+        target=run_test_as_server,
+        args=(num_servers, num_clients, server_rank, self.master_port, self.dataset_list[server_rank])
+      ))
+
+    client_procs = []
+    for client_rank in range(num_clients):
+      server_rank_list = servers_for_clients[client_rank]
+      client_procs.append(mp_context.Process(
+        target=run_test_as_client,
+        args=(num_servers, num_clients, client_rank, server_rank_list, self.master_port, self.sampling_master_port,
+            [self.input_nodes_list[server_rank] for server_rank in server_rank_list], _check_sample_result)
+      ))
+    for sproc in server_procs:
+      sproc.start()
+    for cproc in client_procs:
+      cproc.start()
+    
+    for sproc in server_procs:
+      sproc.join()
+    for cproc in client_procs:
+      cproc.join()
 
 
 if __name__ == "__main__":

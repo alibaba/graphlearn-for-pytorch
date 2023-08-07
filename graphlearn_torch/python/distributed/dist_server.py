@@ -17,11 +17,10 @@ import logging
 import time
 import threading
 from typing import Dict, Optional, Union
+import warnings
 
-import torch
-
-from ..channel import ShmChannel
-from ..sampler import NodeSamplerInput, EdgeSamplerInput, SamplingConfig
+from ..channel import ShmChannel, QueueTimeoutError
+from ..sampler import NodeSamplerInput, EdgeSamplerInput, SamplingConfig, RemoteSamplerInput
 
 from .dist_context import get_context, _set_server_context
 from .dist_dataset import DistDataset
@@ -33,7 +32,6 @@ from .rpc import barrier, init_rpc, shutdown_rpc
 SERVER_EXIT_STATUS_CHECK_INTERVAL = 5.0
 r""" Interval (in seconds) to check exit status of server.
 """
-
 
 class DistServer(object):
   r""" A server that supports launching remote sampling workers for
@@ -51,9 +49,13 @@ class DistServer(object):
     self.dataset = dataset
     self._lock = threading.RLock()
     self._exit = False
-    self._producer_idx = 0
+    self._cur_producer_idx = 0 # auto incremental index (same as producer count)
+    # The mapping from the key in worker options (such as 'train', 'test')
+    # to producer id
+    self._worker_key2producer_id: Dict[str, int] = {}  
     self._producer_pool: Dict[int, DistMpSamplingProducer] = {}
     self._msg_buffer_pool: Dict[int, ShmChannel] = {}
+    self._epoch: Dict[int, int] = {} # last epoch for the producer
 
   def shutdown(self):
     for producer_id in list(self._producer_pool.keys()):
@@ -82,7 +84,7 @@ class DistServer(object):
 
   def create_sampling_producer(
     self,
-    sampler_input: Union[NodeSamplerInput, EdgeSamplerInput],
+    sampler_input: Union[NodeSamplerInput, EdgeSamplerInput, RemoteSamplerInput],
     sampling_config: SamplingConfig,
     worker_options: RemoteDistSamplingWorkerOptions,
   ) -> int:
@@ -99,49 +101,69 @@ class DistServer(object):
     Returns:
       A unique id of created sampling producer on this server.
     """
-    buffer = ShmChannel(
-      worker_options.buffer_capacity, worker_options.buffer_size
-    )
-    producer = DistMpSamplingProducer(
-      self.dataset, sampler_input, sampling_config, worker_options, buffer
-    )
-    producer.init()
-
-    with self._lock:
-      producer_id = self._producer_idx
-      self._producer_pool[producer_id] = producer
-      self._msg_buffer_pool[producer_id] = buffer
-      self._producer_idx += 1
-
+    if isinstance(sampler_input, RemoteSamplerInput):
+      sampler_input = sampler_input.to_local_sampler_input()
+    
+    with self._lock: 
+      producer_id = self._worker_key2producer_id.get(worker_options.worker_key)
+      if producer_id is None:
+        producer_id = self._cur_producer_idx
+        self._worker_key2producer_id[worker_options.worker_key] = producer_id
+        self._cur_producer_idx += 1
+        buffer = ShmChannel(
+          worker_options.buffer_capacity, worker_options.buffer_size
+        )
+        producer = DistMpSamplingProducer(
+          self.dataset, sampler_input, sampling_config, worker_options, buffer
+        )
+        producer.init()
+        self._producer_pool[producer_id] = producer
+        self._msg_buffer_pool[producer_id] = buffer
+        self._epoch[producer_id] = -1
     return producer_id
 
   def destroy_sampling_producer(self, producer_id: int):
     r""" Shutdown and destroy a sampling producer managed by this server with
     its producer id.
     """
-    producer = self._producer_pool.get(producer_id, None)
-    if producer is not None:
-      producer.shutdown()
-      with self._lock:
+    with self._lock:
+      producer = self._producer_pool.get(producer_id, None)
+      if producer is not None:
+        producer.shutdown()
         self._producer_pool.pop(producer_id)
         self._msg_buffer_pool.pop(producer_id)
+        self._epoch.pop(producer_id)
 
-  def start_new_epoch_sampling(self, producer_id: int):
+  def start_new_epoch_sampling(self, producer_id: int, epoch: int):
     r""" Start a new epoch sampling tasks for a specific sampling producer
     with its producer id.
     """
-    producer = self._producer_pool.get(producer_id, None)
-    if producer is not None:
-      producer.produce_all()
+    with self._lock:
+      cur_epoch = self._epoch[producer_id]
+      if cur_epoch < epoch:
+        self._epoch[producer_id] = epoch
+        producer = self._producer_pool.get(producer_id, None)
+        if producer is not None:
+          producer.produce_all()
 
   def fetch_one_sampled_message(self, producer_id: int):
     r""" Fetch a sampled message from the buffer of a specific sampling
     producer with its producer id.
     """
+    producer = self._producer_pool.get(producer_id, None)
+    if producer is None:
+      warnings.warn('invalid producer_id {producer_id}')
+      return None, False
+    if producer.is_all_sampling_completed_and_consumed():
+      return None, True
     buffer = self._msg_buffer_pool.get(producer_id, None)
-    if buffer is None:
-      return None
-    return buffer.recv()
+    while True:
+        try:
+            msg = buffer.recv(timeout_ms=500)
+            return msg, False
+        except QueueTimeoutError as e:
+            if producer.is_all_sampling_completed():
+                return None, True
 
 
 _dist_server: DistServer = None

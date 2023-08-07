@@ -42,7 +42,8 @@ public:
   }
 
   void Enqueue(const TensorMap& msg);
-  TensorMap Dequeue();
+  TensorMap Dequeue(unsigned int timeout_ms = 0);
+  bool Empty();
 
 private:
   std::unique_ptr<ShmQueue> shmq_;

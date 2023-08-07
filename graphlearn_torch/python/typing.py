@@ -81,7 +81,8 @@ HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
 
 # Types for neighbor sampling ##################################################
 
-InputNodes = Union[torch.Tensor, NodeType, Tuple[NodeType, torch.Tensor]]
+Seeds = Union[torch.Tensor, str] 
+InputNodes = Union[Seeds, NodeType, Tuple[NodeType, Seeds], Tuple[NodeType, List[Seeds]]]
 EdgeIndexTensor = Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]
 InputEdges = Union[EdgeIndexTensor, EdgeType, Tuple[EdgeType, EdgeIndexTensor]]
 NumNeighbors = Union[List[int], Dict[EdgeType, List[int]]]

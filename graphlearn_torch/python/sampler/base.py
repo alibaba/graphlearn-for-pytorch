@@ -404,3 +404,32 @@ class BaseSampler(ABC):
       and a mapping from indices in `inputs` to new indices in output nodes,
       i.e. nodes[mapping] = inputs.
     """
+
+class RemoteSamplerInput(ABC):
+  """A base class that provides the `to_local_sampler_input` method for the server
+  to obtain the sampler input.
+  """
+  
+  @abstractmethod
+  def to_local_sampler_input(
+    self,
+  ) -> Union[NodeSamplerInput, EdgeSamplerInput]:
+    r"""
+    Abstract method to convert the sampler input to local format.
+    """
+
+
+class RemoteNodeSamplerInput(RemoteSamplerInput):
+  r"""RemoteNodeSamplerInput passes the node path to the server, where the server
+  can load node seeds from it.
+  """
+  def __init__(self, node_path: str, input_type: str ) -> None:
+    self.node_path = node_path
+    self.input_type = input_type
+
+  def to_local_sampler_input(
+    self,
+  ) -> NodeSamplerInput:
+    
+    node = torch.load(self.node_path)
+    return NodeSamplerInput(node=node, input_type=self.input_type)

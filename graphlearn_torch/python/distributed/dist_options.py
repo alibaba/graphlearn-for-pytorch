@@ -240,7 +240,8 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                num_rpc_threads: Optional[int] = None,
                rpc_timeout: float = 180,
                buffer_size: Optional[Union[int, str]] = None,
-               prefetch_size: int = 4):
+               prefetch_size: int = 4,
+               worker_key: str = None):
     super().__init__(num_workers, worker_devices, worker_concurrency,
                      master_addr, master_port, num_rpc_threads, rpc_timeout)
 
@@ -256,6 +257,7 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       raise ValueError(f"'{self.__class__.__name__}': the prefetch count "
                        f"{self.prefetch_size} exceeds the buffer capacity "
                        f"{self.buffer_capacity}")
+    self.worker_key = worker_key
 
 
 AllDistSamplingWorkerOptions = Union[
