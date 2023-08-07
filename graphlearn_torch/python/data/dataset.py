@@ -168,7 +168,8 @@ class Dataset(object):
             topo_rev = self.graph.topo
           else:
             row, col, eids, weights = self.graph.topo.to_coo()
-            topo_rev = Topology((col, row), eids, weights, input_layout='COO', layout='CSR' if self.edge_dir == 'out' else 'CSC')
+            topo_rev = Topology((col, row), eids, weights, input_layout='COO',
+                              layout='CSR' if self.edge_dir == 'out' else 'CSC')
           node_feature_data, id2idx = \
             sort_func(node_feature_data, split_ratio, topo_rev)
       self.node_features = _build_features(
