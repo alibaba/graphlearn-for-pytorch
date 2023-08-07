@@ -121,7 +121,7 @@ if __name__ == '__main__':
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
-  parser.add_argument('--num_classes', type=int, default=19,
+  parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=0,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
@@ -129,12 +129,12 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='10,10')
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=5120)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=int, default=0.01)
   parser.add_argument('--epochs', type=int, default=20)
-  parser.add_argument('--num_layers', type=int, default=2)
+  parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
   parser.add_argument("--cpu_mode", action="store_true",
