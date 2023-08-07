@@ -34,6 +34,9 @@ class Topology(object):
     edge_ids (torch.Tensor or numpy.ndarray, optional): The edge ids for
       graph edges. If set to ``None``, it will be aranged by the edge size.
       (default: ``None``)
+    edge_weights (torch.Tensor or numpy.ndarray, optional): The edge weights for
+      graph edges. If set to ``None``, it will be None.
+      (default: ``None``)
     input_layout (str): The edge layout representation for the input edge index,
       should be 'COO' (rows and cols uncompressed), 'CSR' (rows compressed)
       or 'CSC' (columns compressed). (default: 'COO')
@@ -94,7 +97,7 @@ class Topology(object):
     r""" Convert to COO format.
 
     Returns:
-      row indice tensor, column indice tensor and edge id tensor
+      row indice tensor, column indice tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
       return ptr2ind(self._indptr), self._indices, \
@@ -107,7 +110,7 @@ class Topology(object):
     r""" Convert to CSC format.
 
     Returns:
-      row indice tensor, column ptr tensor and edge id tensor
+      row indice tensor, column ptr tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
       row, col, edge_id, edge_weights = self.to_coo()
@@ -119,7 +122,7 @@ class Topology(object):
     r""" Convert to CSR format.
 
     Returns:
-      row ptr tensor, column indice tensor and edge id tensor
+      row ptr tensor, column indice tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
       return self._indptr, self._indices, self._edge_ids, self._edge_weights

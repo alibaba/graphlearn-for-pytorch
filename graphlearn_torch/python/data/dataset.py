@@ -47,6 +47,7 @@ class Dataset(object):
     self,
     edge_index: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
     edge_ids: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
+    edge_weights: Union[TensorDataType, Dict[EdgeType, TensorDataType]] = None,
     layout: Union[str, Dict[EdgeType, str]] = 'COO',
     graph_mode: str = 'ZERO_COPY',
     directed: bool = False,
@@ -61,6 +62,9 @@ class Dataset(object):
       edge_ids (torch.Tensor or numpy.ndarray): Edge ids for graph edges, A
         CPU tensor (homo) or a Dict[EdgeType, torch.Tensor](hetero).
         (default: ``None``)
+      edge_weights (torch.Tensor or numpy.ndarray): Edge weights for graph edges,
+        A CPU tensor (homo) or a Dict[EdgeType, torch.Tensor](hetero).
+        (default: ``None``)
       layout (str): The edge layout representation for the input edge index,
         should be 'COO', 'CSR' or 'CSC'. (default: 'COO')
       graph_mode (str): Mode in graphlearn_torch's ``Graph``, 'CPU', 'ZERO_COPY'
@@ -72,6 +76,7 @@ class Dataset(object):
     """
     edge_index = convert_to_tensor(edge_index, dtype=torch.int64)
     edge_ids = convert_to_tensor(edge_ids, dtype=torch.int64)
+    edge_weights = convert_to_tensor(edge_weights, dtype=torch.float)
     self._directed = directed
 
     if edge_index is not None:
@@ -81,6 +86,10 @@ class Dataset(object):
           assert isinstance(edge_ids, dict)
         else:
           edge_ids = {}
+        if edge_weights is not None:
+          assert isinstance(edge_weights, dict)
+        else:
+          edge_weights = {}
         if not isinstance(layout, dict):
           layout = {etype: layout for etype in edge_index.keys()}
         topo_dict = {}
@@ -89,6 +98,7 @@ class Dataset(object):
           topo_dict[etype] = Topology(
             edge_index=e_idx,
             edge_ids=edge_ids.get(etype, None),
+            edge_weights=edge_weights.get(etype, None),
             input_layout=layout[etype],
             layout='CSR' if self.edge_dir == 'out' else 'CSC',
           )
@@ -99,7 +109,8 @@ class Dataset(object):
           self.graph[etype] = g
       else:
         # homogeneous.
-        topo = Topology(edge_index, edge_ids, input_layout=layout, layout='CSR' if self.edge_dir == 'out' else 'CSC')
+        topo = Topology(edge_index, edge_ids, edge_weights, input_layout=layout,
+                        layout='CSR' if self.edge_dir == 'out' else 'CSC')
         self.graph = Graph(topo, graph_mode, device)
         self.graph.lazy_init()
 

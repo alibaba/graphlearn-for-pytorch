@@ -38,8 +38,10 @@ def coo_to_csr(
   Args:
     row (torch.Tensor): The row indices.
     col (torch.Tensor): The column indices.
-    edge_value (torch.Tensor, optional): The value indices corresponding to
-      the input edge index.
+    edge_id (torch.Tensor, optional): The edge ids corresponding to the input
+      edge index.
+    edge_weight (torch.Tensor, optional): The edge weights corresponding to the
+      input edge index.
     node_sizes (Tuple[int, int], optional): The number of nodes in row and col.
   """
   if node_sizes is None:
@@ -75,8 +77,10 @@ def coo_to_csc(
   Args:
     row (torch.Tensor): The row indices.
     col (torch.Tensor): The column indices.
-    edge_value (torch.Tensor, optional): The value indices corresponding to
-      the input edge index.
+    edge_id (torch.Tensor, optional): The edge ids corresponding to the input
+      edge index.
+    edge_weight (torch.Tensor, optional): The edge weights corresponding to the
+      input edge index.
     node_sizes (Tuple[int, int], optional): The number of nodes in row and col.
   """
   if node_sizes is not None:
