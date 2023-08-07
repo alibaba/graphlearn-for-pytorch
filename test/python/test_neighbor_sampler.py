@@ -33,6 +33,7 @@ class RandomSamplerTestCase(unittest.TestCase):
     indptr = torch.tensor([0, 2, 4, 6, 7, 7, 7], dtype=torch.int64)
     indices = torch.tensor([0, 1, 1, 3, 2, 4, 5], dtype=torch.int64)
     self.csr_topo = Topology(edge_index=(indptr, indices), input_layout='CSR')
+
     self.input_seeds = torch.tensor([0, 1, 2, 3, 4], dtype=torch.int64)
     self.num_neighbors = [2]
 
@@ -41,6 +42,11 @@ class RandomSamplerTestCase(unittest.TestCase):
                                     [0, 0, 1, 1, 2, 2, 3]],
                                    dtype=torch.int64)
     self.edge_ids = torch.tensor([0, 1, 2, 3, 4, 5, 6], dtype=torch.int64)
+    self.edge_weights = torch.tensor([.1, .9, .1, .9, .1, .9, .1], dtype=torch.float)
+
+    self.csr_topo_with_weight = Topology(edge_index=(indptr, indices),
+                                         input_layout='CSR',
+                                         edge_weights=self.edge_weights)
     self.device = torch.device('cuda:0')
     self.cuda_nodes = torch.tensor([0, 1, 2, 3, 4, 5],
                                    dtype=torch.int64, device=self.device)
@@ -103,6 +109,22 @@ class RandomSamplerTestCase(unittest.TestCase):
     self.assertTrue(tensor_equal_with_device(
       torch.stack([sample_out.row, sample_out.col]), self.edge_index))
     self.assertTrue(tensor_equal_with_device(sample_out.edge, self.edge_ids))
+  
+  def test_cpu_weighted_sample_from_node_with_edge(self):
+    g = Graph(self.csr_topo_with_weight, mode='CPU')
+    stats = torch.zeros(7)
+    sampler = NeighborSampler(
+      g, [1], with_edge=True, with_weight=True, device=torch.device('cpu'))
+    
+    for _ in range(1000):
+      sample_out = sampler.sample_from_nodes(self.input_seeds)
+      edges = sample_out.edge
+      stats.scatter_add_(0, edges, torch.ones(7))
+
+    # with high probability holds
+    self.assertTrue(stats[0] < 200 and stats[2] < 200 and stats[4] < 200)
+    self.assertTrue(stats[1] > 800 and stats[3] > 800 and stats[5] > 800)
+    self.assertEqual(stats[6], 1000)
 
   def test_cuda_sample_from_node_with_edge(self):
     g = Graph(self.csr_topo, 'CUDA', 0)

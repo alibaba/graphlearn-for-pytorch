@@ -65,7 +65,7 @@ class Topology(object):
     edge_weights = convert_to_tensor(edge_weights, dtype=torch.float)
     if edge_weights is not None:
       assert edge_weights.numel() == num_edges
-    
+
     self._layout = layout
     
     if input_layout == layout:

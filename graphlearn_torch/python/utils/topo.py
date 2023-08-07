@@ -48,20 +48,18 @@ def coo_to_csr(
   assert row.numel() == col.numel()
   if edge_id is not None:
     assert edge_id.numel() == row.numel()
-    edge_value = edge_id
+  adj_t = torch_sparse.SparseTensor(
+    row=row, col=col, value=edge_id, sparse_sizes=node_sizes
+  )
+  edge_ids, edge_weights = adj_t.storage.value(), None
+
   if edge_weight is not None:
     assert edge_weight.numel() == row.numel()
-    edge_value = torch.stack((edge_id, edge_weight)).T
-  adj_t = torch_sparse.SparseTensor(
-    row=row, col=col, value=edge_value, sparse_sizes=node_sizes
-  )
-  edge_value = adj_t.storage.value()
-  if len(edge_value.shape) == 2:
-    edge_ids, edge_weights = edge_value[:,0], edge_value[:,1]
-  elif edge_id is not None:
-    edge_ids, edge_weights = edge_value, torch.empty(0)
-  else:
-    edge_ids, edge_weights = torch.empty(0), edge_value
+    adj_w = torch_sparse.SparseTensor(
+      row=row, col=col, value=edge_weight, sparse_sizes=node_sizes
+    )
+    edge_weights = adj_w.storage.value()
+
   return adj_t.storage.rowptr(), adj_t.storage.col(), edge_ids, edge_weights
 
 
