@@ -48,7 +48,7 @@ def evaluate(model, dataloader):
     return acc
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
-    hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
+    split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, batch_size, learning_rate, log_every,
     dataset, train_idx, val_idx, test_idx,
     master_addr,
@@ -70,6 +70,11 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     current_device = torch.device(local_proc_rank % torch.cuda.device_count())
   else:
     current_device = torch.device('cpu')
+  
+  if split_training_sampling:
+    sampling_device = torch.device((local_proc_rank + 1) % torch.cuda.device_count())
+  else: 
+    sampling_device = current_device
 
   # Initialize training process group of PyTorch.
   torch.distributed.init_process_group(
@@ -93,13 +98,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     to_device=current_device,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
-      worker_devices=[current_device],
-      worker_concurrency=2,
+      worker_devices=sampling_device,
+      worker_concurrency=4,
       master_addr=master_addr,
       master_port=train_loader_master_port,
-      channel_size='8GB',
+      channel_size='16GB',
       pin_memory=True,
       rpc_timeout=rpc_timeout,
+      num_rpc_threads=2
     )
   )
   # Create distributed neighbor loader for validation.
@@ -115,13 +121,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     to_device=current_device,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
-      worker_devices=[current_device],
-      worker_concurrency=1,
+      worker_devices=sampling_device,
+      worker_concurrency=4,
       master_addr=master_addr,
       master_port=val_loader_master_port,
-      channel_size='4GB',
+      channel_size='16GB',
       pin_memory=True,
       rpc_timeout=rpc_timeout,
+      num_rpc_threads=2
     )
   )
 
@@ -138,13 +145,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     to_device=current_device,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
-      worker_devices=[current_device],
-      worker_concurrency=1,
+      worker_devices=current_device,
+      worker_concurrency=4,
       master_addr=master_addr,
       master_port=test_loader_master_port,
-      channel_size='4GB',
+      channel_size='16GB',
       pin_memory=True,
       rpc_timeout=rpc_timeout,
+      num_rpc_threads=2
     )
   )
 
@@ -243,7 +251,7 @@ if __name__ == '__main__':
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
-  parser.add_argument('--num_classes', type=int, default=19,
+  parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=0,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
@@ -251,12 +259,12 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='10,15')
+  parser.add_argument('--fan_out', type=str, default='15, 10, 5')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=int, default=0.001)
   parser.add_argument('--epochs', type=int, default=20)
-  parser.add_argument('--num_layers', type=int, default=6)
+  parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
   # Distributed settings.
@@ -282,11 +290,15 @@ if __name__ == '__main__':
       help="sampling direction, can be 'in' for 'by_dst' or 'out' for 'by_src' for partitions.")
   parser.add_argument("--rpc_timeout", type=int, default=180,
                       help="rpc timeout in seconds")
+  parser.add_argument("--split_training_sampling", action="store_true",
+      help="Use seperate GPUs for training and sampling processes.")
   args = parser.parse_args()
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
     assert(not args.num_training_procs > torch.cuda.device_count())
+    if args.split_training_sampling:
+      assert(not args.num_training_procs > torch.cuda.device_count() // 2)
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
@@ -314,7 +326,7 @@ if __name__ == '__main__':
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,
-    args=(args.num_nodes, args.node_rank, args.num_training_procs,
+    args=(args.num_nodes, args.node_rank, args.num_training_procs, args.split_training_sampling,
           args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
           args.epochs, args.batch_size, args.learning_rate, args.log_every,
           dataset, train_idx, val_idx, test_idx,

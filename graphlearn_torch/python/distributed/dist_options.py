@@ -74,7 +74,7 @@ class _BasicDistSamplingWorkerOptions(object):
       assert len(worker_devices) == self.num_workers
       self.worker_devices = list(worker_devices)
     else:
-      self.worker_devices = [torch.device(worker_devices)] * self.num_workers
+      self.worker_devices = [worker_devices] * self.num_workers
 
     # Worker concurrency should not exceed 32.
     self.worker_concurrency = max(worker_concurrency, 1)

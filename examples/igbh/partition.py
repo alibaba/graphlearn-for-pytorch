@@ -22,7 +22,8 @@ import torch
 from dataset import IGBHeteroDataset
 
 
-def partition_dataset(path: str,
+def partition_dataset(src_path: str,
+                      dst_path: str,
                       num_partitions: int,
                       chunk_size: int,
                       dataset_size: str='tiny',
@@ -30,18 +31,18 @@ def partition_dataset(path: str,
                       edge_assign_strategy: str='by_src',
                       use_label_2K: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
-  data = IGBHeteroDataset(path, dataset_size, in_memory, use_label_2K)
+  data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
 
   print('-- Saving label ...')
-  label_dir = osp.join(path, f'{dataset_size}-label')
+  label_dir = osp.join(dst_path, f'{dataset_size}-label')
   glt.utils.ensure_dir(label_dir)
   torch.save(data.label.squeeze(), osp.join(label_dir, 'label.pt'))
 
   print('-- Partitioning training idx ...')
   train_idx = data.train_idx
   train_idx = train_idx.split(train_idx.size(0) // num_partitions)
-  train_idx_partitions_dir = osp.join(path, f'{dataset_size}-train-partitions')
+  train_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-train-partitions')
   glt.utils.ensure_dir(train_idx_partitions_dir)
   for pidx in range(num_partitions):
     torch.save(train_idx[pidx], osp.join(train_idx_partitions_dir, f'partition{pidx}.pt'))
@@ -49,7 +50,7 @@ def partition_dataset(path: str,
   print('-- Partitioning validation idx ...')
   train_idx = data.val_idx
   train_idx = train_idx.split(train_idx.size(0) // num_partitions)
-  train_idx_partitions_dir = osp.join(path, f'{dataset_size}-val-partitions')
+  train_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-val-partitions')
   glt.utils.ensure_dir(train_idx_partitions_dir)
   for pidx in range(num_partitions):
     torch.save(train_idx[pidx], osp.join(train_idx_partitions_dir, f'partition{pidx}.pt'))
@@ -57,13 +58,13 @@ def partition_dataset(path: str,
   print('-- Partitioning test idx ...')
   test_idx = data.test_idx
   test_idx = test_idx.split(test_idx.size(0) // num_partitions)
-  test_idx_partitions_dir = osp.join(path, f'{dataset_size}-test-partitions')
+  test_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-test-partitions')
   glt.utils.ensure_dir(test_idx_partitions_dir)
   for pidx in range(num_partitions):
     torch.save(test_idx[pidx], osp.join(test_idx_partitions_dir, f'partition{pidx}.pt'))
 
   print('-- Partitioning graph and features ...')
-  partitions_dir = osp.join(path, f'{dataset_size}-partitions')
+  partitions_dir = osp.join(dst_path, f'{dataset_size}-partitions')
   partitioner = glt.partition.RandomPartitioner(
     output_dir=partitions_dir,
     num_parts=num_partitions,
@@ -80,8 +81,10 @@ if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')
   glt.utils.ensure_dir(root)
   parser = argparse.ArgumentParser(description="Arguments for partitioning ogbn datasets.")
-  parser.add_argument('--path', type=str, default=root,
+  parser.add_argument('--src_path', type=str, default=root,
       help='path containing the datasets')
+  parser.add_argument('--dst_path', type=str, default=root,
+      help='path containing the partitioned datasets')
   parser.add_argument('--dataset_size', type=str, default='tiny',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
@@ -99,7 +102,8 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   partition_dataset(
-    args.path,
+    args.src_path,
+    args.dst_path,
     num_partitions=args.num_partitions,
     chunk_size=args.chunk_size,
     dataset_size=args.dataset_size,
