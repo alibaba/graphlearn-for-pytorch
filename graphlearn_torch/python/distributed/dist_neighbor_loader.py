@@ -83,12 +83,12 @@ class DistNeighborLoader(DistLoader):
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
-    
+
     if isinstance(input_nodes, tuple):
       input_type, input_seeds = input_nodes
     else:
       input_type, input_seeds = None, input_nodes
-    
+
     if isinstance(worker_options, RemoteDistSamplingWorkerOptions):
       if isinstance(input_seeds, List):
         input_data = []

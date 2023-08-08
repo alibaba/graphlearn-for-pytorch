@@ -45,9 +45,10 @@ class PartitionTestCase(unittest.TestCase):
       [torch.ones(2) * i for i in range(edge_num)], dim=0
     )
 
+    edge_weights = torch.arange(0, edge_num, dtype=torch.float)
     random_partitioner = RandomPartitioner(
       dir, nparts, node_num, edge_index, node_feat=node_feat,
-      edge_feat=edge_feat, chunk_size=3)
+      edge_feat=edge_feat, edge_weights=edge_weights, chunk_size=3)
     random_partitioner.partition()
 
     for pidx in range(nparts):
@@ -71,11 +72,14 @@ class PartitionTestCase(unittest.TestCase):
       for idx, n_id in enumerate(p_node_feat.ids):
         self.assertTrue(torch.equal(p_node_feat.feats[idx], node_feat[n_id]))
 
-      # edge
+      # edge & weight
       edge_ids = p_graph.eids
+      edge_weight = p_graph.weights
+      
       self.assertEqual(edge_ids.size(0), 10)
       self.assertTrue(torch.equal(torch.sort(edge_ids)[0],
                                   torch.sort(p_edge_feat.ids)[0]))
+      self.assertTrue(torch.allclose(edge_ids.to(torch.float), edge_weight))
 
       expect_edge_pids = torch.ones(10, dtype=torch.int64) * pidx
       self.assertTrue(torch.equal(edge_pb[edge_ids], expect_edge_pids))
@@ -125,9 +129,16 @@ class PartitionTestCase(unittest.TestCase):
       i2i_type: torch.stack(i2i_feats, dim=0)
     }
 
+    u2i_weights = torch.arange(0, edge_index_dict[u2i_type].size(1), dtype=torch.float)
+    i2i_weights = torch.arange(0, edge_index_dict[i2i_type].size(1), dtype=torch.float)
+    edge_weight_dict = {
+      u2i_type: u2i_weights,
+      i2i_type: i2i_weights
+    }
+
     random_partitioner = RandomPartitioner(
       dir, nparts, node_num_dict, edge_index_dict, node_feat=node_feat_dict,
-      edge_feat=edge_feat_dict, chunk_size=3
+      edge_feat=edge_feat_dict, edge_weights=edge_weight_dict, chunk_size=3
     )
     random_partitioner.partition()
 
@@ -178,7 +189,10 @@ class PartitionTestCase(unittest.TestCase):
 
       # u2i
       p_u2i_eids = p_graph_dict[u2i_type].eids
+      p_u2i_weights = p_graph_dict[u2i_type].weights
+      
       self.assertEqual(p_u2i_eids.size(0), 10)
+      self.assertTrue(torch.allclose(p_u2i_eids.to(torch.float), p_u2i_weights))
 
       expect_u2i_pids = torch.ones(10, dtype=torch.long) * pidx
       self.assertTrue(torch.equal(edge_pb_dict[u2i_type][p_u2i_eids],
@@ -195,7 +209,10 @@ class PartitionTestCase(unittest.TestCase):
 
       # i2i
       p_i2i_eids = p_graph_dict[i2i_type].eids
+      p_i2i_weights = p_graph_dict[i2i_type].weights
+
       self.assertEqual(p_i2i_eids.size(0), 6)
+      self.assertTrue(torch.allclose(p_i2i_eids.to(torch.float), p_i2i_weights))
 
       expect_i2i_pids = torch.ones(6, dtype=torch.long) * pidx
       self.assertTrue(torch.equal(edge_pb_dict[i2i_type][p_i2i_eids],
@@ -230,9 +247,10 @@ class PartitionTestCase(unittest.TestCase):
       [torch.ones(2) * i for i in range(edge_num)], dim=0
     )
 
+    edge_weights = torch.arange(0, edge_num, dtype=torch.float)
     freq_partitioner = FrequencyPartitioner(
       dir, nparts, node_num, edge_index, node_probs,
-      node_feat=node_feat, edge_feat=edge_feat,
+      node_feat=node_feat, edge_feat=edge_feat, edge_weights=edge_weights,
       cache_memory_budget=cache_budget_bytes,
       chunk_size=3)
     freq_partitioner.partition()
@@ -259,10 +277,14 @@ class PartitionTestCase(unittest.TestCase):
           node_probs[pidx][p_node_feat.cache_ids[idx + 1]].item()
         )
 
-      # edge
+      # edge & weight
       edge_ids = p_graph.eids
+      edge_weights = p_graph.weights
+
       self.assertTrue(torch.equal(torch.sort(edge_ids)[0],
                                   torch.sort(p_edge_feat.ids)[0]))
+      self.assertTrue(torch.allclose(edge_ids.to(torch.float), edge_weights))
+
       all_edge_ids.append(edge_ids)
 
       expect_edge_pids = torch.ones(edge_ids.size(0), dtype=torch.int64) * pidx
