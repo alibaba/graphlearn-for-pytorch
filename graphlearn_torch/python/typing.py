@@ -58,7 +58,7 @@ class GraphPartitionData(NamedTuple):
   # edge ids tensor corresponding to `edge_index`
   eids: torch.Tensor
   # weights tensor corresponding to `edge_index`
-  weights: Optional[torch.Tensor]
+  weights: Optional[torch.Tensor] = None
 
 class FeaturePartitionData(NamedTuple):
   r""" Data and indexing info of a node/edge feature partition.
