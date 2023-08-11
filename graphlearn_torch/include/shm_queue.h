@@ -18,6 +18,7 @@ limitations under the License.
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 
 #ifndef GRAPHLEARN_TORCH_INCLUDE_SHM_QUEUE_H_
 #define GRAPHLEARN_TORCH_INCLUDE_SHM_QUEUE_H_
