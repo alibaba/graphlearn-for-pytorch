@@ -31,7 +31,7 @@ from torch_geometric.nn import GraphSAGE
 
 
 @torch.no_grad()
-def test(model, test_loader, current_device=torch.device('cpu')):
+def test(model, test_loader, current_device):
   model.eval()
   preds, targets = [], []
   for batch in tqdm.tqdm(test_loader):
