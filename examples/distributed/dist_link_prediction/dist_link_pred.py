@@ -179,7 +179,7 @@ if __name__ == '__main__':
   parser.add_argument(
     "--dataset",
     type=str,
-    default='tmall',
+    default='Your dataset name',
     help="The name of the dataset.",
   )
   parser.add_argument(
@@ -195,7 +195,7 @@ if __name__ == '__main__':
   parser.add_argument(
     "--dataset_root_dir",
     type=str,
-    default='tmall_w_w',
+    default='Your dataset root directory',
     help="The root directory (relative path) of the partitioned dataset.",
   )
   parser.add_argument(
