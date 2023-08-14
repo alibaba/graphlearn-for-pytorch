@@ -236,8 +236,7 @@ if __name__ == '__main__':
   )
   parser.add_argument(
     "--with_weight",
-    type=bool,
-    default=True,
+    action="store_true",
     help="Whether to use edge weights.",
   )
   parser.add_argument(

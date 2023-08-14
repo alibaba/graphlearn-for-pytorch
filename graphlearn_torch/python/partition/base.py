@@ -518,9 +518,12 @@ def _load_graph_partition_data(
                     map_location=device)
   eids = torch.load(os.path.join(graph_data_dir, 'eids.pt'),
                     map_location=device)
+
   if os.path.exists(os.path.join(graph_data_dir, 'weights.pt')):
     weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
-                        map_location=device)
+                          map_location=device)
+  else:
+    weights = None
   pdata = GraphPartitionData(edge_index=(rows, cols), eids=eids, weights=weights)
   return pdata
 
