@@ -120,10 +120,9 @@ class Feature(object):
     self._ipc_handle = None
     self._cuda_ipc_handle_dict = None
 
-    if self.feature_tensor is not None:
-      self.feature_tensor = share_memory(self.feature_tensor.cpu())
-
     if self.with_gpu:
+      if self.feature_tensor is not None:
+        self.feature_tensor = share_memory(self.feature_tensor.cpu())
       if self.device_group_list is None:
         self.device_group_list = [
           DeviceGroup(i, [i]) for i in range(torch.cuda.device_count())]
