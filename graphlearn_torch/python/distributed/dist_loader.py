@@ -116,6 +116,7 @@ class DistLoader(object):
     self.shuffle = sampling_config.shuffle
     self.drop_last = sampling_config.drop_last
     self.with_edge = sampling_config.with_edge
+    self.with_weight = sampling_config.with_weight
     self.collect_features = sampling_config.collect_features
     self.edge_dir = sampling_config.edge_dir
     self.sampling_config = sampling_config

@@ -115,6 +115,7 @@ class DistLinkNeighborLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               with_weight: bool = False,
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
@@ -149,7 +150,7 @@ class DistLinkNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.LINK, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg, edge_dir
+      drop_last, with_edge, collect_features, with_neg, with_weight, edge_dir
     )
 
     super().__init__(

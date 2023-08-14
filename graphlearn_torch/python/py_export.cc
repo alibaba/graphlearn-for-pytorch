@@ -23,6 +23,7 @@ limitations under the License.
 #include "graphlearn_torch/csrc/cpu/inducer.h"
 #include "graphlearn_torch/csrc/cpu/random_negative_sampler.h"
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
+#include "graphlearn_torch/csrc/cpu/weighted_sampler.h"
 #include "graphlearn_torch/csrc/cpu/subgraph_op.h"
 #include "graphlearn_torch/include/graph.h"
 #include "graphlearn_torch/include/negative_sampler.h"
@@ -68,7 +69,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::class_<Graph>(m, "Graph")
     .def(py::init<>())
     .def("init_cpu_from_csr", &Graph::InitCPUGraphFromCSR,
-         py::arg("indptr"), py::arg("indices"), py::arg("edge_ids"))
+         py::arg("indptr"), py::arg("indices"),
+         py::arg("edge_ids"), py::arg("edge_weights"))
 #ifdef WITH_CUDA
     .def("init_cuda_from_csr",
          py::overload_cast<const torch::Tensor&,
@@ -96,6 +98,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("sample", &CPURandomSampler::Sample,
          py::arg("ids"), py::arg("req_num"))
     .def("sample_with_edge", &CPURandomSampler::SampleWithEdge,
+         py::arg("ids"), py::arg("req_num"));
+
+  py::class_<CPUWeightedSampler>(m, "CPUWeightedSampler")
+    .def(py::init<const Graph*>())
+    .def("sample", &CPUWeightedSampler::Sample,
+         py::arg("ids"), py::arg("req_num"))
+    .def("sample_with_edge", &CPUWeightedSampler::SampleWithEdge,
          py::arg("ids"), py::arg("req_num"));
 
   py::class_<CPURandomNegativeSampler>(m, "CPURandomNegativeSampler")

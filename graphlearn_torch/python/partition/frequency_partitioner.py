@@ -38,6 +38,7 @@ class FrequencyPartitioner(PartitionerBase):
     node_feat_dtype: The data type of node features.
     edge_feat: The edge feature data, should be a dict for hetero data.
     edge_feat_dtype: The data type of edge features.
+    edge_weights: The edge weights, should be a dict for hetero data.
     edge_assign_strategy: The assignment strategy when partitioning edges,
       should be 'by_src' or 'by_dst'.
     cache_memory_budget: The memory budget (in bytes) for cached node features
@@ -61,13 +62,14 @@ class FrequencyPartitioner(PartitionerBase):
     node_feat_dtype: torch.dtype = torch.float32,
     edge_feat: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_feat_dtype: torch.dtype = torch.float32,
+    edge_weights: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_assign_strategy: str = 'by_src',
     cache_memory_budget: Union[int, Dict[NodeType, int]] = None,
     cache_ratio: Union[float, Dict[NodeType, float]] = None,
     chunk_size: int = 10000,
   ):
     super().__init__(output_dir, num_parts, num_nodes, edge_index, node_feat,
-                     node_feat_dtype, edge_feat, edge_feat_dtype,
+                     node_feat_dtype, edge_feat, edge_feat_dtype, edge_weights,
                      edge_assign_strategy, chunk_size)
 
     self.probs = probs
