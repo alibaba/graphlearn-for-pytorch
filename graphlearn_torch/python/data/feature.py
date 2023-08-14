@@ -78,7 +78,7 @@ class Feature(object):
     with_gpu (bool): A Boolean value indicating whether the ``Feature`` uses
       ``UnifiedTensor``. If True, it means ``Feature`` consists of
       ``UnifiedTensor``, otherwise ``Feature`` is PyTorch CPU Tensor and
-      ``split_ratio``, ``device_group_list`` and ``device`` will be invliad.
+      ``split_ratio``, ``device_group_list`` and ``device`` will be invalid.
       (Default: ``True``).
     dtype (torch.dtype): The data type of feature elements.
       (Default: ``torch.float32``).
