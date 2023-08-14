@@ -31,16 +31,6 @@ public:
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
   SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) override;
 
-  std::tuple<torch::Tensor, torch::Tensor> WeightedSample(
-    const torch::Tensor& nodes, int32_t req_num) override {
-    std::cerr << "Not supported yet!" << std::endl;
-  }
-
-  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-  WeightedSampleWithEdge(const torch::Tensor& nodes, int32_t req_num) override {
-    std::cerr << "Not supported yet!" << std::endl;
-  }
-
   void CalNbrProb(int k, const torch::Tensor& last_prob,
                   const torch::Tensor& nbr_last_prob,
                   const Graph* nbr_graph_, torch::Tensor cur_prob);

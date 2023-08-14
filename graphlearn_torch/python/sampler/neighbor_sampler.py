@@ -85,16 +85,20 @@ class NeighborSampler(BaseSampler):
       if self._g_cls == 'homo':
         if self.device.type == 'cuda':
           self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
-        else:
+        elif self.with_weight == False:
           self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
+        else:
+          self._sampler = pywrap.CPUWeightedSampler(self.graph.graph_handler)
 
       else: # hetero
         self._sampler = {}
         for etype, g in self.graph.items():
           if self.device != torch.device('cpu'):
             self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
-          else:
+          elif self.with_weight == False:
             self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
+          else:
+            self._sampler[etype] = pywrap.CPUWeightedSampler(g.graph_handler)
 
 
   def lazy_init_neg_sampler(self):
@@ -131,17 +135,12 @@ class NeighborSampler(BaseSampler):
     sampler = self._sampler[etype] if etype is not None else self._sampler
     input_seeds = input_seeds.to(self.device)
     edge_ids = None
-    if self.with_weight:
-      if not self.with_edge:
-        nbrs, nbrs_num = sampler.weighted_sample(input_seeds, req_num)
-      else:
-        nbrs, nbrs_num, edge_ids = sampler.weighted_sample_with_edge(
-          input_seeds, req_num)
+
+    if not self.with_edge:
+      nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
     else:
-      if not self.with_edge:
-        nbrs, nbrs_num = sampler.sample(input_seeds, req_num)
-      else:
-        nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
+      nbrs, nbrs_num, edge_ids = sampler.sample_with_edge(input_seeds, req_num)
+
     if nbrs.numel() == 0:
       nbrs = torch.tensor([], dtype=torch.int64 ,device=self.device)
       nbrs_num = torch.zeros_like(input_seeds, dtype=torch.int64, device=self.device)

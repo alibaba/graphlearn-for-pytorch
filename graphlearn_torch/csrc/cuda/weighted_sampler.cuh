@@ -13,30 +13,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef GRAPHLEARN_TORCH_INCLUDE_SAMPLER_H_
-#define GRAPHLEARN_TORCH_INCLUDE_SAMPLER_H_
+#ifndef GRAPHLEARN_TORCH_CUDA_WEIGHTED_SAMPLER_CUH_
+#define GRAPHLEARN_TORCH_CUDA_WEIGHTED_SAMPLER_CUH_
 
-#include "graphlearn_torch/include/graph.h"
+#include "graphlearn_torch/include/sampler.h"
 
 namespace graphlearn_torch {
 
-class Sampler {
+class CUDAWeightedSampler : public Sampler {
 public:
-  Sampler(const Graph* graph) : graph_(graph) {}
-  virtual ~Sampler() {}
+  CUDAWeightedSampler(const Graph* graph) : Sampler(graph) {}
+  ~CUDAWeightedSampler() {}
 
-  // return: (nbrs, nbrs_num)
-  virtual std::tuple<torch::Tensor, torch::Tensor> Sample(
-    const torch::Tensor& nodes, int32_t req_num) = 0;
+  std::tuple<torch::Tensor, torch::Tensor> Sample(
+    const torch::Tensor& nodes, int32_t req_num) override {
+    std::cerr << "Not supported yet!" << std::endl;
+  }
 
-  // return: (nbrs, nbrs_num, edge_ids)
-  virtual std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-  SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) = 0;
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+  SampleWithEdge(const torch::Tensor& nodes, int32_t req_num) override {
+    std::cerr << "Not supported yet!" << std::endl;
+  }
 
-protected:
-  const Graph* graph_;
 };
 
 } // namespace graphlearn_torch
 
-#endif // GRAPHLEARN_TORCH_INCLUDE_SAMPLER_H_
+#endif // GRAPHLEARN_TORCH_CUDA_WEIGHTED_SAMPLER_CUH_
