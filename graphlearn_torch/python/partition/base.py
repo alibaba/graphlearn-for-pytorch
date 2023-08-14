@@ -95,7 +95,8 @@ def save_graph_partition(
   torch.save(graph_partition.edge_index[0], os.path.join(subdir, 'rows.pt'))
   torch.save(graph_partition.edge_index[1], os.path.join(subdir, 'cols.pt'))
   torch.save(graph_partition.eids, os.path.join(subdir, 'eids.pt'))
-  torch.save(graph_partition.weights, os.path.join(subdir, 'weights.pt'))
+  if graph_partition.weights is not None:
+    torch.save(graph_partition.weights, os.path.join(subdir, 'weights.pt'))
 
 def save_feature_partition(
   output_dir: str,
@@ -517,8 +518,9 @@ def _load_graph_partition_data(
                     map_location=device)
   eids = torch.load(os.path.join(graph_data_dir, 'eids.pt'),
                     map_location=device)
-  weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
-                       map_location=device)
+  if os.path.exists(os.path.join(graph_data_dir, 'weights.pt')):
+    weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
+                        map_location=device)
   pdata = GraphPartitionData(edge_index=(rows, cols), eids=eids, weights=weights)
   return pdata
 
