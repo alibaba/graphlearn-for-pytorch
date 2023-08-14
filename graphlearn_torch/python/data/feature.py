@@ -78,7 +78,7 @@ class Feature(object):
     with_gpu (bool): A Boolean value indicating whether the ``Feature`` uses
       ``UnifiedTensor``. If True, it means ``Feature`` consists of
       ``UnifiedTensor``, otherwise ``Feature`` is PyTorch CPU Tensor and
-      ``split_ratio``, ``device_group_list`` and ``device`` will be invliad.
+      ``split_ratio``, ``device_group_list`` and ``device`` will be invalid.
       (Default: ``True``).
     dtype (torch.dtype): The data type of feature elements.
       (Default: ``torch.float32``).
@@ -120,10 +120,9 @@ class Feature(object):
     self._ipc_handle = None
     self._cuda_ipc_handle_dict = None
 
-    if self.feature_tensor is not None:
-      self.feature_tensor = share_memory(self.feature_tensor.cpu())
-
     if self.with_gpu:
+      if self.feature_tensor is not None:
+        self.feature_tensor = share_memory(self.feature_tensor.cpu())
       if self.device_group_list is None:
         self.device_group_list = [
           DeviceGroup(i, [i]) for i in range(torch.cuda.device_count())]
