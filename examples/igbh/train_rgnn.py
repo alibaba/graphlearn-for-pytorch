@@ -36,7 +36,10 @@ def evaluate(model, dataloader):
   with torch.no_grad():
     for batch in dataloader:
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(batch.x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
       labels.append(batch['paper'].y[:batch_size].cpu().numpy())
       predictions.append(out.argmax(1).cpu().numpy())
 
@@ -72,7 +75,10 @@ def train(model, device, train_dataloader, val_dataloader, test_dataloader, args
     for batch in train_dataloader:
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(batch.x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
@@ -140,6 +146,7 @@ if __name__ == '__main__':
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
+  parser.add_argument("--with_trim", type=bool, default=False)
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   device = torch.device('cuda' if args.with_gpu else 'cpu')
@@ -190,5 +197,6 @@ if __name__ == '__main__':
                dropout=0.2,
                model=args.model,
                heads=args.num_heads,
-               node_type='paper').to(device)
+               node_type='paper',
+               with_trim=args.with_trim).to(device)
   train(model, device, train_loader, val_loader, test_loader, args)
