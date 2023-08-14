@@ -66,6 +66,7 @@ class NeighborLoader(NodeLoader):
     shuffle: bool = False,
     drop_last: bool = False,
     with_edge: bool = False,
+    with_weight: bool = False,
     strategy: str = 'random',
     device: torch.device = torch.device(0),
     as_pyg_v1: bool = False,
@@ -77,6 +78,7 @@ class NeighborLoader(NodeLoader):
         num_neighbors=num_neighbors,
         strategy=strategy,
         with_edge=with_edge,
+        with_weight=with_weight,
         device=device,
         edge_dir=data.edge_dir,
       )

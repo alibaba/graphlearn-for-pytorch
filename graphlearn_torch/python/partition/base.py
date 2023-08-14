@@ -95,6 +95,8 @@ def save_graph_partition(
   torch.save(graph_partition.edge_index[0], os.path.join(subdir, 'rows.pt'))
   torch.save(graph_partition.edge_index[1], os.path.join(subdir, 'cols.pt'))
   torch.save(graph_partition.eids, os.path.join(subdir, 'eids.pt'))
+  if graph_partition.weights is not None:
+    torch.save(graph_partition.weights, os.path.join(subdir, 'weights.pt'))
 
 def save_feature_partition(
   output_dir: str,
@@ -162,6 +164,7 @@ class PartitionerBase(ABC):
     node_feat_dtype: torch.dtype = torch.float32,
     edge_feat: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_feat_dtype: torch.dtype = torch.float32,
+    edge_weights: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_assign_strategy: str = 'by_src',
     chunk_size: int = 10000,
   ):
@@ -175,6 +178,7 @@ class PartitionerBase(ABC):
     self.edge_index = convert_to_tensor(edge_index, dtype=torch.int64)
     self.node_feat = convert_to_tensor(node_feat, dtype=node_feat_dtype)
     self.edge_feat = convert_to_tensor(edge_feat, dtype=edge_feat_dtype)
+    self.edge_weights = convert_to_tensor(edge_weights, dtype=torch.float32)
 
     if isinstance(self.num_nodes, dict):
       assert isinstance(self.edge_index, dict)
@@ -252,7 +256,7 @@ class PartitionerBase(ABC):
     node_pb: Union[PartitionBook, Dict[NodeType, PartitionBook]],
     etype: Optional[EdgeType] = None
   ) -> Tuple[List[GraphPartitionData], PartitionBook]:
-    r""" Partition graph topology of a specify edge type, needs to be
+    r""" Partition graph topology of a specified edge type, needs to be
       overwritten.
 
     Args:
@@ -269,6 +273,8 @@ class PartitionerBase(ABC):
     rows, cols = edge_index[0], edge_index[1]
     edge_num = len(rows)
     eids = torch.arange(edge_num, dtype=torch.int64)
+    weights = self.edge_weights[etype] if isinstance(self.edge_weights, dict) \
+              else self.edge_weights
 
     if 'hetero' == self.data_cls:
       assert etype is not None
@@ -295,6 +301,8 @@ class PartitionerBase(ABC):
       chunk_rows = rows[chunk_start_pos:chunk_end_pos]
       chunk_cols = cols[chunk_start_pos:chunk_end_pos]
       chunk_eids = eids[chunk_start_pos:chunk_end_pos]
+      if weights is not None:
+        chunk_weights = weights[chunk_start_pos:chunk_end_pos]
 
       chunk_target_indices = target_indices[chunk_start_pos:chunk_end_pos]
       chunk_partition_idx = target_node_pb[chunk_target_indices]
@@ -303,7 +311,8 @@ class PartitionerBase(ABC):
         idx = torch.masked_select(chunk_idx, mask)
         res[pidx].append(GraphPartitionData(
           edge_index=(chunk_rows[idx], chunk_cols[idx]),
-          eids=chunk_eids[idx]
+          eids=chunk_eids[idx],
+          weights=chunk_weights[idx] if weights is not None else None
         ))
       chunk_start_pos += current_chunk_size
 
@@ -313,10 +322,13 @@ class PartitionerBase(ABC):
       p_rows = torch.cat([r.edge_index[0] for r in res[pidx]])
       p_cols = torch.cat([r.edge_index[1] for r in res[pidx]])
       p_eids = torch.cat([r.eids for r in res[pidx]])
+      if weights is not None:
+        p_weights = torch.cat([r.weights for r in res[pidx]])
       partition_book[p_eids] = pidx
       partition_results.append(GraphPartitionData(
         edge_index=(p_rows, p_cols),
-        eids=p_eids
+        eids=p_eids,
+        weights=p_weights if weights is not None else None
       ))
 
     return partition_results, partition_book
@@ -369,7 +381,9 @@ class PartitionerBase(ABC):
       return
     for pidx in range(self.num_parts):
       eids = graph_list[pidx].eids
-      eids_chunks = torch.chunk(eids, chunks=((eids.shape[0] + self.chunk_size - 1) // self.chunk_size))
+      eids_chunks = torch.chunk(
+        eids, chunks=((eids.shape[0] + self.chunk_size - 1) // self.chunk_size)
+      )
       for chunk in eids_chunks:
         p_edge_feat_chunk = FeaturePartitionData(
           feats=edge_feat[chunk],
@@ -396,6 +410,7 @@ class PartitionerBase(ABC):
               |-- rows.pt
               |-- cols.pt
               |-- eids.pt
+              |-- weights.pt (optional)
           |-- node_feat/
               |-- feats.pkl
               |-- ids.pkl
@@ -430,6 +445,7 @@ class PartitionerBase(ABC):
                   |-- rows.pt
                   |-- cols.pt
                   |-- eids.pt
+                  |-- weights.pt
               |-- etype2/
                   ...
           |-- node_feat/
@@ -476,7 +492,7 @@ class PartitionerBase(ABC):
       node_ids_list, node_pb = self._partition_node()
       save_node_pb(self.output_dir, node_pb)
       self._partition_and_save_node_feat(node_ids_list)
-      
+
       graph_list, edge_pb = self._partition_graph(node_pb)
       save_edge_pb(self.output_dir, edge_pb)
       for pidx in range(self.num_parts):
@@ -502,7 +518,13 @@ def _load_graph_partition_data(
                     map_location=device)
   eids = torch.load(os.path.join(graph_data_dir, 'eids.pt'),
                     map_location=device)
-  pdata = GraphPartitionData(edge_index=(rows, cols), eids=eids)
+
+  if os.path.exists(os.path.join(graph_data_dir, 'weights.pt')):
+    weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
+                          map_location=device)
+  else:
+    weights = None
+  pdata = GraphPartitionData(edge_index=(rows, cols), eids=eids, weights=weights)
   return pdata
 
 

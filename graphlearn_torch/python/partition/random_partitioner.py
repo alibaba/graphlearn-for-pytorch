@@ -52,11 +52,12 @@ class RandomPartitioner(PartitionerBase):
     node_feat_dtype: torch.dtype = torch.float32,
     edge_feat: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_feat_dtype: torch.dtype = torch.float32,
+    edge_weights: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
     edge_assign_strategy: str = 'by_src',
     chunk_size: int = 10000,
   ):
     super().__init__(output_dir, num_parts, num_nodes, edge_index, node_feat,
-                     node_feat_dtype, edge_feat, edge_feat_dtype,
+                     node_feat_dtype, edge_feat, edge_feat_dtype, edge_weights,
                      edge_assign_strategy, chunk_size)
 
   def _partition_node(

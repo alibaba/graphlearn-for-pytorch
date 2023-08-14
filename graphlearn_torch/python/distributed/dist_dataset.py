@@ -123,15 +123,17 @@ class DistDataset(Dataset):
     # init graph partition
     if isinstance(graph_data, dict):
       # heterogeneous.
-      edge_index, edge_ids = {}, {}
+      edge_index, edge_ids, edge_weights = {}, {}, {}
       for k, v in graph_data.items():
         edge_index[k] = v.edge_index
         edge_ids[k] = v.eids
+        edge_weights[k] = v.weights
     else:
       # homogeneous.
       edge_index = graph_data.edge_index
       edge_ids = graph_data.eids
-    self.init_graph(edge_index, edge_ids, layout='COO',
+      edge_weights = graph_data.weights
+    self.init_graph(edge_index, edge_ids, edge_weights, layout='COO',
                     graph_mode=graph_mode, device=device)
 
     # load node feature partition

@@ -34,6 +34,9 @@ class Topology(object):
     edge_ids (torch.Tensor or numpy.ndarray, optional): The edge ids for
       graph edges. If set to ``None``, it will be aranged by the edge size.
       (default: ``None``)
+    edge_weights (torch.Tensor or numpy.ndarray, optional): The edge weights for
+      graph edges. If set to ``None``, it will be None.
+      (default: ``None``)
     input_layout (str): The edge layout representation for the input edge index,
       should be 'COO' (rows and cols uncompressed), 'CSR' (rows compressed)
       or 'CSC' (columns compressed). (default: 'COO')
@@ -44,6 +47,7 @@ class Topology(object):
                edge_index: Union[TensorDataType,
                                  Tuple[TensorDataType, TensorDataType]],
                edge_ids: Optional[TensorDataType] = None,
+               edge_weights: Optional[TensorDataType] = None,
                input_layout: str = 'COO',
                layout: Literal['CSR', 'CSC'] = 'CSR'):
     input_layout = str(input_layout).upper()
@@ -60,7 +64,11 @@ class Topology(object):
       edge_ids = torch.arange(num_edges, dtype=torch.int64, device=row.device)
     else:
       assert edge_ids.numel() == num_edges
-    
+
+    edge_weights = convert_to_tensor(edge_weights, dtype=torch.float)
+    if edge_weights is not None:
+      assert edge_weights.numel() == num_edges
+
     self._layout = layout
     
     if input_layout == layout:
@@ -69,6 +77,7 @@ class Topology(object):
       elif input_layout == 'CSR':
         self._indptr, self._indices = row, col
       self._edge_ids = edge_ids
+      self._edge_weights = edge_weights
       return
     elif input_layout == 'CSC':
       col = ptr2ind(col)
@@ -77,46 +86,49 @@ class Topology(object):
     # COO format data is prepared.
     
     if layout == 'CSR':
-      self._indptr, self._indices, self._edge_ids = \
-        coo_to_csr(row, col, edge_value=edge_ids)
+      self._indptr, self._indices, self._edge_ids, self._edge_weights = \
+        coo_to_csr(row, col, edge_id=edge_ids, edge_weight=edge_weights)
     elif layout == 'CSC':
-      self._indices, self._indptr, self._edge_ids = \
-        coo_to_csc(row, col, edge_value=edge_ids)
+      self._indices, self._indptr, self._edge_ids, self._edge_weights = \
+        coo_to_csc(row, col, edge_id=edge_ids, edge_weight=edge_weights)
+
   
-  def to_coo(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+  def to_coo(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     r""" Convert to COO format.
 
     Returns:
-      row indice tensor, column indice tensor and edge id tensor
+      row indice tensor, column indice tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
-      return ptr2ind(self._indptr), self._indices, self._edge_ids
+      return ptr2ind(self._indptr), self._indices, \
+             self._edge_ids, self._edge_weights
     elif self._layout == 'CSC':
-      return self._indices, ptr2ind(self._indptr), self._edge_ids
+      return self._indices, ptr2ind(self._indptr), \
+             self._edge_ids, self._edge_weights
 
-  def to_csc(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+  def to_csc(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     r""" Convert to CSC format.
 
     Returns:
-      row indice tensor, column ptr tensor and edge id tensor
+      row indice tensor, column ptr tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
-      row, col, edge_ids = self.to_coo()
-      return coo_to_csc(row, col, edge_value=edge_ids)
+      row, col, edge_id, edge_weights = self.to_coo()
+      return coo_to_csc(row, col, edge_id=edge_id, edge_weight=edge_weights)
     elif self._layout == 'CSC':
-      return self._indices, self._indptr, self._edge_ids
+      return self._indices, self._indptr, self._edge_ids, self._edge_weights
   
-  def to_csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+  def to_csr(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     r""" Convert to CSR format.
 
     Returns:
-      row ptr tensor, column indice tensor and edge id tensor
+      row ptr tensor, column indice tensor, edge id tensor, edge weight tensor
     """
     if self._layout == 'CSR':
-      return self._indptr, self._indices, self._edge_ids
+      return self._indptr, self._indices, self._edge_ids, self._edge_weights
     elif self._layout == 'CSC':
-      row, col, edge_ids = self.to_coo()
-      return coo_to_csr(row, col, edge_value=edge_ids)
+      row, col, edge_ids, edge_weights = self.to_coo()
+      return coo_to_csr(row, col, edge_id=edge_ids, edge_weight=edge_weights)
 
   @property
   def indptr(self):
@@ -131,6 +143,12 @@ class Topology(object):
     r""" local edge ids.
     """
     return self._edge_ids
+  
+  @property
+  def edge_weights(self):
+    r""" local edge weights.
+    """
+    return self._edge_weights
 
   @property
   def degrees(self):
@@ -148,6 +166,7 @@ class Topology(object):
     self._indptr = share_memory(self._indptr)
     self._indices = share_memory(self._indices)
     self._edge_ids = share_memory(self._edge_ids)
+    self._edge_weights = share_memory(self._edge_weights)
 
   def __getitem__(self, key):
     return getattr(self, key, None)
@@ -203,8 +222,13 @@ class Graph(object):
     else:
       edge_ids = torch.empty(0)
 
+    if self.topo.edge_weights is not None:
+      edge_weights = self.topo.edge_weights
+    else:
+      edge_weights = torch.empty(0)
+
     if self.mode == 'CPU':
-      self._graph.init_cpu_from_csr(indptr, indices, edge_ids)
+      self._graph.init_cpu_from_csr(indptr, indices, edge_ids, edge_weights)
     else:
       if self.device is None:
         self.device = torch.cuda.current_device()
