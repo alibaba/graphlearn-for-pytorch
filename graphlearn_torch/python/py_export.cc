@@ -20,6 +20,7 @@ limitations under the License.
 
 #include <torch/extension.h>
 
+#include "graphlearn_torch/csrc/rpc/dist_server_grpc.h"
 #include "graphlearn_torch/csrc/cpu/inducer.h"
 #include "graphlearn_torch/csrc/cpu/random_negative_sampler.h"
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
@@ -151,6 +152,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
             return new SampleQueue{shmid};
         }
     ));
+  py::class_<ServerImpl>(m, "ServerImpl")
+    .def(py::init<>())
+    .def("run", &ServerImpl::Run);
 
 #ifdef WITH_CUDA
   py::class_<SharedTensor>(m, "SharedTensor")

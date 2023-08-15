@@ -1,4 +1,9 @@
 import os
+import glob
+import sys
+import site
+import sysconfig
+import subprocess
 
 from torch.utils.cpp_extension import CppExtension
 
@@ -10,15 +15,52 @@ def ext_module(
   with_vineyard: bool = True,
   release: bool = False
 ):
+  PYTHON_PKG_PATH = site.getsitepackages()[0]
+  PYTHON_INCLUDE_PATH = sysconfig.get_paths()["include"]
+  
+  python_version = sys.version_info[:2]
+  python_lib_name = f"python{python_version[0]}.{python_version[1]}" # e.g. python3.8
+
   include_dirs = []
   library_dirs = []
-  libraries = []
+  libraries = [python_lib_name]
   extra_cxx_flags = []
   extra_link_args = []
   define_macros = []
   undef_macros = []
+  
+  # add third_party grpc libraries
+  for file_path in glob.glob(f"{root_path}/third_party/grpc/build/lib/*.a"):
+    libraries.append(file_path.split('/')[-1][3:-2])
+  libraries.extend(['absl_time', 'absl_int128', 'absl_throw_delegate', 'absl_time_zone', 'upb', 'address_sorting', 'ssl', 'crypto', 'cares'])
+  
+  # generate proto files
+  cmd = [
+    sys.executable,
+    os.path.join(
+        root_path,
+        "graphlearn_torch",
+        "csrc",
+        "rpc",
+        "proto",
+        "proto_generator.py",
+    ),
+    os.path.join(root_path, "graphlearn_torch", "csrc", "rpc", "generated"),
+  ]
+  subprocess.check_call(
+      cmd,
+      env=os.environ.copy(),
+  )
 
+  library_dirs.append(root_path + '/third_party/grpc/build/lib')
+  library_dirs.append(PYTHON_PKG_PATH + '/torch/lib/')
+  
   include_dirs.append(root_path)
+  include_dirs.append(root_path + '/third_party/grpc/build/include')
+  include_dirs.append(PYTHON_PKG_PATH + '/torch/include')
+  include_dirs.append(PYTHON_PKG_PATH + '/torch/include/torch/csrc/api/include/')
+  include_dirs.append(PYTHON_INCLUDE_PATH)
+  
   if with_cuda:
     include_dirs.append('/usr/local/cuda' + '/include')
     library_dirs.append('/usr/local/cuda' + 'lib64')
@@ -46,7 +88,6 @@ def ext_module(
 
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export.cc')]
 
-  import glob
   sources += glob.glob(
     os.path.join(root_path, 'graphlearn_torch/csrc/**/**.cc'), recursive=True
   )
