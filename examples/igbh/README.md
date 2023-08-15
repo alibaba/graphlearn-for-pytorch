@@ -60,6 +60,17 @@ CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 -
 ```
 The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
 
+To seperate the GPU used by sampling and training processes, please add `--split_training_sampling` and set `--num_training_procs` as half of the number of devices:
+
+```
+# node 0:
+CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
+
+# node 1:
+CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
+```
+The script uses one GPU for training and another GPU for sampling in each node.
+
 Note:
 - The `num_partitions` and `num_nodes` must be the same.
 - You should change master_addr to the ip of node#0.

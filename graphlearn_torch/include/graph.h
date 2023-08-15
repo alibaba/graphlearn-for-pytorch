@@ -50,7 +50,8 @@ public:
 
   void InitCPUGraphFromCSR(const torch::Tensor& indptr,
                            const torch::Tensor& indices,
-                           const torch::Tensor& edge_ids=torch::empty(0));
+                           const torch::Tensor& edge_ids=torch::empty(0),
+                           const torch::Tensor& edge_weights=torch::empty(0));
 #ifdef WITH_CUDA
   virtual ~Graph();
   void LookupDegree(const int64_t* nodes,
@@ -80,6 +81,10 @@ public:
 
   const int64_t* GetEdgeId() const {
     return edge_id_;
+  }
+
+  const float* GetEdgeWeight() const {
+    return edge_weight_;
   }
 
   int64_t GetRowCount() const {

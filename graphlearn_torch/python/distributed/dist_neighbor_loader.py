@@ -78,16 +78,17 @@ class DistNeighborLoader(DistLoader):
                shuffle: bool = False,
                drop_last: bool = False,
                with_edge: bool = False,
+               with_weight: bool = False,
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
-    
+
     if isinstance(input_nodes, tuple):
       input_type, input_seeds = input_nodes
     else:
       input_type, input_seeds = None, input_nodes
-    
+
     if isinstance(worker_options, RemoteDistSamplingWorkerOptions):
       if isinstance(input_seeds, List):
         input_data = []
@@ -102,7 +103,8 @@ class DistNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.NODE, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg=False, edge_dir=edge_dir
+      drop_last, with_edge, collect_features, with_neg=False, 
+      with_weight=with_weight, edge_dir=edge_dir
     )
 
     super().__init__(

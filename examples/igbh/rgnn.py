@@ -17,7 +17,7 @@ import torch
 import torch.nn.functional as F
 
 from torch_geometric.nn import HeteroConv, GATConv, GCNConv, SAGEConv
-
+from torch_geometric.utils import trim_to_layer
 
 class RGNN(torch.nn.Module):
   r""" [Relational GNN model](https://arxiv.org/abs/1703.06103).
@@ -35,7 +35,7 @@ class RGNN(torch.nn.Module):
 
   """
   def __init__(self, etypes, in_dim, h_dim, out_dim, num_layers=2,
-               dropout=0.2, model='rgat', heads=4, node_type=None):
+               dropout=0.2, model='rgat', heads=4, node_type=None, with_trim=False):
     super().__init__()
     self.node_type = node_type
     if node_type is not None:
@@ -54,10 +54,19 @@ class RGNN(torch.nn.Module):
             etype: GATConv(in_dim, h_dim // heads, heads=heads, add_self_loops=False)
             for etype in etypes}))
     self.dropout = torch.nn.Dropout(dropout)
+    self.with_trim = with_trim
 
-  def forward(self, x_dict, edge_index_dict):
+  def forward(self, x_dict, edge_index_dict, num_sampled_edges_dict=None,
+              num_sampled_nodes_dict=None):
     for i, conv in enumerate(self.convs):
-      
+      if self.with_trim:
+        x_dict, edge_index_dict, _ = trim_to_layer(
+          layer=i,
+          num_sampled_nodes_per_hop=num_sampled_nodes_dict,
+          num_sampled_edges_per_hop=num_sampled_edges_dict,
+          x=x_dict,
+          edge_index=edge_index_dict
+        )
       for key in list(edge_index_dict.keys()):
         if key[0] not in x_dict or key[-1] not in x_dict:
           del edge_index_dict[key]

@@ -36,7 +36,7 @@ sampling_nprocs = 2
 device_num = 2
 
 
-def _prepare_dataset(rank: int):
+def _prepare_dataset(rank: int, weighted: bool = False):
   # partition
   node_pb = torch.tensor(
     [v % 2 for v in range(0, vnum_total)],
@@ -56,8 +56,12 @@ def _prepare_dataset(rank: int):
     eids.extend([(v * degree + i) for i in range(degree)])
   edge_index = torch.tensor([rows, cols], dtype=torch.int64)
   edge_ids = torch.tensor(eids, dtype=torch.int64)
+  edge_weights = (edge_ids % 2).to(torch.float)
   csr_topo = glt.data.Topology(edge_index=edge_index, edge_ids=edge_ids)
+  weighted_csr_topo = glt.data.Topology(
+    edge_index=edge_index, edge_ids=edge_ids, edge_weights=edge_weights)
   graph = glt.data.Graph(csr_topo, 'ZERO_COPY', device=0)
+  weighted_graph = glt.data.Graph(weighted_csr_topo, 'CPU')
 
   # feature
   device_group_list = [glt.data.DeviceGroup(0, [0]),
@@ -78,14 +82,25 @@ def _prepare_dataset(rank: int):
   node_label = torch.arange(vnum_total)
 
   # dist dataset
-  return glt.distributed.DistDataset(
-    2, rank,
-    graph, node_feature, edge_feature, node_label,
-    node_pb, edge_pb
-  )
+  if weighted:
+    return glt.distributed.DistDataset(
+      2, rank,
+      weighted_graph, node_feature, edge_feature, node_label,
+      node_pb, edge_pb
+    )
+  else:
+    return glt.distributed.DistDataset(
+      2, rank,
+      graph, node_feature, edge_feature, node_label,
+      node_pb, edge_pb
+    )
 
 
-def _prepare_hetero_dataset(rank: int, edge_dir: Literal['in', 'out'] = 'out'):
+def _prepare_hetero_dataset(
+  rank: int,
+  edge_dir: Literal['in', 'out'] = 'out',
+  weighted: bool = False
+):
   # partition
   node_pb = torch.tensor(
     [v % 2 for v in range(0, vnum_total)],
@@ -116,13 +131,21 @@ def _prepare_hetero_dataset(rank: int, edge_dir: Literal['in', 'out'] = 'out'):
     u2i_eids.extend([(v * degree + i) for i in range(degree)])
   u2i_edge_index = torch.tensor([u2i_rows, u2i_cols], dtype=torch.int64)
   u2i_edge_ids = torch.tensor(u2i_eids, dtype=torch.int64)
+  u2i_edge_weights = (u2i_edge_ids % 2).to(torch.float)
   if edge_dir == 'out':
     u2i_topo = glt.data.Topology(
       edge_index=u2i_edge_index, edge_ids=u2i_edge_ids, layout='CSR')
+    weighted_u2i_topo = glt.data.Topology(
+      edge_index=u2i_edge_index, edge_ids=u2i_edge_ids,
+      edge_weights=u2i_edge_weights, layout='CSR')
   elif edge_dir == 'in':
     u2i_topo = glt.data.Topology(
       edge_index=u2i_edge_index, edge_ids=u2i_edge_ids, layout='CSC')
+    weighted_u2i_topo = glt.data.Topology(
+      edge_index=u2i_edge_index, edge_ids=u2i_edge_ids,
+      edge_weights=u2i_edge_weights, layout='CSC')
   u2i_graph = glt.data.Graph(u2i_topo, 'ZERO_COPY', device=0)
+  weighted_u2i_graph = glt.data.Graph(weighted_u2i_topo, 'CPU')
 
   item_nodes = []
   i2i_rows = []
@@ -135,17 +158,30 @@ def _prepare_hetero_dataset(rank: int, edge_dir: Literal['in', 'out'] = 'out'):
     i2i_eids.extend([(v * degree + i) for i in range(degree)])
   i2i_edge_index = torch.tensor([i2i_rows, i2i_cols], dtype=torch.int64)
   i2i_edge_ids = torch.tensor(i2i_eids, dtype=torch.int64)
+  i2i_edge_weights = (i2i_edge_ids % 2).to(torch.float)
   if edge_dir == 'out':
     i2i_topo = glt.data.Topology(
       edge_index=i2i_edge_index, edge_ids=i2i_edge_ids, layout='CSR')
+    weighted_i2i_topo = glt.data.Topology(
+      edge_index=i2i_edge_index, edge_ids=i2i_edge_ids,
+      edge_weights=i2i_edge_weights, layout='CSR')
   elif edge_dir == 'in':
     i2i_topo = glt.data.Topology(
       edge_index=i2i_edge_index, edge_ids=i2i_edge_ids, layout='CSC')
+    weighted_i2i_topo = glt.data.Topology(
+      edge_index=i2i_edge_index, edge_ids=i2i_edge_ids,
+      edge_weights=i2i_edge_weights, layout='CSC')
   i2i_graph = glt.data.Graph(i2i_topo, 'ZERO_COPY', device=0)
+  weighted_i2i_graph = glt.data.Graph(weighted_i2i_topo, 'CPU')
 
   graph_dict = {
     u2i_etype: u2i_graph,
     i2i_etype: i2i_graph
+  }
+
+  weighted_graph_dict = {
+    u2i_etype: weighted_u2i_graph,
+    i2i_etype: weighted_i2i_graph
   }
 
   # feature
@@ -190,8 +226,15 @@ def _prepare_hetero_dataset(rank: int, edge_dir: Literal['in', 'out'] = 'out'):
   }
 
   # dist dataset
-  return glt.distributed.DistDataset(
-    2, rank,
-    graph_dict, node_feature_dict, edge_feature_dict, node_label_dict,
-    node_pb_dict, edge_pb_dict, edge_dir=edge_dir
-  )
+  if weighted:
+    return glt.distributed.DistDataset(
+      2, rank,
+      weighted_graph_dict, node_feature_dict, edge_feature_dict, node_label_dict,
+      node_pb_dict, edge_pb_dict, edge_dir=edge_dir
+    )
+  else:
+    return glt.distributed.DistDataset(
+      2, rank,
+      graph_dict, node_feature_dict, edge_feature_dict, node_label_dict,
+      node_pb_dict, edge_pb_dict, edge_dir=edge_dir
+    )
