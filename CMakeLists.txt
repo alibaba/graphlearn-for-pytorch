@@ -3,7 +3,7 @@ project(GraphLearn-for-PyTorch)
 set(CMAKE_CXX_STANDARD 14)
 
 option(DEBUG "Enable debug mode" OFF)
-option(BUILD_TESTS "Enable testing" OFF)
+option(BUILD_TESTS "Enable testing" ON)
 option(WITH_CUDA "Enable CUDA support" ON)
 option(WITH_VINEYARD "Enable vineyard support" OFF)
 
@@ -65,17 +65,9 @@ if(WITH_CUDA)
 endif()
 
 ## protobuf and gRPC package
-set(Protobuf_PROTOC_EXECUTABLE "${GLT_THIRD_PARTY_DIR}/grpc/build/bin/protoc")
-set(Protobuf_INSTALL_DIR "${GLT_THIRD_PARTY_DIR}/grpc/build/")
-# find_package (Protobuf QUIET)
-# if (NOT Protobuf_FOUND)
 set (gRPC_INSTALL_DIR ${GLT_THIRD_PARTY_DIR}/grpc/build)
 list (APPEND CMAKE_PREFIX_PATH ${gRPC_INSTALL_DIR})
 find_package (protobuf CONFIG REQUIRED)
-# endif ()
-
-message(STATUS "Using protobuf: Protobuf_found=${Protobuf_FOUND}")
-message(STATUS "Using protobuf: ${Protobuf_INCLUDE_DIRS}")
 
 macro (get_target_import_location var target)
   if (TARGET ${target})
@@ -88,7 +80,7 @@ macro (get_target_import_location var target)
   endif ()
 endmacro ()
 
-find_package (gRPC CONFIG QUIET)
+find_package (gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC: gRPC_found=${gRPC_FOUND}")
 if (gRPC_FOUND)
   if (TARGET gRPC::grpc_cpp_plugin)
@@ -163,9 +155,10 @@ endif()
 
 # Build library
 add_library(graphlearn_torch SHARED
-  ${GLT_GRPC_AUTOGEN_FILES})
+  ${GLT_GRPC_AUTOGEN_FILES} )
 
 add_dependencies(graphlearn_torch grpc_codegen)
+
 
 function(target_source_tree target)
   file(GLOB_RECURSE SRCS ${ARGN})
@@ -184,16 +177,15 @@ if(WITH_CUDA)
 endif()
 
 target_include_directories(graphlearn_torch
-  PUBLIC ${GLT_ROOT})# ${GLT_THIRD_PARTY_DIR}/grpc/build/include
+  PUBLIC ${GLT_ROOT})
 
 target_link_libraries(graphlearn_torch
-  # PUBLIC protobuf::libprotobuf
-  PUBLIC gRPC::grpc++
-  # PUBLIC gRPC::grpc++_reflection
-  )
-
-target_link_libraries(graphlearn_torch
-  PUBLIC Python3::Python ${TORCH_LIBRARIES})
+  PUBLIC 
+    Python3::Python 
+    ${TORCH_LIBRARIES} 
+    gRPC::grpc++ 
+    gRPC::grpc++_reflection
+)
 
 if(WITH_CUDA)
   target_set_cuda_options(graphlearn_torch)
@@ -206,10 +198,6 @@ if(WITH_VINEYARD)
     PUBLIC ${VINEYARD_LIBRARIES})
 endif()
 
-add_executable(server
-"/root/graphlearn-for-pytorch/graphlearn_torch/csrc/rpc/server.cc")
-target_link_libraries(server
-  PUBLIC graphlearn_torch) 
 
 # Build tests
 if(BUILD_TESTS)

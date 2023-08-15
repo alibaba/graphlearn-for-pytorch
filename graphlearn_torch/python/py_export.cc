@@ -23,6 +23,7 @@ limitations under the License.
 #include "graphlearn_torch/csrc/cpu/inducer.h"
 #include "graphlearn_torch/csrc/cpu/random_negative_sampler.h"
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
+#include "graphlearn_torch/csrc/cpu/weighted_sampler.h"
 #include "graphlearn_torch/csrc/cpu/subgraph_op.h"
 #include "graphlearn_torch/include/graph.h"
 #include "graphlearn_torch/include/negative_sampler.h"
@@ -68,7 +69,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::class_<Graph>(m, "Graph")
     .def(py::init<>())
     .def("init_cpu_from_csr", &Graph::InitCPUGraphFromCSR,
-         py::arg("indptr"), py::arg("indices"), py::arg("edge_ids"))
+         py::arg("indptr"), py::arg("indices"),
+         py::arg("edge_ids"), py::arg("edge_weights"))
 #ifdef WITH_CUDA
     .def("init_cuda_from_csr",
          py::overload_cast<const torch::Tensor&,
@@ -98,6 +100,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def("sample_with_edge", &CPURandomSampler::SampleWithEdge,
          py::arg("ids"), py::arg("req_num"));
 
+  py::class_<CPUWeightedSampler>(m, "CPUWeightedSampler")
+    .def(py::init<const Graph*>())
+    .def("sample", &CPUWeightedSampler::Sample,
+         py::arg("ids"), py::arg("req_num"))
+    .def("sample_with_edge", &CPUWeightedSampler::SampleWithEdge,
+         py::arg("ids"), py::arg("req_num"));
+
   py::class_<CPURandomNegativeSampler>(m, "CPURandomNegativeSampler")
     .def(py::init<const Graph*>())
     .def("sample", &CPURandomNegativeSampler::Sample,
@@ -121,13 +130,17 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<const Graph*>())
     .def("node_subgraph", &CPUSubGraphOp::NodeSubGraph,
          py::arg("srcs"), py::arg("with_edge"));
+  
+  py::register_exception<QueueTimeoutError>(m, "QueueTimeoutError");
 
   py::class_<SampleQueue>(m, "SampleQueue")
     .def(py::init<size_t, size_t>(), py::arg("capacity"), py::arg("buf_size"))
     .def("pin_memory", &SampleQueue::PinMemory)
+    .def("empty", &SampleQueue::Empty,
+         py::call_guard<py::gil_scoped_release>())
     .def("send", &SampleQueue::Enqueue, py::arg("msg"),
          py::call_guard<py::gil_scoped_release>())
-    .def("receive", &SampleQueue::Dequeue,
+    .def("receive", &SampleQueue::Dequeue, py::arg("timeout_ms"),
          py::call_guard<py::gil_scoped_release>())
     .def(py::pickle(
         [](const SampleQueue& q) { // __getstate__

@@ -47,3 +47,4 @@ from .rpc import (
   RpcCalleeBase, rpc_register, rpc_request_async, rpc_request,
   rpc_global_request_async, rpc_global_request
 )
+from .dist_grpc_server import DistSamplingServer
