@@ -67,7 +67,12 @@ class RpcSamplingCallee(RpcCalleeBase):
     ensure_device(self.device)
     output = self.sampler.sample_one_hop(*args, **kwargs)
     if output is None:
-      return torch.tensor([], torch.device('cpu'), dtype=torch.int64)
+      nbrs = torch.tensor([], dtype=torch.int64, device=torch.device('cpu'))
+      nbrs_num = torch.zeros_like(args[0], dtype=torch.int64,
+                                  device=torch.device('cpu'))
+      edge_ids = torch.tensor([], device=torch.device('cpu'), dtype=torch.int64) \
+        if self.with_edge else None
+      return NeighborOutput(nbrs, nbrs_num, edge_ids)
     return output.to(torch.device('cpu'))
 
 class RpcSubGraphCallee(RpcCalleeBase):
@@ -283,12 +288,12 @@ class DistNeighborSampler(ConcurrentEventLoop):
           req_num = self.num_neighbors[etype][i]
           if self.edge_dir == 'in':
             srcs = src_dict.get(etype[-1], None)
-            if srcs is not None:
+            if srcs is not None and srcs.numel() > 0:
               task_dict[reverse_edge_type(etype)] = self._loop.create_task(
                 self._sample_one_hop(srcs, req_num, etype))
           elif self.edge_dir == 'out':
             srcs = src_dict.get(etype[0], None)
-            if srcs is not None:
+            if srcs is not None and srcs.numel() > 0:
               task_dict[etype] = self._loop.create_task(
                 self._sample_one_hop(srcs, req_num, etype))
 

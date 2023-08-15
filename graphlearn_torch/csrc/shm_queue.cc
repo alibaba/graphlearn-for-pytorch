@@ -213,8 +213,16 @@ void ShmQueue::Enqueue(size_t size, WriteFunc func) {
   block.NotifyToRead();
 }
 
-ShmData ShmQueue::Dequeue() {
+ShmData ShmQueue::Dequeue(unsigned int timeout_ms) {
+  auto timeout_duration = std::chrono::milliseconds(timeout_ms);
+  auto start_time = std::chrono::steady_clock::now();
   while (meta_->read_block_id_ >= meta_->write_block_id_) {
+    if (timeout_ms > 0) {
+      auto elapsed_time = std::chrono::steady_clock::now() - start_time;
+      if (elapsed_time > timeout_duration) {
+        throw QueueTimeoutError();
+      }
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   auto block_id = meta_->GetBlockToRead();
@@ -225,6 +233,10 @@ ShmData ShmQueue::Dequeue() {
   auto* shm_read_ptr = meta_->GetData(block.data);
   auto shm_data_size = block.end - block.data;
   return {shm_read_ptr, shm_data_size, block_id, meta_};
+}
+
+bool ShmQueue::Empty() {
+  return meta_->read_block_id_ == meta_->write_block_id_;
 }
 
 void ShmQueue::PinMemory() {

@@ -25,6 +25,8 @@ import torch.nn.functional as F
 from ogb.nodeproppred import Evaluator
 from torch.nn.parallel import DistributedDataParallel
 from torch_geometric.nn import GraphSAGE
+from typing import List
+from torch.distributed.algorithms.join import Join
 
 
 @torch.no_grad()
@@ -36,10 +38,11 @@ def test(model, test_loader, dataset_name):
   for i, batch in enumerate(test_loader):
     if i == 0:
       device = batch.x.device
-    x = model(batch.x, batch.edge_index)[:batch.batch_size]
+    x = model.module(batch.x, batch.edge_index)[:batch.batch_size]
     xs.append(x.cpu())
     y_true.append(batch.y[:batch.batch_size].cpu())
     del batch
+
   xs = [t.to(device) for t in xs]
   y_true = [t.to(device) for t in y_true]
   y_pred = torch.cat(xs, dim=0).argmax(dim=-1, keepdim=True)
@@ -51,10 +54,13 @@ def test(model, test_loader, dataset_name):
   return test_acc
 
 
-def run_client_proc(num_servers: int, num_clients: int, client_rank: int, dataset_name: str,
-                    train_idx: torch.Tensor, test_idx: torch.Tensor, epochs: int, batch_size: int,
-                    master_addr: str, server_client_port: int, training_pg_master_port: int,
-                    train_loader_master_port: int, test_loader_master_port: int):
+def run_client_proc(
+  num_servers: int, num_clients: int, client_rank: int, server_rank_list: List[int],
+  dataset_name: str, train_path_list: List[str], test_path_list: List[str], epochs: int,
+  batch_size: int, master_addr: str, server_client_port: int,
+  training_pg_master_port: int, train_loader_master_port: int,
+  test_loader_master_port: int
+):
   print(f'-- [Client {client_rank}] Initializing client ...')
   glt.distributed.init_client(
     num_servers=num_servers,
@@ -63,66 +69,76 @@ def run_client_proc(num_servers: int, num_clients: int, client_rank: int, datase
     master_addr=master_addr,
     master_port=server_client_port,
     num_rpc_threads=4,
-    client_group_name='dist-train-supervised-sage-client')
+    client_group_name='dist-train-supervised-sage-client'
+  )
 
+  # Initialize training process group of PyTorch.
   current_ctx = glt.distributed.get_context()
   current_device = torch.device(current_ctx.rank % torch.cuda.device_count())
 
-  # Initialize training process group of PyTorch.
-  print(f'-- [Client {client_rank}] Initializing training process group of PyTorch ...')
+  print(
+    f'-- [Client {client_rank}] Initializing training process group of PyTorch ...'
+  )
   torch.distributed.init_process_group(
     backend='nccl',
     rank=current_ctx.rank,
     world_size=current_ctx.world_size,
-    init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port))
+    init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port)
+  )
 
-  # Select target server on remote.
-  target_server_rank = client_rank % num_servers
-  # Fetch availble device count on the target server.
-  target_server_device_count = glt.distributed.request_server(
-    target_server_rank, func=torch.cuda.device_count)
+  # TODO(hongyi): handle the case that different servers have different device count
+  server_device_count = glt.distributed.request_server(
+    server_rank=server_rank_list[0], func=torch.cuda.device_count)
 
   # Create distributed neighbor loader on remote server for training.
   print(f'-- [Client {client_rank}] Creating training dataloader ...')
   train_loader = glt.distributed.DistNeighborLoader(
     data=None,
     num_neighbors=[15, 10, 5],
-    input_nodes=train_idx,
+    input_nodes=train_path_list,
     batch_size=batch_size,
     shuffle=True,
     collect_features=True,
     to_device=current_device,
     worker_options=glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=target_server_rank,
-      num_workers=1,
+      server_rank=server_rank_list,
+      num_workers=server_device_count,
       worker_devices=[
-        torch.device('cuda', (client_rank // num_servers) // target_server_device_count)
+        torch.device(f'cuda:{i}') for i in range(server_device_count)
       ],
       worker_concurrency=4,
       master_addr=master_addr,
       master_port=train_loader_master_port,
       buffer_size='1GB',
-      prefetch_size=2))
+      prefetch_size=2,
+      worker_key='train'
+    )
+  )
 
   # Create distributed neighbor loader on remote server for testing.
   print(f'-- [Client {client_rank}] Creating testing dataloader ...')
   test_loader = glt.distributed.DistNeighborLoader(
     data=None,
     num_neighbors=[15, 10, 5],
-    input_nodes=test_idx,
+    input_nodes=test_path_list,
     batch_size=batch_size,
     shuffle=False,
     collect_features=True,
     to_device=current_device,
     worker_options=glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=target_server_rank,
-      num_workers=2,
-      worker_devices=[torch.device('cuda', i % target_server_device_count) for i in range(2)],
+      server_rank=server_rank_list,
+      num_workers=server_device_count,
+      worker_devices=[
+        torch.device(f'cuda:{i}') for i in range(server_device_count)
+      ],
       worker_concurrency=4,
       master_addr=master_addr,
       master_port=test_loader_master_port,
-      buffer_size='2GB',
-      prefetch_size=4))
+      buffer_size='1GB',
+      prefetch_size=2,
+      worker_key='test'
+    )
+  )
 
   # Define model and optimizer.
   print(f'-- [Client {client_rank}] Initializing model and optimizer ...')
@@ -141,15 +157,20 @@ def run_client_proc(num_servers: int, num_clients: int, client_rank: int, datase
   for epoch in range(0, epochs):
     model.train()
     start = time.time()
-    for batch in train_loader:
-      optimizer.zero_grad()
-      out = model(batch.x, batch.edge_index)[:batch.batch_size].log_softmax(dim=-1)
-      loss = F.nll_loss(out, batch.y[:batch.batch_size])
-      loss.backward()
-      optimizer.step()
+
+    with Join([model]):
+      for batch in train_loader:
+        optimizer.zero_grad()
+        out = model(batch.x,
+                    batch.edge_index)[:batch.batch_size].log_softmax(dim=-1)
+        loss = F.nll_loss(out, batch.y[:batch.batch_size])
+        loss.backward()
+        optimizer.step()
+
     end = time.time()
     print(
-      f'-- [Client {client_rank}] Epoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {end - start}')
+      f'-- [Client {client_rank}] Epoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {end - start}'
+    )
     torch.cuda.synchronize()
     torch.distributed.barrier()
     # Test accuracy.
@@ -167,7 +188,8 @@ def run_client_proc(num_servers: int, num_clients: int, client_rank: int, datase
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
-    description="Arguments for distributed training of supervised SAGE with servers.")
+    description="Arguments for distributed training of supervised SAGE with servers."
+  )
   parser.add_argument(
     "--dataset",
     type=str,
@@ -181,10 +203,10 @@ if __name__ == '__main__':
     help="The root directory (relative path) of partitioned ogbn dataset.",
   )
   parser.add_argument(
-    "--num_client_dataset_partitions",
+    "--num_dataset_partitions",
     type=int,
-    default=3,
-    help="The number of client partitions of the dataset.",
+    default=2,
+    help="The number of partitions of the dataset.",
   )
   parser.add_argument(
     "--num_server_nodes",
@@ -268,19 +290,21 @@ if __name__ == '__main__':
   print(f'* total server nodes: {args.num_server_nodes}')
   print(f'* total client nodes: {args.num_client_nodes}')
   print(f'* node rank: {args.node_rank}')
-  print(f'* number of server processes per server node: {args.num_server_procs_per_node}')
-  print(f'* number of client processes per client node: {args.num_client_procs_per_node}')
+  print(
+    f'* number of server processes per server node: {args.num_server_procs_per_node}'
+  )
+  print(
+    f'* number of client processes per client node: {args.num_client_procs_per_node}'
+  )
   print(f'* master addr: {args.master_addr}')
   print(f'* server-client master port: {args.server_client_master_port}')
-
-  print(f'* number of client dataset partitions: {args.num_client_dataset_partitions}')
+  print(f'* number of dataset partitions: {args.num_dataset_partitions}')
 
   num_servers = args.num_server_nodes * args.num_server_procs_per_node
   num_clients = args.num_client_nodes * args.num_client_procs_per_node
-  root_dir = osp.join(osp.dirname(osp.realpath(__file__)), args.dataset_root_dir)
-  data_pidx = args.node_rank % args.num_client_dataset_partitions
-
-  mp_context = torch.multiprocessing.get_context('spawn')
+  root_dir = osp.join(
+    osp.dirname(osp.realpath(__file__)), args.dataset_root_dir
+  )
 
   print(f'* epochs: {args.epochs}')
   print(f'* batch size: {args.batch_size}')
@@ -289,23 +313,38 @@ if __name__ == '__main__':
   print(f'* testing loader master port: {args.test_loader_master_port}')
 
   print('--- Loading training and testing seeds ...')
-  train_idx = torch.load(
-    osp.join(root_dir, f'{args.dataset}-train-partitions', f'partition{data_pidx}.pt'))
-  test_idx = torch.load(
-    osp.join(root_dir, f'{args.dataset}-test-partitions', f'partition{data_pidx}.pt'))
-  train_idx = train_idx.split(train_idx.size(0) // args.num_client_procs_per_node)
-  test_idx = test_idx.split(test_idx.size(0) // args.num_client_procs_per_node)
+  train_path_list = []
+  for data_pidx in range(args.num_dataset_partitions):
+    train_path_list.append(
+      osp.join(
+        root_dir, f'{args.dataset}-train-partitions', f'partition{data_pidx}.pt'
+      )
+    )
+
+  test_path_list = []
+  for data_pidx in range(args.num_dataset_partitions):
+    test_path_list.append(
+      osp.join(
+        root_dir, f'{args.dataset}-test-partitions', f'partition{data_pidx}.pt'
+      )
+    )
 
   print('--- Launching client processes ...')
+  mp_context = torch.multiprocessing.get_context('spawn')
   client_procs = []
   for local_proc_rank in range(args.num_client_procs_per_node):
     client_rank = args.node_rank * args.num_client_procs_per_node + local_proc_rank
     cproc = mp_context.Process(
       target=run_client_proc,
-      args=(num_servers, num_clients, client_rank, args.dataset, train_idx[local_proc_rank],
-            test_idx[local_proc_rank], args.epochs, args.batch_size, args.master_addr,
-            args.server_client_master_port, args.training_pg_master_port,
-            args.train_loader_master_port, args.test_loader_master_port))
+      args=(
+        num_servers, num_clients, client_rank,
+        [server_rank for server_rank in range(num_servers)
+        ], args.dataset, train_path_list, test_path_list, args.epochs,
+        args.batch_size, args.master_addr, args.server_client_master_port,
+        args.training_pg_master_port, args.train_loader_master_port,
+        args.test_loader_master_port
+      )
+    )
     client_procs.append(cproc)
   for cproc in client_procs:
     cproc.start()

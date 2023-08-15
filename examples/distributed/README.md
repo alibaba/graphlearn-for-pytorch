@@ -110,10 +110,7 @@ in an environment consisting of 2 nodes, each with 2 A100 GPUs.
 
 ## Example of distributed training with server-client mode
 The server-client mode enables the training to be decoupled, allowing for an arbitrary number of servers or clients. However, it's important to note that the number of clients must be equal to or greater than the number of servers, because each server needs at least one client to initiate it.
-### Prepare data with different number of servers and clients.
-Here we use ogbn_products and partition it into 2 server parts and 3 client parts.
-```
-python partition_ogbn_dataset.py --dataset=ogbn-products --num_server_partitions=2 --num_client_partitions=3
+
 ```
 ### Launch training with:
 - 2 server nodes each with 1 server process for remote sampling and 2 GPUs.
@@ -121,27 +118,27 @@ python partition_ogbn_dataset.py --dataset=ogbn-products --num_server_partitions
 ```
 # server node 0:
 CUDA_VISIBLE_DEVICES=0,1 python server_client_mode/sage_supervised_server.py \
-  --num_server_nodes=2 --num_client_nodes=3 --node_rank=0 --num_server_dataset_partitions=2 \
+  --num_server_nodes=2 --num_client_nodes=3 --node_rank=0 --num_dataset_partitions=2 \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 
 # server node 1:
 CUDA_VISIBLE_DEVICES=2,3 python server_client_mode/sage_supervised_server.py \
-  --num_server_nodes=2 --num_client_nodes=3 --node_rank=1 --num_server_dataset_partitions=2 \
+  --num_server_nodes=2 --num_client_nodes=3 --node_rank=1 --num_dataset_partitions=2 \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 
 # client node 0:
 CUDA_VISIBLE_DEVICES=4,5 python server_client_mode/sage_supervised_client.py \
-  --num_server_nodes=2 --num_client_nodes=3 --node_rank=0 --num_client_dataset_partitions=3 \
+  --num_server_nodes=2 --num_client_nodes=3 --node_rank=0 --num_dataset_partitions=3 \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 
 # client node 1:
 CUDA_VISIBLE_DEVICES=6,7 python server_client_mode/sage_supervised_client.py \
-  --num_server_nodes=2 --num_client_nodes=3 --node_rank=1 --num_client_dataset_partitions=3 \
+  --num_server_nodes=2 --num_client_nodes=3 --node_rank=1 --num_dataset_partitions=3 \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 
 # client node 2:
 CUDA_VISIBLE_DEVICES=8,9 python server_client_mode/sage_supervised_client.py \
-  --num_server_nodes=2 --num_client_nodes=3 --node_rank=2 --num_client_dataset_partitions=3 \
+  --num_server_nodes=2 --num_client_nodes=3 --node_rank=2 --num_dataset_partitions=3 \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 ```
 
