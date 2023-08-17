@@ -12,6 +12,8 @@ set -x
 bash install_dependencies.sh
 pip install ninja
 pip install parameterized
+pip install grpcio
+pip install grpcio-tools
 cmake .
 make -j$CORES
 python setup.py bdist_wheel

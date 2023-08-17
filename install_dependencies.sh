@@ -4,8 +4,8 @@ set -eo pipefail
 
 # libssl-dev
 echo "prepare libssl-dev ..."
-sudo apt-get update
-sudo apt-get install -y libssl-dev
+apt-get update
+apt-get install -y libssl-dev
 echo "libssl-dev done."
 
 root_dir=$(pwd)
