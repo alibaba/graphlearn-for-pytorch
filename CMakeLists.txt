@@ -176,9 +176,6 @@ target_source_tree(graphlearn_torch
 target_source_tree(graphlearn_torch
   ${GLT_CSRC_DIR}/rpc/*.cc
   PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
-  target_source_tree(graphlearn_torch
-  ${GLT_CSRC_DIR}/rpc/*.cc
-  PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
 
 
 if(WITH_CUDA)

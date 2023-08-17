@@ -37,21 +37,34 @@ def ext_module(
     env=os.environ.copy(),
   )
   print("cmake build done...")
+  # environment variables
+  subprocess.check_call(
+    ["chmod", "+x", root_path + "env.sh"],
+    env=os.environ.copy(),
+  )
+  subprocess.check_call(
+    ["./env.sh"],
+    env=os.environ.copy(),
+  )
+  
   PYTHON_PKG_PATH = site.getsitepackages()[0]
   PYTHON_INCLUDE_PATH = sysconfig.get_paths()["include"]
+  python_lib = PYTHON_INCLUDE_PATH.split('/')[-1]
 
   include_dirs = []
   library_dirs = ['built/lib']
   libraries = ['graphlearn_torch']
   extra_cxx_flags = []
-  extra_link_args = []
+  extra_link_args = ["-Wl,-rpath=$ORIGIN/built/lib"]
   define_macros = []
   undef_macros = []
   
   library_dirs.append(root_path + '/third_party/grpc/build/lib')
   library_dirs.append(PYTHON_PKG_PATH + '/torch/lib/')
+  library_dirs.append('/usr/local/cuda' + 'lib64')
   
   include_dirs.append(root_path)
+  include_dirs.append('/usr/local/cuda' + '/include')
   include_dirs.append(root_path + '/third_party/grpc/build/include')
   include_dirs.append(PYTHON_PKG_PATH + '/torch/include')
   include_dirs.append(PYTHON_PKG_PATH + '/torch/include/torch/csrc/api/include/')
@@ -70,8 +83,6 @@ def ext_module(
     undef_macros.append(('WITH_VINEYARD'))
 
   if with_cuda:
-    include_dirs.append('/usr/local/cuda' + '/include')
-    library_dirs.append('/usr/local/cuda' + 'lib64')
     define_macros.append(('WITH_CUDA', 'ON'))
   else:
     undef_macros.append(('WITH_CUDA'))
