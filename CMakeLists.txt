@@ -121,6 +121,8 @@ function (generate_grpc_files target_name grpc_gen_files)
       COMMAND protobuf::protoc -I ${GLT_PROTO_DIR} --cpp_out=${GLT_PROTO_GEN_DIR} ${FIL}
       COMMAND protobuf::protoc -I ${GLT_PROTO_DIR} --grpc_out=${GLT_PROTO_GEN_DIR}
         --plugin=protoc-gen-grpc=${GLT_GRPC_CPP_PLUGIN} ${FIL}
+      COMMAND python -m grpc_tools.protoc -I ${GLT_PROTO_DIR} --python_out=${GLT_PROTO_GEN_DIR}
+        --grpc_python_out=${GLT_PROTO_GEN_DIR} ${FIL}
       VERBATIM)
   endforeach ()
 
@@ -171,6 +173,14 @@ target_source_tree(graphlearn_torch
 target_source_tree(graphlearn_torch
   ${GLT_CSRC_DIR}/cpu/*.cc
   PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+target_source_tree(graphlearn_torch
+  ${GLT_CSRC_DIR}/rpc/*.cc
+  PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+  target_source_tree(graphlearn_torch
+  ${GLT_CSRC_DIR}/rpc/*.cc
+  PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+
+
 if(WITH_CUDA)
   target_source_tree(graphlearn_torch
     ${GLT_CSRC_DIR}/cuda/*.cu)
@@ -185,6 +195,7 @@ target_link_libraries(graphlearn_torch
     ${TORCH_LIBRARIES} 
     gRPC::grpc++ 
     gRPC::grpc++_reflection
+    protobuf::libprotobuf
 )
 
 if(WITH_CUDA)

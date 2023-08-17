@@ -5,8 +5,8 @@ code_src=${script_dir}/grpc
 install_prefix=${script_dir}/build
 cores=$(cat < /proc/cpuinfo | grep -c "processor")
 
-cd "${code_src}" && git submodule update --init third_party/protobuf third_party/abseil-cpp third_party/cares && \
-#third_party/re2
+cd "${code_src}" && git submodule update --init third_party/protobuf third_party/abseil-cpp third_party/cares third_party/re2 && \
+
 mkdir -p cmake/build && cd cmake/build && \
 cmake -DCMAKE_CXX_FLAGS="-fPIC -D_GLIBCXX_USE_CXX11_ABI=0" \
   -DCMAKE_BUILD_TYPE=Release \
