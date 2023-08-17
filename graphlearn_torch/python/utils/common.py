@@ -15,7 +15,7 @@
 
 import os
 import socket
-from typing import Any, Dict, Callable, Optional, Literal
+from typing import Any, Dict, Callable, Optional
 from ..typing import reverse_edge_type
 from .tensor import id2idx
 
@@ -71,7 +71,7 @@ def index_select(data, index):
 
 def merge_hetero_sampler_output(
     in_sample: Any, out_sample: Any, device,
-    edge_dir: Literal['in', 'out']='out'):
+    edge_dir: str = 'out'):
   def subid2gid(sample):
     for k, v in sample.row.items():
       sample.row[k] = sample.node[k[0]][v]
@@ -110,7 +110,7 @@ def merge_hetero_sampler_output(
   return out_sample
 
 
-def format_hetero_sampler_output(in_sample: Any, edge_dir=Literal['in', 'out']):
+def format_hetero_sampler_output(in_sample: Any, edge_dir:str):
   for k in in_sample.node.keys():
     in_sample.node[k] = in_sample.node[k].unique()
   if in_sample.edge_types is not None:

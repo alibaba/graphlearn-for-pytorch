@@ -13,21 +13,32 @@ def ext_module(
   root_path: str,
   with_cuda: bool = False,
   with_vineyard: bool = True,
-  release: bool = False
+  release: bool = False,
+  build_tests: bool = False,
+  debug: bool = False
 ):
-  # call cmake to build the static library
+  # call cmake to build the library
+  cmake_call = ['cmake', '-DCMAKE_CXX_FLAGS=-fPIC']
+  
+  cmake_call.append('-DWITH_CUDA=ON' if with_cuda else '-DWITH_CUDA=OFF')
+  cmake_call.append('-DWITH_VINEYARD=ON' if with_vineyard else '-DWITH_VINEYARD=OFF')
+  cmake_call.append('-DBUILD_TESTS=ON' if build_tests else '-DBUILD_TESTS=OFF')
+  cmake_call.append('-DDEBUG=ON' if debug else '-DDEBUG=OFF')
+  if with_cuda:
+    cmake_call.append('-DCMAKE_CUDA_FLAGS=-Xcompiler=-fPIC')
+  cmake_call.append(root_path)
+  
   subprocess.check_call(  
-    ["cmake", '-DCMAKE_CXX_FLAGS=-fPIC', '-DCMAKE_CUDA_FLAGS=-Xcompiler=-fPIC', "."],
+    cmake_call,
     env=os.environ.copy(),
   )
   subprocess.check_call(
-    ["cmake", "--build", ".", "-j", str(multiprocessing.cpu_count())],
+    ["cmake", "--build", root_path, "-j", str(multiprocessing.cpu_count())],
     env=os.environ.copy(),
   )
   print("cmake build done...")
   PYTHON_PKG_PATH = site.getsitepackages()[0]
   PYTHON_INCLUDE_PATH = sysconfig.get_paths()["include"]
-  python_lib_name = PYTHON_INCLUDE_PATH.split('/')[-1]
 
   include_dirs = []
   library_dirs = ['built/lib']

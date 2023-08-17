@@ -14,7 +14,7 @@
 # ==============================================================================
 
 
-from typing import Tuple, Union, Optional, Literal
+from typing import Tuple, Union, Optional
 
 import torch
 
@@ -105,7 +105,7 @@ class LinkLoader(object):
     edge_label: Optional[torch.Tensor] = None,
     neg_sampling: Optional[NegativeSampling] = None,
     device: torch.device = torch.device(0),
-    edge_dir: Literal['out', 'in'] = 'out',
+    edge_dir: str = 'out',
     **kwargs,
   ):
     # Get edge type (or `None` for homogeneous graphs):

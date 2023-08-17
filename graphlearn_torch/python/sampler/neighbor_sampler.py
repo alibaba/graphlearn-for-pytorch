@@ -14,7 +14,7 @@
 # ==============================================================================
 
 import math
-from typing import Dict, Optional, Union, Literal
+from typing import Dict, Optional, Union
 
 import torch
 
@@ -45,7 +45,7 @@ class NeighborSampler(BaseSampler):
                with_neg: bool=False,
                with_weight: bool=False,
                strategy: str = 'random',
-               edge_dir: Literal['in', 'out'] = 'out'):
+               edge_dir: str = 'out'):
     self.graph = graph
     self.num_neighbors = num_neighbors
     self.device = device

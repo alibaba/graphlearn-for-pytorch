@@ -14,7 +14,7 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Union
 
 import torch
 
@@ -43,7 +43,7 @@ class DistDataset(Dataset):
     edge_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     node_feat_pb: Union[PartitionBook, HeteroNodePartitionDict] = None,
     edge_feat_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
-    edge_dir: Literal['in', 'out'] = 'out',
+    edge_dir: str = 'out',
   ):
     super().__init__(
       graph_partition,

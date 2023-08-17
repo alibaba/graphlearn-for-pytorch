@@ -15,7 +15,7 @@
 
 import logging
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Union
 
 import torch
 
@@ -35,7 +35,7 @@ class Dataset(object):
     node_features: Union[Feature, Dict[NodeType, Feature]] = None,
     edge_features: Union[Feature, Dict[EdgeType, Feature]] = None,
     node_labels: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
-    edge_dir: Literal['in', 'out'] = 'out'
+    edge_dir: str = 'out'
   ):
     self.graph = graph
     self.node_features = node_features

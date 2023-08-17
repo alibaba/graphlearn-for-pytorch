@@ -2,6 +2,12 @@
 
 set -eo pipefail
 
+# libssl-dev
+echo "prepare libssl-dev ..."
+sudo apt-get update
+sudo apt-get install -y libssl-dev
+echo "libssl-dev done."
+
 root_dir=$(pwd)
 third_party_dir=${root_dir}/third_party
 # googletest
@@ -21,9 +27,3 @@ if [ ! -f "${third_party_dir}/grpc/build/include/grpc++/grpc++.h" ]; then
   popd
 fi
 echo "grpc done."
-
-# # pybind11
-# echo "-- preparing pybind11 ..."
-# pushd "${third_party_dir}/pybind11"
-# git submodule update --init pybind11
-# popd

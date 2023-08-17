@@ -16,7 +16,7 @@
 import math
 import queue
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple
 
 import torch
 
@@ -120,7 +120,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
                with_edge: bool = False,
                with_neg: bool = False,
                with_weight: bool = False,
-               edge_dir: Literal['in', 'out'] = 'out',
+               edge_dir: str = 'out',
                collect_features: bool = False,
                channel: Optional[ChannelBase] = None,
                concurrency: int = 1,

@@ -53,7 +53,7 @@ class Topology(object):
       the output. (default: 'CSR')
   """
   def __init__(self, edge_index, edge_ids, input_layout = 'COO', 
-               layout: Literal['CSR', 'CSC'] = 'CSR')
+               layout: str = 'CSR')
 ```
 
 ### 1.2 Graph

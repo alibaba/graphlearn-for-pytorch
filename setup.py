@@ -25,6 +25,8 @@ RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
 WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
+BUILD_TESTS = os.getenv('BUILD_TESTS', 'ON')
+DEBUG = os.getenv('DEBUG', 'OFF')
 
 sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
 from build import ext_module
@@ -45,7 +47,9 @@ setup(
       root_path=ROOT_PATH,
       with_cuda=WITH_CUDA == "ON",
       with_vineyard=WITH_VINEYARD == "ON",
-      release=RELEASE == "TRUE"
+      release=RELEASE == "TRUE",
+      build_tests=BUILD_TESTS == "ON",
+      debug=DEBUG == "ON"
     )
   ],
   package_dir={'graphlearn_torch': 'graphlearn_torch/python'},

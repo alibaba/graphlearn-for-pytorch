@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Dict, Optional, Literal
+from typing import Dict, Optional
 
 import torch
 import torch.nn.functional as F
@@ -62,7 +62,7 @@ def to_hetero_data(
   batch_label_dict: Optional[Dict[NodeType, torch.Tensor]] = None,
   node_feat_dict: Optional[Dict[NodeType, torch.Tensor]] = None,
   edge_feat_dict: Optional[Dict[EdgeType, torch.Tensor]] = None,
-  edge_dir: Literal['in', 'out'] = 'out',
+  edge_dir: str = 'out',
   **kwargs
 ) -> HeteroData:
   data = HeteroData(**kwargs)

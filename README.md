@@ -124,6 +124,7 @@ distributed training can be found in [distributed examples](examples/distributed
 - python>=3.6
 - torch(PyTorch)
 - torch_geometric, torch_scatter, torch_sparse. Please refer to [PyG](https://github.com/pyg-team/pytorch_geometric) for installation.
+- grpcio, grpcio-tools (e.g. pip install grpcio grpcio-tools)
 ### Pip Wheels
 
 ```

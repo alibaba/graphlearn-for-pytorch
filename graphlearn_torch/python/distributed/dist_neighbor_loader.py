@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-from typing import Optional, Literal, List
+from typing import Optional, List
 
 import torch
 
@@ -79,7 +79,7 @@ class DistNeighborLoader(DistLoader):
                drop_last: bool = False,
                with_edge: bool = False,
                with_weight: bool = False,
-               edge_dir: Literal['in', 'out'] = 'out',
+               edge_dir: str = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):

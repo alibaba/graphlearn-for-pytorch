@@ -15,7 +15,6 @@
 
 import torch
 import graphlearn_torch as glt
-from typing import Literal
 
 
 # options for dataset generation
@@ -98,7 +97,7 @@ def _prepare_dataset(rank: int, weighted: bool = False):
 
 def _prepare_hetero_dataset(
   rank: int,
-  edge_dir: Literal['in', 'out'] = 'out',
+  edge_dir: str = 'out',
   weighted: bool = False
 ):
   # partition

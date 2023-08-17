@@ -14,7 +14,7 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Optional, Tuple, Union, Literal
+from typing import Optional, Tuple, Union
 
 import torch
 import warnings
@@ -49,7 +49,7 @@ class Topology(object):
                edge_ids: Optional[TensorDataType] = None,
                edge_weights: Optional[TensorDataType] = None,
                input_layout: str = 'COO',
-               layout: Literal['CSR', 'CSC'] = 'CSR'):
+               layout: str = 'CSR'):
     input_layout = str(input_layout).upper()
     if input_layout not in ['COO', 'CSR', 'CSC']:
       raise RuntimeError(f"'{self.__class__.__name__}': got "
