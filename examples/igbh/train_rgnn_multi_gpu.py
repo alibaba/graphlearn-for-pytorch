@@ -37,7 +37,13 @@ def evaluate(model, dataloader):
   with torch.no_grad():
     for batch in dataloader:
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(
+        {
+          node_name: node_feat.to(torch.float32) 
+          for node_name, node_feat in batch.x_dict.items()
+        },  
+        batch.edge_index_dict
+      )[:batch_size]
       labels.append(batch['paper'].y[:batch_size].cpu().numpy())
       predictions.append(out.argmax(1).cpu().numpy())
 
@@ -134,7 +140,13 @@ def run_training_proc(rank, world_size,
     for batch in train_loader:
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(
+        {
+          node_name: node_feat.to(torch.float32) 
+          for node_name, node_feat in batch.x_dict.items()
+        }, 
+        batch.edge_index_dict
+      )[:batch_size]
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
@@ -199,7 +211,7 @@ if __name__ == '__main__':
   parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=5120)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.01)
+  parser.add_argument('--learning_rate', type=float, default=0.01)
   parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
@@ -207,11 +219,27 @@ if __name__ == '__main__':
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
+
+  # Provides a workaround for if memmap is too slow 
+  # and the dataset cannot fit into the memory
+  parser.add_argument("--use_fp16", action="store_true", 
+      help="To use FP16 for loading the features. Default is False.")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
 
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983)
+  
+  if args.use_fp16:
+    # We transforms the data here, since we need to use them in glt_dataset.init_node_features,
+    # and since we can therefore keep the changes as minimal as possible - 
+    # this way, we don't have to go into dataset.py 
+    # and add arguments to IGBHeteroDataset constructor.
+    for node_name, node_feat in igbh_dataset.feat_dict.items():
+      # This will load the node_feat to memory.
+      # if you're using memmap anyway, then FP16 won't be necessary.
+      igbh_dataset.feat_dict[node_name] = node_feat.half()
+
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
   glt_dataset.init_graph(
