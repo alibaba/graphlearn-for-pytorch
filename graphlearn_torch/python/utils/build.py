@@ -37,15 +37,6 @@ def ext_module(
     env=os.environ.copy(),
   )
   print("cmake build done...")
-  # environment variables
-  subprocess.check_call(
-    ["chmod", "+x", root_path + "env.sh"],
-    env=os.environ.copy(),
-  )
-  subprocess.check_call(
-    ["./env.sh"],
-    env=os.environ.copy(),
-  )
   
   PYTHON_PKG_PATH = site.getsitepackages()[0]
   PYTHON_INCLUDE_PATH = sysconfig.get_paths()["include"]
