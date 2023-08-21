@@ -40,31 +40,34 @@ def ext_module(
   
   PYTHON_PKG_PATH = site.getsitepackages()[0]
   PYTHON_INCLUDE_PATH = sysconfig.get_paths()["include"]
-  python_lib = PYTHON_INCLUDE_PATH.split('/')[-1]
 
   include_dirs = []
-  library_dirs = ['built/lib']
+  library_dirs = []
   libraries = ['graphlearn_torch']
   extra_cxx_flags = []
-  extra_link_args = ["-Wl,-rpath=$ORIGIN/built/lib"]
+  extra_link_args = []
   define_macros = []
   undef_macros = []
+  runtime_library_dirs = []
   
-  library_dirs.append(root_path + '/third_party/grpc/build/lib')
+  library_dirs.append(root_path + '/third_party/grpc/build/lib/')
+  library_dirs.append(root_path + '/built/lib/')
   library_dirs.append(PYTHON_PKG_PATH + '/torch/lib/')
   library_dirs.append('/usr/local/cuda' + 'lib64')
   
   include_dirs.append(root_path)
-  include_dirs.append('/usr/local/cuda' + '/include')
-  include_dirs.append(root_path + '/third_party/grpc/build/include')
-  include_dirs.append(PYTHON_PKG_PATH + '/torch/include')
+  include_dirs.append('/usr/local/cuda' + '/include/')
+  include_dirs.append(root_path + '/third_party/grpc/build/include/')
+  include_dirs.append(PYTHON_PKG_PATH + '/torch/include/')
   include_dirs.append(PYTHON_PKG_PATH + '/torch/include/torch/csrc/api/include/')
   include_dirs.append(PYTHON_INCLUDE_PATH)
   
-
   extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
   extra_cxx_flags.append('-std=gnu++14')
   extra_cxx_flags.append('-fPIC')
+  
+  runtime_library_dirs.append(root_path + '/built/lib/')
+  runtime_library_dirs.append(PYTHON_PKG_PATH + '/torch/lib/')
 
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export.cc')]
 
@@ -104,5 +107,5 @@ def ext_module(
     },
     define_macros=define_macros,
     undef_macros=undef_macros,
-    runtime_library_dirs=['built/lib']
+    runtime_library_dirs=runtime_library_dirs
   )

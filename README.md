@@ -122,6 +122,7 @@ distributed training can be found in [distributed examples](examples/distributed
 ### Requirements
 - cuda
 - python>=3.6
+- cmake>=3.10
 - torch(PyTorch)
 - torch_geometric, torch_scatter, torch_sparse. Please refer to [PyG](https://github.com/pyg-team/pytorch_geometric) for installation.
 - grpcio, grpcio-tools (e.g. pip install grpcio grpcio-tools)

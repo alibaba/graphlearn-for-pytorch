@@ -25,7 +25,11 @@ class GraphTestCase(unittest.TestCase):
     def test_helloworld(self):
         self.resps = []
         self.async_call_times = 30
-        asyncio.run(self.async_call())
+
+        # asyncio.run is supported after python 3.7
+        # asyncio.run(self.async_call())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.async_call())
         
         # check response
         self.resps = [int(resp.split()[2]) for resp in self.resps]
