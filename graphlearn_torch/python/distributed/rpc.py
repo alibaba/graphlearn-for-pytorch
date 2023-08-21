@@ -19,6 +19,7 @@ import collections
 import functools
 import logging
 import threading
+import torch
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set
 
@@ -251,13 +252,14 @@ def init_rpc(master_addr: str,
       raise RuntimeError("'init_rpc': Distributed context has not been set.")
 
     options = rpc.TensorPipeRpcBackendOptions(
-      _transports=['ibv', 'uv'],
+      _transports=['uv'],
       _channels=['mpt_uv', 'basic'],
       num_worker_threads=num_rpc_threads,
       rpc_timeout=rpc_timeout,
       init_method=f'tcp://{master_addr}:{master_port}'
     )
-
+    torch.distributed.constants.default_pg_timeout = rpc_timeout
+    
     rpc.init_rpc(
       name=ctx.worker_name,
       rank=ctx.global_rank,
