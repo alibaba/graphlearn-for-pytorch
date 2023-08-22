@@ -202,8 +202,8 @@ class NeighborSampler(BaseSampler):
 
     return SamplerOutput(
       node=torch.cat(out_nodes),
-      row=torch.cat(out_cols),
-      col=torch.cat(out_rows),
+      row=torch.cat(out_cols) if len(out_cols) > 0 else torch.tensor(out_cols),
+      col=torch.cat(out_rows) if len(out_rows) > 0 else torch.tensor(out_rows),
       edge=(torch.cat(out_edges) if out_edges else None),
       batch=batch,
       num_sampled_nodes=num_sampled_nodes,
