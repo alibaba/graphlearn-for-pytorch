@@ -139,6 +139,8 @@ if(BUILD_TESTS)
     file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cu)
   endif()
 
+  file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cc)
+
   foreach(t ${GLT_TEST_FILES})
     get_filename_component(name ${t} NAME_WE)
     glt_add_test(${name} ${t})

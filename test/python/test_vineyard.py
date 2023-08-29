@@ -16,34 +16,141 @@
 import os
 import unittest
 
+
+# TODO(hongyi): Refactor the CI
+
+os.environ["socket"] = '/var/run/vineyard.sock'
+os.environ["fid"] = '26586469478206803'
+
 from graphlearn_torch.data import *
+from graphlearn_torch.distributed import DistDataset
 
 
-class LoadVineyardTest(unittest.TestCase):
-  '''This test case is for the dataset
-     https://github.com/GraphScope/gstest/tree/master/modern_graph
-  '''
+class VineyardDatasetTest(unittest.TestCase):
 
-  @unittest.skip("Vineyard Env Needed")
   def setUp(self):
-    sock = os.environ["socket"]
-    fid = os.environ["fid"]
-    self.indptr, self.indices, self.edge_ids = vineyard_to_csr(sock, fid, 0, 0, 1)
-    self.vfeat = load_vertex_feature_from_vineyard(
-      sock, fid, ['age', 'id'], 0, 'int64')
-    self.efeat = load_edge_feature_from_vineyard(
-      sock, fid, ["weight"], 0, 'float64')
+    self.sock = os.environ["socket"]
+    self.fid = os.environ["fid"]
+    self.homo_edges = [
+      ("person", "knows", "person"),
+    ]
+    self.homo_edge_weights = {
+      ("person", "knows", "person"): "weight",
+    }
+    self.homo_node_features = {
+      "person": ["feat0", "feat1"],
+    }
+    self.homo_edge_features = {
+      ("person", "knows", "person"): ["feat0", "feat1"],
+    },
+    self.node_labels = {
+      "person": "label",
+    }
 
-  @unittest.skip("Vineyard Env Needed")
-  def test_vineyard_csr(self):
-    self.assertEqual(len(self.indptr), 5)
-    self.assertEqual(len(self.indices), 2)
-    self.assertEqual(sum(self.edge_ids), 1)
-    self.assertEqual(len(self.vfeat), 4)
-    self.assertEqual(len(self.vfeat[0]), 2)
-    self.assertEqual(self.vfeat[2, 0], 32)
-    self.assertEqual(len(self.efeat), 2)
-    self.assertAlmostEqual(self.efeat[0].item(), 0.5)
+    self.hetero_edges = [
+      ("person", "knows", "person"),
+      ("person", "created", "software"),
+    ]
+    self.hetero_edge_weights = {
+      ("person", "knows", "person"): "weight",
+      ("person", "created", "software"): "weight",
+    }
+    self.hetero_node_features = {
+      "person": ["feat0", "feat1"],
+      "software": ["feat0"],
+    }
+    self.hetero_edge_features = {
+      ("person", "knows", "person"): ["feat0", "feat1"],
+      ("person", "created", "software"): ["feat0"],
+    }
+
+  def test_homo_dataset(self):
+    ds = Dataset()
+    ds.load_vineyard(
+      self.fid,
+      self.sock,
+      edges=self.homo_edges,
+      edge_weights=self.homo_edge_weights,
+      node_features=self.homo_node_features,
+      edge_features=self.homo_edge_features,
+      node_labels=self.node_labels,
+    )
+    self.assertEqual(ds.graph.row_count, 4)
+    self.assertEqual(ds.graph.edge_count, 2)
+    self.assertEqual(ds.graph.topo.edge_weights.shape, (2,))
+    self.assertEqual(ds.node_features.shape, (4, 2))
+    self.assertEqual(ds.edge_features.shape, (2, 2))
+    self.assertEqual(ds.node_labels.shape, (4,))
+
+  def test_hetero_dataset(self):
+    ds = Dataset()
+    ds.load_vineyard(
+      self.fid,
+      self.sock,
+      edges=self.hetero_edges,
+      edge_weights=self.hetero_edge_weights,
+      node_features=self.hetero_node_features,
+      edge_features=self.hetero_edge_features,
+      node_labels=self.node_labels,
+    )
+    graph1 = ds.graph[("person", "knows", "person")]
+    graph2 = ds.graph[("person", "created", "software")]
+    self.assertEqual(graph1.row_count, 4)
+    self.assertEqual(graph1.edge_count, 2)
+    self.assertEqual(graph1.topo.edge_weights.shape, (2,))
+    self.assertEqual(graph2.row_count, 4)
+    self.assertEqual(graph2.edge_count, 4)
+    self.assertEqual(graph2.topo.edge_weights.shape, (4,))
+
+    self.assertEqual(ds.node_features["person"].shape, (4, 2))
+    self.assertEqual(ds.node_features["software"].shape, (2, 1))
+    self.assertEqual(
+      ds.edge_features[("person", "knows", "person")].shape, (2, 2)
+    )
+    self.assertEqual(
+      ds.edge_features[("person", "created", "software")].shape, (4, 1)
+    )
+    self.assertEqual(ds.node_labels["person"].shape, (4,))
+
+  def test_homo_dist_dataset(self):
+    ds = DistDataset()
+    ds.load_vineyard(
+      self.fid,
+      self.sock,
+      edges=self.homo_edges,
+      node_features=self.homo_node_features,
+      edge_features=self.homo_edge_features,
+      node_labels=self.node_labels,
+    )
+    self.assertEqual(ds.node_pb.shape, (4,))
+    self.assertEqual(ds.edge_pb.shape, (2,))
+    self.assertEqual(ds.node_feat_pb.shape, (4,))
+    self.assertEqual(ds.edge_feat_pb.shape, (2,))
+
+  def test_hetero_dist_dataset(self):
+    ds = DistDataset()
+    ds.load_vineyard(
+      self.fid,
+      self.sock,
+      edges=self.hetero_edges,
+      node_features=self.hetero_node_features,
+      edge_features=self.hetero_edge_features,
+      node_labels=self.node_labels,
+    )
+    self.assertEqual(ds.node_pb["person"].shape, (4,))
+    # self.assertEqual(ds.node_pb["software"].shape, (2,))
+    
+    self.assertEqual(ds.edge_pb[("person", "knows", "person")].shape, (2,))
+    self.assertEqual(ds.edge_pb[("person", "created", "software")].shape, (4,))
+
+    self.assertEqual(ds.node_feat_pb["person"].shape, (4,))
+    self.assertEqual(ds.node_feat_pb["software"].shape, (2,))
+
+    self.assertEqual(ds.edge_feat_pb[("person", "knows", "person")].shape, (2,))
+    self.assertEqual(
+      ds.edge_feat_pb[("person", "created", "software")].shape, (4,)
+    )
+
 
 if __name__ == "__main__":
   unittest.main()
