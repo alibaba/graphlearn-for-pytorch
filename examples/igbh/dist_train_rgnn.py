@@ -36,11 +36,11 @@ def evaluate(model, dataloader):
   predictions = []
   labels = []
   with torch.no_grad():
-    for batch in dataloader:
+    for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
       out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
-      labels.append(batch['paper'].y[:batch_size].cpu().numpy())
-      predictions.append(out.argmax(1).cpu().numpy())
+      labels.append(batch['paper'].y[:batch_size].clone().cpu().numpy())
+      predictions.append(out.argmax(1).clone().cpu().numpy())
 
     predictions = np.concatenate(predictions)
     labels = np.concatenate(labels)
@@ -187,14 +187,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   best_accuracy = 0
   training_start = time.time()
-  for epoch in tqdm.tqdm(range(epochs)):
+  for epoch in range(epochs):
     model.train()
     total_loss = 0
     train_acc = 0
     idx = 0
     gpu_mem_alloc = 0
     epoch_start = time.time()
-    for batch in train_loader:
+    for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
       out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
@@ -204,8 +204,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       loss.backward()
       optimizer.step()
       total_loss += loss.item()
-      train_acc += sklearn.metrics.accuracy_score(y.cpu().numpy(),
-          out.argmax(1).detach().cpu().numpy())*100
+      train_acc += sklearn.metrics.accuracy_score(y.clone().cpu().numpy(),
+          out.argmax(1).detach().clone().cpu().numpy())*100
       gpu_mem_alloc += (
           torch.cuda.max_memory_allocated() / 1000000
           if with_gpu
@@ -259,7 +259,7 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='15, 10, 5')
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=int, default=0.001)
