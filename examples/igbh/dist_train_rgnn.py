@@ -39,8 +39,8 @@ def evaluate(model, dataloader):
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
       out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
-      labels.append(batch['paper'].y[:batch_size].clone().cpu().numpy())
-      predictions.append(out.argmax(1).clone().cpu().numpy())
+      labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
+      predictions.append(out.argmax(1).cpu().clone().numpy())
 
     predictions = np.concatenate(predictions)
     labels = np.concatenate(labels)
@@ -204,8 +204,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       loss.backward()
       optimizer.step()
       total_loss += loss.item()
-      train_acc += sklearn.metrics.accuracy_score(y.clone().cpu().numpy(),
-          out.argmax(1).detach().clone().cpu().numpy())*100
+      train_acc += sklearn.metrics.accuracy_score(y.cpu().numpy(),
+          out.argmax(1).detach().cpu().numpy())*100
       gpu_mem_alloc += (
           torch.cuda.max_memory_allocated() / 1000000
           if with_gpu
@@ -266,7 +266,7 @@ if __name__ == '__main__':
   parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
-  parser.add_argument('--log_every', type=int, default=5)
+  parser.add_argument('--log_every', type=int, default=2)
   # Distributed settings.
   parser.add_argument("--num_nodes", type=int, default=2,
       help="Number of distributed nodes.")
