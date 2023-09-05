@@ -128,7 +128,8 @@ class Dataset(object):
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the
-    :class:`~graphlearn_torch.data.Dataset` object.
+    :class:`~graphlearn_torch.data.Dataset` object. All nodes except 
+    those in the validation and test sets will be used for training.
 
     Args:
       num_val (int or float): The number of validation samples.
