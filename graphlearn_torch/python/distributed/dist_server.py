@@ -102,7 +102,7 @@ class DistServer(object):
       A unique id of created sampling producer on this server.
     """
     if isinstance(sampler_input, RemoteSamplerInput):
-      sampler_input = sampler_input.to_local_sampler_input()
+      sampler_input = sampler_input.to_local_sampler_input(dataset=self.dataset)
     
     with self._lock: 
       producer_id = self._worker_key2producer_id.get(worker_options.worker_key)

@@ -14,14 +14,14 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Union, Literal, Tuple
 
 import torch
 
 from ..data import Dataset, Graph, Feature, DeviceGroup
 from ..partition import load_partition, cat_feature_cache
 from ..typing import (
-  NodeType, EdgeType, TensorDataType,
+  NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 from ..utils import share_memory
@@ -38,19 +38,21 @@ class DistDataset(Dataset):
     graph_partition: Union[Graph, Dict[EdgeType, Graph]] = None,
     node_feature_partition: Union[Feature, Dict[NodeType, Feature]] = None,
     edge_feature_partition: Union[Feature, Dict[EdgeType, Feature]] = None,
-    whole_node_labels: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    whole_node_labels: NodeLabel = None,
     node_pb: Union[PartitionBook, HeteroNodePartitionDict] = None,
     edge_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     node_feat_pb: Union[PartitionBook, HeteroNodePartitionDict] = None,
     edge_feat_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     edge_dir: Literal['in', 'out'] = 'out',
+    node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
   ):
     super().__init__(
       graph_partition,
       node_feature_partition,
       edge_feature_partition,
       whole_node_labels,
-      edge_dir
+      edge_dir,
+      node_split,
     )
 
     self.num_partitions = num_partitions
@@ -166,6 +168,37 @@ class DistDataset(Dataset):
         whole_node_labels = torch.load(whole_node_label_file)
       self.init_node_labels(whole_node_labels)
 
+  def random_node_split(
+    self,
+    num_val: Union[float, int],
+    num_test: Union[float, int],
+  ):
+    r"""Performs a node-level random split by adding :obj:`train_idx`,
+    :obj:`val_idx` and :obj:`test_idx` attributes to the
+    :class:`~graphlearn_torch.distributed.DistDataset` object.
+
+    Args:
+      num_val (int or float): The number of validation samples.
+        If float, it represents the ratio of samples to include in the
+        validation set.
+      num_test (int or float): The number of test samples in case
+        of :obj:`"train_rest"` and :obj:`"random"` split. If float, it
+        represents the ratio of samples to include in the test set.
+    """
+
+    if isinstance(self.node_labels, dict):
+      train_idx = {}
+      val_idx = {}
+      test_idx = {}
+  
+      for node_type, _ in self.node_labels.items():
+        indices = torch.where(self.node_pb[node_type] == self.partition_idx)[0]
+        train_idx[node_type], val_idx[node_type], test_idx[node_type] = random_split(indices, num_val, num_test)
+    else:
+      indices = torch.where(self.node_pb == self.partition_idx)[0]
+      train_idx, val_idx, test_idx = random_split(indices, num_val, num_test)
+    self.init_node_split((train_idx, val_idx, test_idx))
+
   def share_ipc(self):
     super().share_ipc()
     self.node_pb = share_memory(self.node_pb)
@@ -175,7 +208,8 @@ class DistDataset(Dataset):
     ipc_hanlde = (
       self.num_partitions, self.partition_idx,
       self.graph, self.node_features, self.edge_features, self.node_labels,
-      self.node_pb, self.edge_pb, self._node_feat_pb, self._edge_feat_pb
+      self.node_pb, self.edge_pb, self._node_feat_pb, self._edge_feat_pb, 
+      self.edge_dir, (self.train_idx, self.val_idx, self.test_idx)
     )
     return ipc_hanlde
 
@@ -224,3 +258,17 @@ def reduce_dist_dataset(dataset: DistDataset):
   return (rebuild_dist_dataset, (ipc_handle, ))
 
 ForkingPickler.register(DistDataset, reduce_dist_dataset)
+
+def random_split(
+  indices: torch.Tensor,
+  num_val: Union[float, int],
+  num_test: Union[float, int],
+):  
+  num_total = indices.shape[0]
+  num_val = round(num_total * num_val) if isinstance(num_val, float) else num_val
+  num_test = round(num_total * num_test) if isinstance(num_test, float) else num_test
+  perm = torch.randperm(num_total)
+  val_idx = indices[perm[:num_val]].clone()
+  test_idx = indices[perm[num_val:num_val + num_test]].clone()
+  train_idx = indices[perm[num_val + num_test:]].clone()
+  return train_idx, val_idx, test_idx
