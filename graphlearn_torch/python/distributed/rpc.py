@@ -26,6 +26,7 @@ from torch.distributed import rpc
 
 from .dist_context import DistRole, get_context
 
+SERVER_INIT_CHECK_INTERVAL = 3.0
 
 _rpc_init_lock = threading.RLock()
 
@@ -37,8 +38,9 @@ _rpc_worker_names: Dict[DistRole, List[str]] = None
 r""" Dict from role type to all rpc worker names in this role group.
 """
 
-_rpc_current_group_worker_names: Set[str] = set()
-r""" Set of rpc worker names in the current role group.
+_rpc_current_group_worker_names: Set[str] = None
+r""" Set of rpc worker names in the current role group. Used in all_gather
+in a role group. 
 """
 
 _rpc_master_addr: str = None
@@ -237,7 +239,8 @@ def global_barrier(timeout=None):
 def init_rpc(master_addr: str,
              master_port: int,
              num_rpc_threads: int = 16,
-             rpc_timeout: float = 180):
+             rpc_timeout: float = 180,
+             is_dynamic_world_size: bool = False):
   r""" Initialize rpc on the current process.
   """
   with _rpc_init_lock:
@@ -251,25 +254,60 @@ def init_rpc(master_addr: str,
       raise RuntimeError("'init_rpc': Distributed context has not been set.")
 
     options = rpc.TensorPipeRpcBackendOptions(
-      _transports=['ibv', 'uv'],
+      _transports=['uv'],
       _channels=['mpt_uv', 'basic'],
       num_worker_threads=num_rpc_threads,
       rpc_timeout=rpc_timeout,
       init_method=f'tcp://{master_addr}:{master_port}'
     )
-
+    
     rpc.init_rpc(
       name=ctx.worker_name,
       rank=ctx.global_rank,
-      world_size=ctx.global_world_size,
+      world_size=None if is_dynamic_world_size else ctx.global_world_size,
       rpc_backend_options=options
     )
 
     global _rpc_inited
     _rpc_inited = True
 
+    global _rpc_current_group_worker_names
     global _rpc_worker_names
     _rpc_worker_names = {}
+    
+    if is_dynamic_world_size:
+      _rpc_worker_names[DistRole.SERVER] = []
+      _rpc_worker_names[DistRole.CLIENT] = [] 
+     
+      if ctx.is_server():
+        # ensure all servers is inited
+        for server_rank in range(ctx.world_size):  
+          if server_rank == ctx.rank:
+            _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
+            continue
+          
+          is_avail = False
+          while not is_avail:
+            try:
+              is_avail = rpc_global_request_by_rank(server_rank, rpc.is_available)
+            except:
+              time.sleep(SERVER_INIT_CHECK_INTERVAL)
+          _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
+        _rpc_current_group_worker_names = set(_rpc_worker_names[DistRole.SERVER])
+        return
+      if ctx.is_client():
+        for server_rank in range(ctx.global_rank - ctx.rank):
+          is_avail = False
+          while not is_avail:
+            try:
+              is_avail = rpc_global_request_by_rank(server_rank, rpc.is_available)
+            except:
+              time.sleep(SERVER_INIT_CHECK_INTERVAL)
+          server_name = rpc_global_request_by_rank(server_rank, rpc.get_worker_info).name
+          _rpc_worker_names[DistRole.SERVER].append(server_name)
+        _rpc_current_group_worker_names = set([ctx.group_name + '_' + str(server_rank) for server_rank in range(ctx.world_size)])
+        return
+    
     gathered_results = global_all_gather(
       obj=(ctx.role, ctx.world_size, ctx.rank), timeout=rpc_timeout
     )
@@ -287,7 +325,6 @@ def init_rpc(master_addr: str,
       worker_list[role_rank] = worker_name
       _rpc_worker_names[role] = worker_list
 
-    global _rpc_current_group_worker_names
     _rpc_current_group_worker_names = set(_rpc_worker_names[ctx.role])
 
     global_barrier(timeout=rpc_timeout) 
@@ -468,4 +505,12 @@ def rpc_global_request(target_role: DistRole, role_rank: int,
   arbitrary role group and return the results.
   """
   fut = rpc_global_request_async(target_role, role_rank, func, args, kwargs)
+  return fut.wait()
+
+@_require_initialized
+def rpc_global_request_by_rank(global_rank: int, func, args=None, kwargs=None):
+  r""" Perform a rpc request synchronously to other rpc worker by rank
+  and return the results.
+  """
+  fut = rpc.rpc_async(global_rank, func, args, kwargs)
   return fut.wait()

@@ -23,7 +23,7 @@ from .rpc import init_rpc, shutdown_rpc, rpc_global_request_async, barrier
 
 def init_client(num_servers: int, num_clients: int, client_rank: int,
                 master_addr: str, master_port: int, num_rpc_threads: int = 4,
-                client_group_name: Optional[str] = None):
+                client_group_name: Optional[str] = None, is_dynamic_world_size: bool = False):
   r""" Initialize the current process as a client and establish connections
   with all other servers and clients. Note that this method should be called
   only in the server-client distribution mode.
@@ -44,11 +44,12 @@ def init_client(num_servers: int, num_clients: int, client_rank: int,
     client_group_name (str): A unique name of the client group that current
       process belongs to. If set to ``None``, a default name will be used.
       (Default: ``None``).
+    is_dynamic_world_size (bool): Whether the world size is dynamic. (Default: ``False``).
   """
   _set_client_context(num_servers, num_clients, client_rank, client_group_name)
   # Note that a client RPC agent will never remote requests, thus set the
   # number of rpc threads to ``1`` is enough.
-  init_rpc(master_addr, master_port, num_rpc_threads=num_rpc_threads)
+  init_rpc(master_addr, master_port, num_rpc_threads=num_rpc_threads, is_dynamic_world_size=is_dynamic_world_size)
 
 
 def shutdown_client():
