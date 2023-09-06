@@ -254,7 +254,7 @@ def init_rpc(master_addr: str,
       raise RuntimeError("'init_rpc': Distributed context has not been set.")
 
     options = rpc.TensorPipeRpcBackendOptions(
-      _transports=['uv'],
+      _transports=['ibv', 'uv'],
       _channels=['mpt_uv', 'basic'],
       num_worker_threads=num_rpc_threads,
       rpc_timeout=rpc_timeout,
