@@ -16,12 +16,12 @@
 from .. import py_graphlearn_torch as pywrap
 
 
-def vineyard_to_csr(sock, fid, v_label_name, e_label_name, haseid=0):
+def vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid=0):
   '''
     Wrap to_csr function to read graph from vineyard
     with return (indptr, indices, (Optional)edge_id)
   '''
-  return pywrap.vineyard_to_csr(sock, fid, v_label_name, e_label_name, haseid)
+  return pywrap.vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid)
 
 
 def load_vertex_feature_from_vineyard(sock, fid, vcols, v_label_name):

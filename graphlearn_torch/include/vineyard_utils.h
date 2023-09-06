@@ -24,7 +24,7 @@ limitations under the License.
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
   const std::string& ipc_socket, const std::string& object_id_str,
   const std::string& v_label_name, const std::string& e_label_id_name,
-  bool has_eid);
+  const std::string& edge_dir, bool has_eid);
 
 torch::Tensor LoadVertexFeatures(
   const std::string& ipc_socket, const std::string& object_id_str,

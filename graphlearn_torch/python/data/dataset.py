@@ -151,7 +151,7 @@ class Dataset(object):
     else:
       train_idx, val_idx, test_idx = random_split(self.node_labels.shape[0], num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
-
+  
   def load_vineyard(
     self,
     vineyard_id: str,
@@ -162,10 +162,7 @@ class Dataset(object):
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
   ):
-    
-    # TODO(hongyi): support both 'in' and 'out'
     # TODO(hongyi): GPU support
-
     is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
     from .vineyard_utils import \
       vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
@@ -173,21 +170,25 @@ class Dataset(object):
     edge_index = {}
     edge_ids = {}
     _edge_weights = {}
-
+    layout = {}
     for etype in edges:
-      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, etype[0], etype[1], True)
-      edge_index[etype] = (indptr, indices)
+      src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
+      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
+      edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
       edge_ids[etype] = edge_id
+      layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
       if edge_weights:
         etype_edge_weights_label_name = edge_weights.get(etype)
         if etype_edge_weights_label_name: 
           _edge_weights[etype] = torch.squeeze(
             load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
     if is_homo:
-      edge_index = edge_index[edges[0]]
-      edge_ids = edge_ids[edges[0]]
-      _edge_weights =  _edge_weights.get(edges[0])
-    self.init_graph(edge_index=edge_index, edge_ids=edge_ids, layout='CSR', graph_mode='CPU', edge_weights=_edge_weights)
+      ntype = edges[0]
+      edge_index = edge_index[ntype]
+      edge_ids = edge_ids[ntype]
+      _edge_weights =  _edge_weights.get(ntype)
+      layout = "CSR" if self.edge_dir == "out" else "CSC"
+    self.init_graph(edge_index=edge_index, edge_ids=edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
 
     # load node features
     if node_features:

@@ -48,22 +48,52 @@ protected:
 
 TEST_F(VineyardTest, VineyardTest) {
 
-  torch::Tensor indptr;
-  torch::Tensor indices;
-  torch::Tensor edge_ids;
   grape::InitMPIComm();
   {
     grape::CommSpec comm_spec;
     comm_spec.Init(MPI_COMM_WORLD);
-    std::tie(indptr, indices, edge_ids) = ToCSR(ipc_socket, object_id_str, v_label_name, e_label_name, true);
-    std::cout << "ToCSR" << std::endl;
-    ASSERT_EQ(indptr.numel(), 5);
-    ASSERT_EQ(indptr.dtype(), torch::kLong);
-    // ASSERT_TRUE(torch::all(torch::eq(indptr, torch::tensor({0, 0, 0, 0, 2}, torch::kLong))));
-    ASSERT_EQ(indices.numel(), 2);
-    ASSERT_EQ(indices.dtype(), torch::kLong);
-    ASSERT_EQ(edge_ids.numel(), 2);
-    ASSERT_EQ(edge_ids.dtype(), torch::kLong);
+    torch::Tensor out_indptr;
+    torch::Tensor out_indices;
+    torch::Tensor out_edge_ids;
+    std::tie(out_indptr, out_indices, out_edge_ids) = ToCSR(ipc_socket, object_id_str, v_label_name, e_label_name, "out", true);
+    // std::cout << "ToCSR out" << std::endl;
+    // std::cout << "out_indptr" <<  out_indptr << std::endl;
+    // std::cout << "out_indices" <<  out_indices << std::endl;
+    // std::cout << "out_edge_ids" <<  out_edge_ids << std::endl;
+    
+    torch::Tensor in_indptr;
+    torch::Tensor in_indices;
+    torch::Tensor in_edge_ids;
+    std::tie(in_indptr, in_indices, in_edge_ids) = ToCSR(ipc_socket, object_id_str, v_label_name, e_label_name, "in", true);
+    // std::cout << "ToCSR in" << std::endl;
+    // std::cout << "in_indptr" <<  in_indptr << std::endl;
+    // std::cout << "in_indices" <<  in_indices << std::endl;
+    // std::cout << "in_edge_ids" <<  in_edge_ids << std::endl;
+
+    ASSERT_EQ(out_indptr.numel(), 5);
+    ASSERT_EQ(out_indptr.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(out_indptr, torch::tensor({0, 0, 0, 0, 2}, torch::kLong)));
+    
+    ASSERT_EQ(out_indices.numel(), 2);
+    ASSERT_EQ(out_indices.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(out_indices, torch::tensor({0, 2}, torch::kLong)));
+    
+    ASSERT_EQ(out_edge_ids.numel(), 2);
+    ASSERT_EQ(out_edge_ids.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(out_edge_ids, torch::tensor({0, 1}, torch::kLong)));
+    
+    ASSERT_EQ(in_indptr.numel(), 5);
+    ASSERT_EQ(in_indptr.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(in_indptr, torch::tensor({0, 1, 1, 2, 2}, torch::kLong)));
+    
+    ASSERT_EQ(in_indices.numel(), 2);
+    ASSERT_EQ(in_indices.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(in_indices, torch::tensor({3, 3}, torch::kLong)));
+    
+    ASSERT_EQ(in_edge_ids.numel(), 2);
+    ASSERT_EQ(in_edge_ids.dtype(), torch::kLong);
+    ASSERT_TRUE(torch::allclose(in_edge_ids, torch::tensor({0, 1}, torch::kLong)));
+
 
     auto vfeat_1 = LoadVertexFeatures(ipc_socket, object_id_str, v_label_name, vcols_1);
     ASSERT_EQ(vfeat_1.sizes(), torch::IntArrayRef({4, 1}));
