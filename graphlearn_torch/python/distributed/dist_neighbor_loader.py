@@ -17,8 +17,9 @@ from typing import Optional, Literal, List
 
 import torch
 
-from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig, RemoteNodeSamplerInput
-from ..typing import InputNodes, NumNeighbors
+from ..sampler import NodeSamplerInput, SamplingType, SamplingConfig, \
+    RemoteNodeSplitSamplerInput, RemoteNodePathSamplerInput
+from ..typing import InputNodes, NumNeighbors, Split
 
 from .dist_dataset import DistDataset
 from .dist_options import AllDistSamplingWorkerOptions, RemoteDistSamplingWorkerOptions
@@ -90,12 +91,16 @@ class DistNeighborLoader(DistLoader):
       input_type, input_seeds = None, input_nodes
 
     if isinstance(worker_options, RemoteDistSamplingWorkerOptions):
-      if isinstance(input_seeds, List):
+      if isinstance(input_seeds, Split):
+        input_data = RemoteNodeSplitSamplerInput(split=input_seeds, input_type=input_type)
+        if isinstance(worker_options.server_rank, List):
+          input_data = [input_data] * len(worker_options.server_rank)
+      elif isinstance(input_seeds, List):
         input_data = []
         for elem in input_seeds:
-          input_data.append(RemoteNodeSamplerInput(node_path=elem, input_type=input_type))
+          input_data.append(RemoteNodePathSamplerInput(node_path=elem, input_type=input_type))
       elif isinstance(input_seeds, str):
-        input_data = RemoteNodeSamplerInput(node_path=input_seeds, input_type=input_type)
+        input_data = RemoteNodePathSamplerInput(node_path=input_seeds, input_type=input_type)
       else:
         raise ValueError("Invalid input seeds")
     else:

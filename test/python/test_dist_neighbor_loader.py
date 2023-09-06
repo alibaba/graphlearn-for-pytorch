@@ -305,6 +305,10 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.dataset0 = _prepare_dataset(rank=0)
     self.dataset1 = _prepare_dataset(rank=1)
 
+    # all for train
+    self.dataset0.random_node_split(0, 0)
+    self.dataset1.random_node_split(0, 0)
+    
     self.input_nodes0 = torch.arange(vnum_per_partition)
     self.input_nodes1 = torch.arange(vnum_per_partition) + vnum_per_partition
 
@@ -445,21 +449,26 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     w1.join()
 
   @parameterized.expand([
-    ([[0],[1]], 2, 2),
-    ([[0, 1]], 1, 2),
-    ([[0, 1], [0, 1]], 2, 2),
+    ([[0],[1]], 2, 2, "file_path"),
+    ([[0, 1]], 1, 2, "file_path"),
+    ([[0, 1], [0, 1]], 2, 2, "file_path"),
+    ([[0],[1]], 2, 2, "split"),
+    ([[0, 1]], 1, 2, "split"),
+    ([[0, 1], [0, 1]], 2, 2, "split"),
   ])
-  def test_remote_mode(self, servers_for_clients, num_clients, num_servers):
+  def test_remote_mode(self, servers_for_clients, num_clients, num_servers, input_nodes_type):
     print("\n--- DistNeighborLoader Test (server-client mode, remote) ---")
     print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
     for client_rank, servers in enumerate(servers_for_clients):
       print(f'[Client {client_rank}] will connect servers {servers}')
+    print(f"--- input_nodes_type: {input_nodes_type} ---")
 
     self.dataset_list = [self.dataset0, self.dataset1]
-    self.input_nodes_list = [self.input_nodes0_path, self.input_nodes1_path]
+    # self.input_nodes_list = [self.input_nodes0, self.input_nodes1]
+    self.input_nodes_path_list = [self.input_nodes0_path, self.input_nodes1_path]
 
     mp_context = torch.multiprocessing.get_context('spawn')
-
+          
     server_procs = []
     for server_rank in range(num_servers):
       server_procs.append(mp_context.Process(
@@ -470,10 +479,15 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     client_procs = []
     for client_rank in range(num_clients):
       server_rank_list = servers_for_clients[client_rank]
+      if input_nodes_type == "split":
+        input_nodes = glt.typing.Split.train
+      elif input_nodes_type == "file_path":
+        input_nodes = [self.input_nodes_path_list[server_rank] for server_rank in server_rank_list]
+
       client_procs.append(mp_context.Process(
         target=run_test_as_client,
-        args=(num_servers, num_clients, client_rank, server_rank_list, self.master_port, self.sampling_master_port,
-            [self.input_nodes_list[server_rank] for server_rank in server_rank_list], _check_sample_result)
+        args=(num_servers, num_clients, client_rank, server_rank_list, self.master_port, 
+            self.sampling_master_port, input_nodes, _check_sample_result)
       ))
     for sproc in server_procs:
       sproc.start()
