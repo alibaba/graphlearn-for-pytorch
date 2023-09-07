@@ -171,12 +171,13 @@ def _set_client_context(num_servers: int, num_clients: int, client_rank: int,
   )
   assign_server_by_order()
 
-def assign_server_by_order() -> List[int]:
+def assign_server_by_order():
   r"""Assign servers to each client in turn.
   e.g. 2 clients and 4 servers, then the assignment is: {0: [0, 1], 1: [2, 3]},
   5 clients and 2 servers, then the assignment is: {0: [0], 1: [1], 2: [0], 3: [1], 4: [0]}."""
-  assert _dist_context is not None and _dist_context.is_client()
-  client_num, server_num = _dist_context.world_size, _dist_context.global_world_size - _dist_context.world_size
+  ctx = get_context()
+  assert ctx is not None and ctx.is_client()
+  client_num, server_num = ctx.world_size, ctx.global_world_size - ctx.world_size
   global _clients_to_servers
   _clients_to_servers = {}
   cur_server = 0
@@ -192,6 +193,7 @@ def assign_server_by_order() -> List[int]:
     if len(_clients_to_servers[i]) == 0:
       _clients_to_servers[i].append(cur_server)
       cur_server = (cur_server + 1) % server_num
+  return _clients_to_servers[ctx.rank]
 
 
 def init_worker_group(world_size: int, rank: int,

@@ -20,7 +20,7 @@ import torch
 
 from ..utils import assign_device
 
-from .dist_context import DistContext
+from .dist_context import DistContext, assign_server_by_order
 
 
 class _BasicDistSamplingWorkerOptions(object):
@@ -244,8 +244,10 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                worker_key: str = None):
     super().__init__(num_workers, worker_devices, worker_concurrency,
                      master_addr, master_port, num_rpc_threads, rpc_timeout)
-
-    self.server_rank = server_rank
+    if server_rank is not None:
+      self.server_rank = server_rank
+    else:
+      self.server_rank = assign_server_by_order()
     self.buffer_capacity = self.num_workers * self.worker_concurrency
     if buffer_size is None:
       self.buffer_size = f'{self.num_workers * 64}MB'

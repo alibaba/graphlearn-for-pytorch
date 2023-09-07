@@ -46,6 +46,8 @@ def init_client(num_servers: int, num_clients: int, client_rank: int,
       (Default: ``None``).
     is_dynamic_world_size (bool): Whether the world size is dynamic. (Default: ``False``).
   """
+  if client_group_name:
+    client_group_name = client_group_name.replace('-', '_')
   _set_client_context(num_servers, num_clients, client_rank, client_group_name)
   # Note that a client RPC agent will never remote requests, thus set the
   # number of rpc threads to ``1`` is enough.

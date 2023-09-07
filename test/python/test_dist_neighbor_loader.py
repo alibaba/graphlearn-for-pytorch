@@ -23,7 +23,7 @@ import graphlearn_torch as glt
 from dist_test_utils import *
 from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
 from parameterized import parameterized
-from typing import List
+from typing import List, Optional
 
 def _check_sample_result(data, edge_dir):
   tc = unittest.TestCase()
@@ -236,9 +236,10 @@ def run_test_as_server(num_servers: int, num_clients: int, server_rank: List[int
   print(f'[Server {server_rank}] Exited ...')
 
 
-def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, server_rank: List[int],
+def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, server_rank: Optional[List[int]],
                        master_port: int, sampling_master_port: int,
-                       input_nodes: glt.InputNodes, check_fn, edge_dir='out', is_dynamic_world_size: bool = False):
+                       input_nodes: glt.InputNodes, check_fn, edge_dir='out',
+                       is_dynamic_world_size: bool = False):
     print(f'[Client {client_rank}] Initializing client ...')
     glt.distributed.init_client(
       num_servers=num_servers,
@@ -254,7 +255,7 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, ser
     print(f'[Client {client_rank}] Creating DistNeighborLoader ...')
     
     options = glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=server_rank,
+      server_rank=server_rank if not server_rank else None, # if auto assign server
       num_workers=sampling_nprocs,
       worker_devices=[torch.device('cuda', i % device_num)
                       for i in range(sampling_nprocs)],
@@ -459,8 +460,6 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
   def test_remote_mode(self, servers_for_clients, num_clients, num_servers, input_nodes_type):
     print("\n--- DistNeighborLoader Test (server-client mode, remote) ---")
     print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
-    for client_rank, servers in enumerate(servers_for_clients):
-      print(f'[Client {client_rank}] will connect servers {servers}')
     print(f"--- input_nodes_type: {input_nodes_type} ---")
 
     self.dataset_list = [self.dataset0, self.dataset1]
@@ -507,8 +506,6 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
   def test_remote_mode_dynamic_world_size(self, servers_for_clients, num_clients, num_servers):
     print("\n--- DistNeighborLoader Test (server-client mode, remote, dynamic world size) ---")
     print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
-    # for client_rank, servers in enumerate(servers_for_clients):
-    #   print(f'[Client {client_rank}] will connect servers {servers}')
 
     self.dataset_list = [self.dataset0, self.dataset1]
     self.input_nodes_list = [self.input_nodes0_path, self.input_nodes1_path]
@@ -529,6 +526,43 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
         target=run_test_as_client,
         args=(num_servers, num_clients, client_rank, server_rank_list, self.master_port, self.sampling_master_port,
             [self.input_nodes_list[server_rank] for server_rank in server_rank_list], _check_sample_result, 'out', True)
+      ))
+    for sproc in server_procs:
+      sproc.start()
+    for cproc in client_procs:
+      cproc.start()
+    
+    for sproc in server_procs:
+      sproc.join()
+    for cproc in client_procs:
+      cproc.join()
+      
+  @parameterized.expand([
+    (2, 2),
+    (1, 2)
+  ])
+  def test_remote_mode_auto_assign_server(self, num_clients, num_servers):
+    print("\n--- DistNeighborLoader Test (server-client mode, remote, dynamic world size) ---")
+    print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
+
+    self.dataset_list = [self.dataset0, self.dataset1]
+    self.input_nodes_list = [self.input_nodes0_path, self.input_nodes1_path]
+
+    mp_context = torch.multiprocessing.get_context('spawn')
+
+    server_procs = []
+    for server_rank in range(num_servers):
+      server_procs.append(mp_context.Process(
+        target=run_test_as_server,
+        args=(num_servers, 0, server_rank, self.master_port, self.dataset_list[server_rank], True)
+      ))
+
+    client_procs = []
+    for client_rank in range(num_clients):
+      client_procs.append(mp_context.Process(
+        target=run_test_as_client,
+        args=(num_servers, num_clients, client_rank, None, self.master_port, self.sampling_master_port,
+            [self.input_nodes_list[server_rank] for server_rank in range(num_servers)], _check_sample_result, 'out', True)
       ))
     for sproc in server_procs:
       sproc.start()

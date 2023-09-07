@@ -208,6 +208,8 @@ def init_server(num_servers: int, server_rank: int, dataset: DistDataset,
       (Default: ``None``).
     is_dynamic_world_size (bool): Whether the world size is dynamic. (Default: ``False``).
   """
+  if server_group_name:
+    server_group_name = server_group_name.replace('-', '_')
   _set_server_context(num_servers, server_rank, server_group_name, num_clients)
   global _dist_server
   _dist_server = DistServer(dataset=dataset)

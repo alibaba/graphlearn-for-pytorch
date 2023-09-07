@@ -27,6 +27,7 @@ from torch.distributed import rpc
 from .dist_context import DistRole, get_context
 
 SERVER_INIT_CHECK_INTERVAL = 3.0
+MAX_RETYR_TIMES = 60
 
 _rpc_init_lock = threading.RLock()
 
@@ -285,24 +286,35 @@ def init_rpc(master_addr: str,
           if server_rank == ctx.rank:
             _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
             continue
-          
+          times = 0
           is_avail = False
           while not is_avail:
             try:
               is_avail = rpc_global_request_by_rank(server_rank, rpc.is_available)
             except:
               time.sleep(SERVER_INIT_CHECK_INTERVAL)
+              logging.info(f"RETRY {times}: client {ctx.rank} waits server {server_rank}...")
+            times += 1
+            if times >= MAX_RETYR_TIMES:
+              raise RuntimeError(f"TIMEOUT: server {ctx.rank} waits server {server_rank} timeout. "
+                                 f"Check if the server {server_rank} is ready.")
           _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
         _rpc_current_group_worker_names = set(_rpc_worker_names[DistRole.SERVER])
         return
       if ctx.is_client():
         for server_rank in range(ctx.global_rank - ctx.rank):
+          times = 0
           is_avail = False
           while not is_avail:
             try:
               is_avail = rpc_global_request_by_rank(server_rank, rpc.is_available)
             except:
               time.sleep(SERVER_INIT_CHECK_INTERVAL)
+              logging.info(f"RETRY {times}: client {ctx.rank} waits server {server_rank}...")
+            times += 1
+            if times >= MAX_RETYR_TIMES:
+              raise RuntimeError(f"TIMEOUT: client {ctx.rank} waits server {server_rank} timeout. "
+                                 f"Check if the server {server_rank} is ready.")
           server_name = rpc_global_request_by_rank(server_rank, rpc.get_worker_info).name
           _rpc_worker_names[DistRole.SERVER].append(server_name)
         _rpc_current_group_worker_names = set([ctx.group_name + '_' + str(server_rank) for server_rank in range(ctx.world_size)])
