@@ -296,7 +296,7 @@ def init_rpc(master_addr: str,
               logging.info(f"RETRY {times}: server {ctx.rank} waits server {server_rank}...")
             times += 1
             if times >= MAX_RETYR_TIMES:
-              raise RuntimeError(f"TIMEOUT: server {ctx.rank} waits server {server_rank} timeout. "
+              raise RuntimeError(f"TIMEOUT: server {ctx.rank} waits server {server_rank} timeout."
                                  f"Check if server {server_rank} is ready.")
           _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
         _rpc_current_group_worker_names = set(_rpc_worker_names[DistRole.SERVER])
@@ -313,7 +313,7 @@ def init_rpc(master_addr: str,
               logging.info(f"RETRY {times}: client {ctx.rank} waits server {server_rank}...")
             times += 1
             if times >= MAX_RETYR_TIMES:
-              raise RuntimeError(f"TIMEOUT: client {ctx.rank} waits server {server_rank} timeout. "
+              raise RuntimeError(f"TIMEOUT: client {ctx.rank} waits server {server_rank} timeout."
                                  f"Check if server {server_rank} is ready.")
           server_name = rpc_global_request_by_rank(server_rank, rpc.get_worker_info).name
           _rpc_worker_names[DistRole.SERVER].append(server_name)
