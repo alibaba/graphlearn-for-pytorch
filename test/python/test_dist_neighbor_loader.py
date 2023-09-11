@@ -328,6 +328,7 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.in_hetero_input_nodes1 = (item_ntype, self.input_nodes1)
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
+    time.sleep(1)
 
   def tearDown(self):
     for file_path in [self.input_nodes0_path, self.input_nodes1_path]:
