@@ -214,15 +214,17 @@ if __name__ == '__main__':
                                   args.num_classes==2983)
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
-  glt_dataset.init_graph(
-    edge_index=igbh_dataset.edge_dict,
-    graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
-  )
 
   glt_dataset.init_node_features(
     node_feature_data=igbh_dataset.feat_dict,
     with_gpu=True
   )
+
+  glt_dataset.init_graph(
+    edge_index=igbh_dataset.edge_dict,
+    graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
+  )
+
   glt_dataset.init_node_labels(node_label_data={'paper': igbh_dataset.label})
 
   train_idx = igbh_dataset.train_idx.share_memory_()
