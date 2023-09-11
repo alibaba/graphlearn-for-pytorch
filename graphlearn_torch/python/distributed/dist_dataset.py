@@ -200,6 +200,46 @@ class DistDataset(Dataset):
       train_idx, val_idx, test_idx = random_split(indices, num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
 
+  def load_vineyard(
+    self,
+    vineyard_id: str,
+    vineyard_socket: str,
+    edges: List[EdgeType],
+    edge_weights: Dict[EdgeType, str] = None,
+    node_features: Dict[NodeType, List[str]] = None,
+    edge_features: Dict[EdgeType, List[str]] = None,
+    node_labels: Dict[NodeType, str] = None,
+  ):
+    # TODO(hongyi): to support more than one partitions
+    super().load_vineyard(vineyard_id=vineyard_id, vineyard_socket=vineyard_socket, 
+                          edges=edges, edge_weights=edge_weights, node_features=node_features, 
+                          edge_features=edge_features, node_labels=node_labels,)
+    if isinstance(self.graph, dict):
+      # hetero
+      self.node_pb = {}
+      self.edge_pb = {}
+      for etype, graph in self.graph.items():
+        self.node_pb[etype[0]] = torch.zeros(graph.row_count)
+        self.edge_pb[etype] = torch.zeros(graph.edge_count)
+
+      self._node_feat_pb = {}
+      if node_features:
+        for ntype, nfeat in self.node_features.items():
+          self._node_feat_pb[ntype] = torch.zeros(nfeat.shape[0])
+    
+      self._edge_feat_pb = {}
+      if edge_features:
+        for etype, efeat in self.edge_features.items():
+          self._edge_feat_pb[etype] = torch.zeros(efeat.shape[0])
+    else:
+      # homo
+      self.node_pb = torch.zeros(self.graph.row_count)
+      self.edge_pb = torch.zeros(self.graph.edge_count)
+      if node_features:
+        self._node_feat_pb = torch.zeros(self.node_features.shape[0])
+      if edge_features:
+        self._edge_feat_pb = torch.zeros(self.edge_features.shape[0])
+
   def share_ipc(self):
     super().share_ipc()
     self.node_pb = share_memory(self.node_pb)

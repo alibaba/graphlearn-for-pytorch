@@ -151,6 +151,77 @@ class Dataset(object):
     else:
       train_idx, val_idx, test_idx = random_split(self.node_labels.shape[0], num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
+  
+  def load_vineyard(
+    self,
+    vineyard_id: str,
+    vineyard_socket: str,
+    edges: List[EdgeType],
+    edge_weights: Dict[EdgeType, str] = None,
+    node_features: Dict[NodeType, List[str]] = None,
+    edge_features: Dict[EdgeType, List[str]] = None,
+    node_labels: Dict[NodeType, str] = None,
+  ):
+    # TODO(hongyi): GPU support
+    is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
+    from .vineyard_utils import \
+      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
+
+    _edge_index = {}
+    _edge_ids = {}
+    _edge_weights = {}
+    layout = {}
+    for etype in edges:
+      src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
+      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
+      _edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
+      _edge_ids[etype] = edge_id
+      layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
+      if edge_weights:
+        etype_edge_weights_label_name = edge_weights.get(etype)
+        if etype_edge_weights_label_name: 
+          _edge_weights[etype] = torch.squeeze(
+            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
+    if is_homo:
+      ntype = edges[0]
+      _edge_index = _edge_index[ntype]
+      _edge_ids = _edge_ids[ntype]
+      _edge_weights =  _edge_weights.get(ntype)
+      layout = "CSR" if self.edge_dir == "out" else "CSC"
+    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
+
+    # load node features
+    if node_features:
+      node_feature_data = {}
+      for ntype, property_names in node_features.items():
+        node_feature_data[ntype] = \
+          load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, ntype)
+      if is_homo:
+        node_feature_data = node_feature_data[edges[0][0]]
+      self.init_node_features(node_feature_data=node_feature_data, with_gpu=False)
+    
+    # load edge features
+    if edge_features:
+      edge_feature_data = {}
+      if isinstance(edge_features, tuple):
+        edge_features = edge_features[0]
+      for etype, property_names in edge_features.items():
+        edge_feature_data[etype] = \
+          load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, etype[1])
+      if is_homo:
+        edge_feature_data = edge_feature_data[edges[0]]
+      self.init_edge_features(edge_feature_data=edge_feature_data, with_gpu=False)
+    
+    # load node labels
+    if node_labels:
+      node_label_data = {}
+      for ntype, label_property_name in node_labels.items():
+        node_label_data[ntype] = \
+          load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, [label_property_name], ntype)
+
+      if is_homo:
+        node_label_data = node_label_data[edges[0][0]]
+      self.init_node_labels(node_label_data=node_label_data)
 
   def init_node_features(
     self,
