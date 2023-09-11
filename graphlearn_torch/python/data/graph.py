@@ -50,14 +50,20 @@ class Topology(object):
                edge_weights: Optional[TensorDataType] = None,
                input_layout: str = 'COO',
                layout: Literal['CSR', 'CSC'] = 'CSR'):
-    input_layout = str(input_layout).upper()
-    if input_layout not in ['COO', 'CSR', 'CSC']:
-      raise RuntimeError(f"'{self.__class__.__name__}': got "
-                         f"invalid edge layout {input_layout}")
-
+    
     edge_index = convert_to_tensor(edge_index, dtype=torch.int64)
     row, col = edge_index[0], edge_index[1]
-    num_edges = max(row.numel(), col.numel())
+    input_layout = str(input_layout).upper()
+    if input_layout == 'COO':
+        assert row.numel() == col.numel()
+        num_edges = row.numel()
+    elif input_layout == 'CSR':
+        num_edges = col.numel()
+    elif input_layout == 'CSC':
+        num_edges = row.numel()
+    else:
+      raise RuntimeError(f"'{self.__class__.__name__}': got "
+                         f"invalid edge layout {input_layout}")
 
     edge_ids = convert_to_tensor(edge_ids, dtype=torch.int64)
     if edge_ids is None:

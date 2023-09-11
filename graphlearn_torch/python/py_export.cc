@@ -55,13 +55,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
   m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
 #endif
-
-  py::enum_<DataType>(m, "DataType")
-    .value("Int32", DataType::Int32)
-    .value("Int64", DataType::Int64)
-    .value("Float32", DataType::Float32)
-    .value("Float64", DataType::Float64);
-
   py::enum_<GraphMode>(m, "GraphMode")
     .value("DMA", GraphMode::DMA)
     .value("ZERO_COPY", GraphMode::ZERO_COPY);
