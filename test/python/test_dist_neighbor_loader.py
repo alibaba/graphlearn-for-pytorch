@@ -215,7 +215,7 @@ def run_test_as_worker(world_size: int, rank: int,
 
 
 def run_test_as_server(num_servers: int, num_clients: int, server_rank: List[int],
-                       master_port: int, dataset: glt.distributed.DistDataset, is_dynamic_world_size: bool = False):
+                       master_port: int, dataset: glt.distributed.DistDataset, is_dynamic: bool = False):
   print(f'[Server {server_rank}] Initializing server ...')
   glt.distributed.init_server(
     num_servers=num_servers,
@@ -227,7 +227,7 @@ def run_test_as_server(num_servers: int, num_clients: int, server_rank: List[int
     request_timeout=30,
     num_rpc_threads=2,
     server_group_name='dist_remote_sampling_test_server',
-    is_dynamic_world_size=is_dynamic_world_size
+    is_dynamic=is_dynamic
   )
 
   print(f'[Server {server_rank}] Waiting for exit ...')
@@ -239,7 +239,7 @@ def run_test_as_server(num_servers: int, num_clients: int, server_rank: List[int
 def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, server_rank: Optional[List[int]],
                        master_port: int, sampling_master_port: int,
                        input_nodes: glt.InputNodes, check_fn, edge_dir='out',
-                       is_dynamic_world_size: bool = False):
+                       is_dynamic: bool = False):
     print(f'[Client {client_rank}] Initializing client ...')
     glt.distributed.init_client(
       num_servers=num_servers,
@@ -249,13 +249,14 @@ def run_test_as_client(num_servers: int, num_clients: int, client_rank: int, ser
       master_port=master_port,
       num_rpc_threads=1,
       client_group_name='dist_remote_sampling_test_client',
-      is_dynamic_world_size=is_dynamic_world_size
+      is_dynamic=is_dynamic
     )
 
     print(f'[Client {client_rank}] Creating DistNeighborLoader ...')
     
     options = glt.distributed.RemoteDistSamplingWorkerOptions(
-      server_rank=server_rank if not server_rank else None, # if auto assign server
+      # Automatically assign server_rank (server_rank_list) if server_rank (server_rank_list) is None
+      server_rank=server_rank,
       num_workers=sampling_nprocs,
       worker_devices=[torch.device('cuda', i % device_num)
                       for i in range(sampling_nprocs)],
@@ -516,6 +517,7 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     for server_rank in range(num_servers):
       server_procs.append(mp_context.Process(
         target=run_test_as_server,
+        # set `num_clients`=0 because this arg is not used in server-client mode with dynamic world size feature(`is_dynamic`=True).
         args=(num_servers, 0, server_rank, self.master_port, self.dataset_list[server_rank], True)
       ))
 
@@ -554,6 +556,7 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     for server_rank in range(num_servers):
       server_procs.append(mp_context.Process(
         target=run_test_as_server,
+        # set `num_clients`=0 because this arg is not used in server-client mode with dynamic world size feature(`is_dynamic`=True).
         args=(num_servers, 0, server_rank, self.master_port, self.dataset_list[server_rank], True)
       ))
 
@@ -561,6 +564,7 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     for client_rank in range(num_clients):
       client_procs.append(mp_context.Process(
         target=run_test_as_client,
+        # set `server_rank`=None to test assign server rank automatically.
         args=(num_servers, num_clients, client_rank, None, self.master_port, self.sampling_master_port,
             [self.input_nodes_list[server_rank] for server_rank in range(num_servers)], _check_sample_result, 'out', True)
       ))

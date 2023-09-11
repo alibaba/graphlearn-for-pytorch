@@ -137,7 +137,7 @@ def _role_based_broadcast_to_followers(sequence_id, objects_map):
 def all_gather(obj, timeout=None):
   r""" Gathers objects only from the current role group in a list. This
   function blocks until all workers in the current role group have received
-  the gathered results. The implementation of this methid is refer to
+  the gathered results. The implementation of this method is refer to
   ``torch.distributed.rpc.api._all_gather``.
   """
   assert (
@@ -241,7 +241,7 @@ def init_rpc(master_addr: str,
              master_port: int,
              num_rpc_threads: int = 16,
              rpc_timeout: float = 180,
-             is_dynamic_world_size: bool = False):
+             is_dynamic: bool = False):
   r""" Initialize rpc on the current process.
   """
   with _rpc_init_lock:
@@ -265,7 +265,7 @@ def init_rpc(master_addr: str,
     rpc.init_rpc(
       name=ctx.worker_name,
       rank=ctx.global_rank,
-      world_size=None if is_dynamic_world_size else ctx.global_world_size,
+      world_size=None if is_dynamic else ctx.global_world_size,
       rpc_backend_options=options
     )
 
@@ -276,7 +276,7 @@ def init_rpc(master_addr: str,
     global _rpc_worker_names
     _rpc_worker_names = {}
     
-    if is_dynamic_world_size:
+    if is_dynamic:
       _rpc_worker_names[DistRole.SERVER] = []
       _rpc_worker_names[DistRole.CLIENT] = [] 
      
@@ -293,11 +293,11 @@ def init_rpc(master_addr: str,
               is_avail = rpc_global_request_by_rank(server_rank, rpc.is_available)
             except:
               time.sleep(SERVER_INIT_CHECK_INTERVAL)
-              logging.info(f"RETRY {times}: client {ctx.rank} waits server {server_rank}...")
+              logging.info(f"RETRY {times}: server {ctx.rank} waits server {server_rank}...")
             times += 1
             if times >= MAX_RETYR_TIMES:
               raise RuntimeError(f"TIMEOUT: server {ctx.rank} waits server {server_rank} timeout. "
-                                 f"Check if the server {server_rank} is ready.")
+                                 f"Check if server {server_rank} is ready.")
           _rpc_worker_names[DistRole.SERVER].append(ctx.group_name + '_' + str(server_rank))
         _rpc_current_group_worker_names = set(_rpc_worker_names[DistRole.SERVER])
         return
@@ -314,10 +314,10 @@ def init_rpc(master_addr: str,
             times += 1
             if times >= MAX_RETYR_TIMES:
               raise RuntimeError(f"TIMEOUT: client {ctx.rank} waits server {server_rank} timeout. "
-                                 f"Check if the server {server_rank} is ready.")
+                                 f"Check if server {server_rank} is ready.")
           server_name = rpc_global_request_by_rank(server_rank, rpc.get_worker_info).name
           _rpc_worker_names[DistRole.SERVER].append(server_name)
-        _rpc_current_group_worker_names = set([ctx.group_name + '_' + str(server_rank) for server_rank in range(ctx.world_size)])
+        _rpc_current_group_worker_names = set([ctx.group_name + '_' + str(client_rank) for client_rank in range(ctx.world_size)])
         return
     
     gathered_results = global_all_gather(

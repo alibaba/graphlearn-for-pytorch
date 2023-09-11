@@ -208,8 +208,9 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
   produced by those remote sampling workers and consumed by the current process.
 
   Args:
-    server_rank (int): The rank of server to launch sampling workers. If set
-      to ``None``, it will be automatically assigned. (default: ``None``).
+    server_rank (int or List[int], optional): The rank of server to launch
+      sampling workers, can be multiple. If set to ``None``, it will be 
+      automatically assigned. (default: ``None``).
     num_workers (int): How many workers to launch on the remote server for
       distributed neighbor sampling of the current process. (default: ``1``).
     worker_devices (torch.device or List[torch.device], optional): List of
@@ -231,7 +232,7 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       the client side. (default: ``4``).
   """
   def __init__(self,
-               server_rank: Optional[int] = None,
+               server_rank: Optional[Union[int, List[int]]] = None,
                num_workers: int = 1,
                worker_devices: Optional[List[torch.device]] = None,
                worker_concurrency: int = 4,

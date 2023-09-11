@@ -180,7 +180,7 @@ def get_server() -> DistServer:
 def init_server(num_servers: int, server_rank: int, dataset: DistDataset,
                 master_addr: str, master_port: int, num_clients: int = 0,
                 num_rpc_threads: int = 16, request_timeout: int = 180,
-                server_group_name: Optional[str] = None, is_dynamic_world_size: bool = False):
+                server_group_name: Optional[str] = None, is_dynamic: bool = False):
   r""" Initialize the current process as a server and establish connections
   with all other servers and clients. Note that this method should be called
   only in the server-client distribution mode.
@@ -198,7 +198,7 @@ def init_server(num_servers: int, server_rank: int, dataset: DistDataset,
       servers and clients, the value of this parameter should be same for all
       servers and clients.
     num_clients (int): Number of processes participating in the client group.
-      if ``is_dynamic_world_size`` is ``True``, this parameter will be ignored.
+      if ``is_dynamic`` is ``True``, this parameter will be ignored.
     num_rpc_threads (int): The number of RPC worker threads used for the
       current server to respond remote requests. (Default: ``16``).
     request_timeout (int): The max timeout seconds for remote requests,
@@ -206,14 +206,14 @@ def init_server(num_servers: int, server_rank: int, dataset: DistDataset,
     server_group_name (str): A unique name of the server group that current
       process belongs to. If set to ``None``, a default name will be used.
       (Default: ``None``).
-    is_dynamic_world_size (bool): Whether the world size is dynamic. (Default: ``False``).
+    is_dynamic (bool): Whether the world size is dynamic. (Default: ``False``).
   """
   if server_group_name:
     server_group_name = server_group_name.replace('-', '_')
   _set_server_context(num_servers, server_rank, server_group_name, num_clients)
   global _dist_server
   _dist_server = DistServer(dataset=dataset)
-  init_rpc(master_addr, master_port, num_rpc_threads, request_timeout, is_dynamic_world_size=is_dynamic_world_size)
+  init_rpc(master_addr, master_port, num_rpc_threads, request_timeout, is_dynamic=is_dynamic)
 
 
 def wait_and_shutdown_server():
