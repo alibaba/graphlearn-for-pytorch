@@ -98,10 +98,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
 
   for (auto v: iv) {
     if (edge_dir == "out") {
-      auto oe = vineyard_graph->GetOutgoingAdjList(v, e_label_id);
+      auto oe = vineyard_graph->GetOutgoingRawAdjList(v, e_label_id);
       indice_len += oe.Size();
     } else {
-      auto oe = vineyard_graph->GetIncomingAdjList(v, e_label_id);
+      auto oe = vineyard_graph->GetIncomingRawAdjList(v, e_label_id);
       indice_len += oe.Size();
     }
   }

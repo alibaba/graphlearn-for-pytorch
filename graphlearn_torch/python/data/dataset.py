@@ -167,15 +167,15 @@ class Dataset(object):
     from .vineyard_utils import \
       vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
 
-    edge_index = {}
-    edge_ids = {}
+    _edge_index = {}
+    _edge_ids = {}
     _edge_weights = {}
     layout = {}
     for etype in edges:
       src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
       indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
-      edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
-      edge_ids[etype] = edge_id
+      _edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
+      _edge_ids[etype] = edge_id
       layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
       if edge_weights:
         etype_edge_weights_label_name = edge_weights.get(etype)
@@ -184,11 +184,11 @@ class Dataset(object):
             load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
     if is_homo:
       ntype = edges[0]
-      edge_index = edge_index[ntype]
-      edge_ids = edge_ids[ntype]
+      _edge_index = _edge_index[ntype]
+      _edge_ids = _edge_ids[ntype]
       _edge_weights =  _edge_weights.get(ntype)
       layout = "CSR" if self.edge_dir == "out" else "CSC"
-    self.init_graph(edge_index=edge_index, edge_ids=edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
+    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
 
     # load node features
     if node_features:
