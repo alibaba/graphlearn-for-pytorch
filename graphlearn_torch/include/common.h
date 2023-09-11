@@ -20,14 +20,7 @@ limitations under the License.
 
 namespace graphlearn_torch
 {
-
-enum class DataType {
-  Int32 = 0,
-  Int64 = 1,
-  Float32 = 2,
-  Float64 = 3
-};
-
+  
 inline void Check(bool val, const char* err_msg) {
   if (val) { return; }
   throw std::runtime_error(err_msg);

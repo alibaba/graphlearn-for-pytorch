@@ -23,6 +23,13 @@ def ext_module(
     include_dirs.append('/usr/local/cuda' + '/include')
     library_dirs.append('/usr/local/cuda' + 'lib64')
   if with_vineyard:
+
+    # in graphscope environment
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard')
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard/contrib')
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include')
+    # include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
+
     include_dirs.append('/usr/local/include')
     include_dirs.append('/usr/local/include' + '/glog')
     include_dirs.append('/usr/local/include' + '/gflags')
@@ -30,6 +37,8 @@ def ext_module(
     include_dirs.append('/usr/local/include' + '/vineyard/contrib')
     include_dirs.append('/home/pai/include')
 
+    library_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/lib')
+    
     library_dirs.append('/usr/local/lib')
     library_dirs.append('/home/pai/lib')
 
@@ -42,7 +51,7 @@ def ext_module(
     libraries.append('vineyard_io')
 
   extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
-  extra_cxx_flags.append('-std=gnu++14')
+  extra_cxx_flags.append('-std=c++17')
 
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export.cc')]
 

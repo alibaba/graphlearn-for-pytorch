@@ -139,6 +139,10 @@ if(BUILD_TESTS)
     file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_*.cu)
   endif()
 
+  if (WITH_VINEYARD)
+    file(GLOB GLT_TEST_FILES ${GLT_CTEST_DIR}/test_vineyard.cc)
+  endif()
+
   foreach(t ${GLT_TEST_FILES})
     get_filename_component(name ${t} NAME_WE)
     glt_add_test(${name} ${t})
