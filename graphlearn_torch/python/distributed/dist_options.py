@@ -20,7 +20,7 @@ import torch
 
 from ..utils import assign_device
 
-from .dist_context import DistContext
+from .dist_context import DistContext, assign_server_by_order
 
 
 class _BasicDistSamplingWorkerOptions(object):
@@ -208,8 +208,9 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
   produced by those remote sampling workers and consumed by the current process.
 
   Args:
-    server_rank (int): The rank of server to launch sampling workers. If set
-      to ``None``, it will be automatically assigned. (default: ``None``).
+    server_rank (int or List[int], optional): The rank of server to launch
+      sampling workers, can be multiple. If set to ``None``, it will be 
+      automatically assigned. (default: ``None``).
     num_workers (int): How many workers to launch on the remote server for
       distributed neighbor sampling of the current process. (default: ``1``).
     worker_devices (torch.device or List[torch.device], optional): List of
@@ -231,7 +232,7 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       the client side. (default: ``4``).
   """
   def __init__(self,
-               server_rank: Optional[int] = None,
+               server_rank: Optional[Union[int, List[int]]] = None,
                num_workers: int = 1,
                worker_devices: Optional[List[torch.device]] = None,
                worker_concurrency: int = 4,
@@ -244,8 +245,10 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                worker_key: str = None):
     super().__init__(num_workers, worker_devices, worker_concurrency,
                      master_addr, master_port, num_rpc_threads, rpc_timeout)
-
-    self.server_rank = server_rank
+    if server_rank is not None:
+      self.server_rank = server_rank
+    else:
+      self.server_rank = assign_server_by_order()
     self.buffer_capacity = self.num_workers * self.worker_concurrency
     if buffer_size is None:
       self.buffer_size = f'{self.num_workers * 64}MB'
