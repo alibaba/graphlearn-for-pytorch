@@ -231,8 +231,8 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
     prefetch_size (int): The max prefetched sampled messages for consuming on
       the client side. (default: ``4``).
     glt_graph: Used in GraphScope side to get parameters. (default: ``None``).
-    option_type: Used in GraphScope side, indicates the type of option. This 
-      field must be set when ``option_type`` is not None. (default: ``None``).
+    workload_type: Used in GraphScope side, indicates the type of option. This 
+      field must be set when ``workload_type`` is not None. (default: ``None``).
   """
   def __init__(self,
                server_rank: Optional[Union[int, List[int]]] = None,
@@ -247,17 +247,17 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                prefetch_size: int = 4,
                worker_key: str = None,
                glt_graph=None,
-               option_type: Optional[Literal['train', 'validate', 'test']] = None):
+               workload_type: Optional[Literal['train', 'validate', 'test']] = None):
     # glt_graph is used in GraphScope side to get parameters
     if glt_graph:
-      if not option_type:
-        raise ValueError(f"'{self.__class__.__name__}': missing option_type ")
+      if not workload_type:
+        raise ValueError(f"'{self.__class__.__name__}': missing workload_type ")
       master_addr = glt_graph.master_addr
-      if option_type == 'train':
+      if workload_type == 'train':
         master_port = glt_graph.train_loader_master_port
-      elif option_type == 'validate':
+      elif workload_type == 'validate':
         master_port = glt_graph.val_loader_master_port
-      elif option_type == 'test':
+      elif workload_type == 'test':
         master_port = glt_graph.test_loader_master_port
       worker_key = str(master_port)
     
