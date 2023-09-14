@@ -13,8 +13,10 @@
 # limitations under the License.
 # ==============================================================================
 
-from .. import  py_graphlearn_torch_vineyard as pywrap
-
+try:
+    from .. import py_graphlearn_torch_vineyard as pywrap
+except ImportError:
+   pass
 
 def vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid=0):
   '''

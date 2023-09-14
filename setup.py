@@ -17,6 +17,7 @@ import os
 import sys
 from torch.utils.cpp_extension import BuildExtension
 from setuptools import setup
+import torch
 
 # This version string should be updated when releasing a new version.
 _VERSION = '0.2.1'
@@ -29,13 +30,19 @@ WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
 sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
 from build import glt_ext_module, glt_v6d_ext_module
 
+
+GLT_V6D_EXT_NAME = "py_graphlearn_torch_vineyard"
+GLT_EXT_NAME = "py_graphlearn_torch"
+
 class CustomizedBuildExtension(BuildExtension):
-    def _add_gnu_cpp_abi_flag(self, extension):
-      pass
+  def _add_gnu_cpp_abi_flag(self, extension):
+    if extension.name != GLT_V6D_EXT_NAME:
+      # use the same CXX ABI as what PyTorch was compiled with
+      self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)))     
 
 ext_modules = [
   glt_ext_module(
-    name='py_graphlearn_torch',
+    name=GLT_EXT_NAME,
     root_path=ROOT_PATH,
     with_cuda=WITH_CUDA == "ON",
     release=RELEASE == "TRUE"
@@ -45,7 +52,7 @@ ext_modules = [
 if WITH_VINEYARD == "ON":
   ext_modules.append(
     glt_v6d_ext_module(
-      name='py_graphlearn_torch_vineyard',
+      name=GLT_V6D_EXT_NAME,
       root_path=ROOT_PATH,      
     ),
   )
