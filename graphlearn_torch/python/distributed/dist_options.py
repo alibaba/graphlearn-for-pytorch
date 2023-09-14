@@ -246,7 +246,7 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                buffer_size: Optional[Union[int, str]] = None,
                prefetch_size: int = 4,
                worker_key: str = None,
-               glt_graph=None,
+               glt_graph = None,
                workload_type: Optional[Literal['train', 'validate', 'test']] = None):
     # glt_graph is used in GraphScope side to get parameters
     if glt_graph:
