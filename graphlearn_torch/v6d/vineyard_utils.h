@@ -13,10 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifdef WITH_VINEYARD
-
 #include <torch/extension.h>
-namespace graphlearn_torch_vineyard {
+namespace graphlearn_torch {
+namespace vineyard_utils {
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
   const std::string& ipc_socket, const std::string& object_id_str,
@@ -33,5 +32,5 @@ torch::Tensor LoadEdgeFeatures(
   const std::string& e_label_name, std::vector<std::string>& ecols
 );
 
-}  // namespace graphlearn_torch_vineyard
-#endif // WITH_VINEYARD
+} // namespace vineyard_utils
+}  // namespace graphlearn_torch

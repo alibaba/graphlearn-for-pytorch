@@ -24,7 +24,7 @@ limitations under the License.
 
 namespace py = pybind11;
 
-using namespace graphlearn_torch_vineyard;
+using namespace graphlearn_torch::vineyard_utils;
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.doc() = "Python bindings for vineyard utils C++ frontend";

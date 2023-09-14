@@ -20,13 +20,13 @@ limitations under the License.
 #include <grape/communication/communicator.h>
 #include <grape/worker/comm_spec.h>
 
-using namespace graphlearn_torch;
+using namespace graphlearn_torch::vineyard_utils;
 
 class VineyardTest : public ::testing::Test {
 protected:
   void SetUp() override {
     ipc_socket = "/var/run/vineyard.sock";
-    object_id_str = "26586469478206803";
+    object_id_str = "29791161733259207";
     v_label_name = "person";
     e_label_name = "knows";
     vcols_1 = {"feat0"};
