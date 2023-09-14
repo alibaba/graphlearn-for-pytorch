@@ -27,7 +27,28 @@ WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
 
 sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
-from build import ext_module
+from build import glt_ext_module, glt_v6d_ext_module
+
+class CustomizedBuildExtension(BuildExtension):
+    def _add_gnu_cpp_abi_flag(self, extension):
+      pass
+
+ext_modules = [
+  glt_ext_module(
+    name='py_graphlearn_torch',
+    root_path=ROOT_PATH,
+    with_cuda=WITH_CUDA == "ON",
+    release=RELEASE == "TRUE"
+  )
+]
+
+if WITH_VINEYARD == "ON":
+  ext_modules.append(
+    glt_v6d_ext_module(
+      name='py_graphlearn_torch_vineyard',
+      root_path=ROOT_PATH,      
+    ),
+  )
 
 setup(
   name='graphlearn-torch',
@@ -37,17 +58,9 @@ setup(
   url="https://github.com/alibaba/graphlearn-for-pytorch",
   python_requires='>=3.6',
   requires=['torch'],
-  cmdclass={'build_ext': BuildExtension},
+  cmdclass={'build_ext': CustomizedBuildExtension},
   ext_package='graphlearn_torch',
-  ext_modules=[
-    ext_module(
-      name='py_graphlearn_torch',
-      root_path=ROOT_PATH,
-      with_cuda=WITH_CUDA == "ON",
-      with_vineyard=WITH_VINEYARD == "ON",
-      release=RELEASE == "TRUE"
-    )
-  ],
+  ext_modules=ext_modules,
   package_dir={'graphlearn_torch': 'graphlearn_torch/python'},
   packages=[
     'graphlearn_torch', 'graphlearn_torch.channel', 'graphlearn_torch.data',
