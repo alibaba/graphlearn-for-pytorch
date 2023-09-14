@@ -41,7 +41,7 @@ def count_dict(in_dict: Dict[Any, Any], out_dict: Dict[Any, Any], target_len):
     out_dict[k] = vals
 
 def get_free_port(host: str = 'localhost') -> int:
-  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.bind((host, 0))
   port = s.getsockname()[1]
   s.close()
