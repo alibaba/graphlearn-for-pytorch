@@ -134,6 +134,8 @@ function(add_library_graphlearn_torch)
   endif()
 endfunction()
 
+add_library_graphlearn_torch()
+
 # Build tests
 if(BUILD_TESTS)
   set (GTest_INSTALL_DIR ${GLT_THIRD_PARTY_DIR}/googletest/build)
