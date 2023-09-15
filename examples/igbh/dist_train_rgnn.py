@@ -38,7 +38,10 @@ def evaluate(model, dataloader):
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(batch.x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
       labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
       predictions.append(out.argmax(1).cpu().clone().numpy())
 
@@ -56,7 +59,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     train_loader_master_port,
     val_loader_master_port,
     test_loader_master_port,
-    with_gpu, edge_dir,
+    with_gpu, trim_to_layer, edge_dir,
     rpc_timeout):
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
@@ -167,7 +170,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                dropout=0.2,
                model=model_type,
                heads=num_heads,
-               node_type='paper').to(current_device)
+               node_type='paper',
+               with_trim=trim_to_layer).to(current_device)
   model = DistributedDataParallel(model,
                                   device_ids=[current_device.index] if with_gpu else None,
                                   find_unused_parameters=True)
@@ -197,7 +201,10 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict, batch.edge_index_dict)[:batch_size]
+      out = model(batch.x_dict,
+                  batch.edge_index_dict,
+                  num_sampled_nodes_dict=batch.num_sampled_nodes,
+                  num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
@@ -292,6 +299,8 @@ if __name__ == '__main__':
                       help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
       help="Use seperate GPUs for training and sampling processes.")
+  parser.add_argument("--with_trim", action="store_true",
+      help="use trim_to_layer function from pyG")
   args = parser.parse_args()
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
@@ -336,6 +345,7 @@ if __name__ == '__main__':
           args.val_loader_master_port,
           args.test_loader_master_port,
           args.with_gpu,
+          args.with_trim,
           args.edge_dir,
           args.rpc_timeout),
     nprocs=args.num_training_procs,
