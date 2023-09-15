@@ -17,7 +17,7 @@ from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import torch
 import numpy as np
-
+from enum import Enum
 
 # Types for basic graph entity #################################################
 
@@ -45,8 +45,17 @@ def reverse_edge_type(etype: EdgeType):
       edge = 'rev_' + edge
   return (dst, edge, src)
 
+
 # A representation of tensor data
 TensorDataType = Union[torch.Tensor, np.ndarray]
+
+NodeLabel = Union[TensorDataType, Dict[NodeType, TensorDataType]]
+NodeIndex = Union[TensorDataType, Dict[NodeType, TensorDataType]]
+
+class Split(Enum):
+  train = 'train'
+  valid = 'valid'
+  test = 'test'
 
 # Types for partition data #####################################################
 

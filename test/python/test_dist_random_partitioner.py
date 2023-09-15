@@ -15,6 +15,7 @@
 
 import os
 import shutil
+import time
 import unittest
 
 import torch
@@ -178,6 +179,7 @@ class DistRandomPartitionerTestCase(unittest.TestCase):
     root_dir = 'dist_random_partitioner_ut_homo'
     master_addr = 'localhost'
     master_port = glt.utils.get_free_port(master_addr)
+    time.sleep(1)
     n_partitioners = 2
     mp.spawn(
       run_dist_partitioner,
@@ -191,6 +193,7 @@ class DistRandomPartitionerTestCase(unittest.TestCase):
     root_dir = 'dist_random_partitioner_ut_hetero'
     master_addr = 'localhost'
     master_port = glt.utils.get_free_port(master_addr)
+    time.sleep(1)
     n_partitioners = 2
     mp.spawn(
       run_dist_partitioner,

@@ -21,21 +21,19 @@ limitations under the License.
 #include "graphlearn_torch/include/common.h"
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-ToCSR(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
   const std::string& ipc_socket, const std::string& object_id_str,
-  int v_label, int e_label,
-  bool has_eid);
-
+  const std::string& v_label_name, const std::string& e_label_id_name,
+  const std::string& edge_dir, bool has_eid);
 
 torch::Tensor LoadVertexFeatures(
   const std::string& ipc_socket, const std::string& object_id_str,
-  int v_label, std::vector<std::string>& vcols, graphlearn_torch::DataType dtype
+  const std::string& v_label_name, std::vector<std::string>& vcols
 );
 
 torch::Tensor LoadEdgeFeatures(
   const std::string& ipc_socket, const std::string& object_id_str,
-  int e_label, std::vector<std::string>& ecols, graphlearn_torch::DataType dtype
+  const std::string& e_label_name, std::vector<std::string>& ecols
 );
 
 #endif // WITH_VINEYARD
