@@ -151,7 +151,6 @@ function(add_library_graphlearn_torch)
   endif()
   target_include_directories(graphlearn_torch
     PUBLIC ${GLT_ROOT})
-  message("TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
   target_link_libraries(graphlearn_torch
     PUBLIC Python3::Python ${TORCH_LIBRARIES})
   target_compile_definitions(graphlearn_torch PRIVATE GCC_USE_CXX11_ABI_FALSE_FLAG)
