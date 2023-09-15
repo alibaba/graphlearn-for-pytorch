@@ -29,7 +29,6 @@ def glt_v6d_ext_module(
   libraries.append('vineyard_graph')
   libraries.append('vineyard_io')
 
-  extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
   extra_cxx_flags.append('-std=c++17')
 
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export_v6d.cc')]
@@ -74,7 +73,6 @@ def glt_ext_module(
     include_dirs.append('/usr/local/cuda' + '/include')
     library_dirs.append('/usr/local/cuda' + 'lib64')
 
-  extra_cxx_flags.append('-D_GLIBCXX_USE_CXX11_ABI=0')
   extra_cxx_flags.append('-std=c++17')
 
   sources = [os.path.join(root_path, 'graphlearn_torch/python/py_export_glt.cc')]
