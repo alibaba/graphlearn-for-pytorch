@@ -31,7 +31,6 @@ limitations under the License.
 #include "graphlearn_torch/include/sampler.h"
 #include "graphlearn_torch/include/stitch_sample_results.h"
 #include "graphlearn_torch/include/types.h"
-#include "graphlearn_torch/v6d/vineyard_utils.h"
 
 #ifdef WITH_CUDA
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"

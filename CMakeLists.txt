@@ -40,9 +40,10 @@ endmacro(check_gcc_cxx11abi)
 check_gcc_cxx11abi()
 message("GCC_USE_CXX11_ABI: ${GCC_USE_CXX11_ABI}")
 
+# for glt_vineyard, set GCC_USE_CXX11_ABI_FLAG according to gcc environment
 set(GCC_USE_CXX11_ABI_FLAG "_GLIBCXX_USE_CXX11_ABI=${GCC_USE_CXX11_ABI}")
-message("GCC_USE_CXX11_ABI_FLAG: ${GCC_USE_CXX11_ABI_FLAG}")
 
+# for glt, always use false (same as pytorch)
 set(GCC_USE_CXX11_ABI_FALSE_FLAG "_GLIBCXX_USE_CXX11_ABI=0")
 
 if(DEBUG)
