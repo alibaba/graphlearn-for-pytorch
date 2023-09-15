@@ -16,8 +16,34 @@ set(GLT_THIRD_PARTY_DIR ${GLT_ROOT}/third_party)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${GLT_BUILT_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${GLT_BUILT_DIR}/lib)
 
-set(CXX11_ABI_TRUE_FLAG "_GLIBCXX_USE_CXX11_ABI=1")
-set(CXX11_ABI_FALSE_FLAG "_GLIBCXX_USE_CXX11_ABI=0")
+
+# refer to https://github.com/v6d-io/v6d/blob/main/cmake/CheckGCCABI.cmake
+macro(check_gcc_cxx11abi)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -v
+            OUTPUT_VARIABLE GCC_VERSION_OUT
+            ERROR_VARIABLE GCC_VERSION_ERR)
+    if(GCC_VERSION_OUT MATCHES ".*with-default-libstdcxx-abi=new.*" OR GCC_VERSION_ERR MATCHES ".*with-default-libstdcxx-abi=new.*")
+      set(GCC_USE_CXX11_ABI 1)
+    else()
+      if(GCC_VERSION_OUT MATCHES ".*gcc4-compatible.*" OR GCC_VERSION_ERR MATCHES ".*gcc4-compatible.*")
+        set(GCC_USE_CXX11_ABI 0)
+      else()
+        set(GCC_USE_CXX11_ABI 1)
+      endif()
+    endif()
+  else()
+    set(GCC_USE_CXX11_ABI 1)
+  endif()
+endmacro(check_gcc_cxx11abi)
+
+check_gcc_cxx11abi()
+message("GCC_USE_CXX11_ABI: ${GCC_USE_CXX11_ABI}")
+
+set(GCC_USE_CXX11_ABI_FLAG "_GLIBCXX_USE_CXX11_ABI=${GCC_USE_CXX11_ABI}")
+message("GCC_USE_CXX11_ABI_FLAG: ${GCC_USE_CXX11_ABI_FLAG}")
+
+set(GCC_USE_CXX11_ABI_FALSE_FLAG "_GLIBCXX_USE_CXX11_ABI=0")
 
 if(DEBUG)
   set(GLT_MODE_FLAGS -g)
@@ -103,7 +129,7 @@ function(add_library_graphlearn_torch_vineyard)
     PUBLIC Python3::Python ${TORCH_LIBRARIES})
   target_link_libraries(graphlearn_torch_vineyard
     PUBLIC ${VINEYARD_LIBRARIES})
-  target_compile_definitions(graphlearn_torch_vineyard PRIVATE CXX11_ABI_FALSE_FLAG)
+  target_compile_definitions(graphlearn_torch_vineyard PRIVATE GCC_USE_CXX11_ABI_FLAG)
 endfunction()
 
 if(WITH_VINEYARD)
@@ -127,7 +153,7 @@ function(add_library_graphlearn_torch)
   message("TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
   target_link_libraries(graphlearn_torch
     PUBLIC Python3::Python ${TORCH_LIBRARIES})
-  target_compile_definitions(graphlearn_torch PRIVATE CXX11_ABI_FALSE_FLAG)
+  target_compile_definitions(graphlearn_torch PRIVATE GCC_USE_CXX11_ABI_FALSE_FLAG)
 
   if(WITH_CUDA)
     target_set_cuda_options(graphlearn_torch)
@@ -141,7 +167,7 @@ if(BUILD_TESTS)
   set (GTest_INSTALL_DIR ${GLT_THIRD_PARTY_DIR}/googletest/build)
   find_package(GTest REQUIRED PATHS ${GTest_INSTALL_DIR})
 
-  function(add_tests target library)
+  function(add_tests target library abi_flag)
     add_executable(${target} ${ARGN})
     add_dependencies(${target} ${library})
     target_link_libraries(${target}
@@ -149,7 +175,7 @@ if(BUILD_TESTS)
     if(WITH_CUDA)
       target_set_cuda_options(${target})
     endif()
-    target_compile_definitions(${target} PRIVATE CXX11_ABI_FALSE_FLAG)
+    target_compile_definitions(${target} PRIVATE ${abi_flag})
   endfunction()
 
   if(WITH_CUDA)
@@ -158,14 +184,13 @@ if(BUILD_TESTS)
 
   foreach(t ${GLT_TEST_FILES})
     get_filename_component(name ${t} NAME_WE)
-    add_tests(${name} graphlearn_torch ${t})
+    add_tests(${name} graphlearn_torch GCC_USE_CXX11_ABI_FALSE_FLAG ${t})
   endforeach()
   if (WITH_VINEYARD)
     file(GLOB GLT_V6D_TEST_FILES ${GLT_CTEST_DIR}/test_vineyard.cc)
     foreach(t ${GLT_V6D_TEST_FILES})
       get_filename_component(name ${t} NAME_WE)
-      add_tests(${name} graphlearn_torch_vineyard ${t})
+      add_tests(${name} graphlearn_torch_vineyard GCC_USE_CXX11_ABI_FLAG ${t})
     endforeach()
   endif()
-
 endif()
