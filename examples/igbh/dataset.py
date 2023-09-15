@@ -17,8 +17,6 @@ import numpy as np
 import torch
 import os.path as osp
 
-import graphlearn_torch as glt
-
 from torch_geometric.utils import add_self_loops, remove_self_loops
 from download import download_dataset
 
@@ -27,11 +25,14 @@ class IGBHeteroDataset(object):
                path,
                dataset_size='tiny',
                in_memory=True,
-               use_label_2K=False):
+               use_label_2K=False,
+               use_fp16=False):
     self.dir = path
     self.dataset_size = dataset_size
     self.in_memory = in_memory
     self.use_label_2K = use_label_2K
+    self.use_fp16 = use_fp16
+    self.dst_root = osp.join(self.dir, self.dataset_size, 'processed', 'fp16')
 
     self.ntypes = ['paper', 'author', 'institute', 'fos']
     self.etypes = None
@@ -46,7 +47,7 @@ class IGBHeteroDataset(object):
     self.test_idx = None
     if not osp.exists(osp.join(path, self.dataset_size, 'processed')):
       download_dataset(path, 'heterogeneous', dataset_size)
-    if not osp.exists("paper.pt"):
+    if not osp.exists("paper.pt") and self.use_fp16:
       self.float2half()
     self.process()
 
@@ -61,31 +62,31 @@ class IGBHeteroDataset(object):
     if self.dataset_size in ['large', 'full']:
       paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
       paper_node_features = paper_node_features.half()
-      torch.save(paper_node_features, "paper.pt")
+      torch.save(paper_node_features, self.dst_root + "paper.pt")
 
       author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
       author_node_features = author_node_features.half()
-      torch.save(author_node_features, "author.pt")
+      torch.save(author_node_features, self.dst_root + "author.pt")
 
       institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'institute', 'node_feat.npy'), mmap_mode='r'))
       institute_node_features = institute_node_features.half()
-      torch.save(institute_node_features, "institute.pt")
+      torch.save(institute_node_features, self.dst_root + "institute.pt")
 
       fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'fos', 'node_feat.npy'), mmap_mode='r'))
       fos_node_features = fos_node_features.half()
-      torch.save(fos_node_features, "fos.pt")
+      torch.save(fos_node_features, self.dst_root + "fos.pt")
 
       conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'conference', 'node_feat.npy'), mmap_mode='r'))
       conference_node_features = conference_node_features.half()
-      torch.save(conference_node_features, "conference.pt")
+      torch.save(conference_node_features, self.dst_root + "conference.pt")
 
       journal_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'journal', 'node_feat.npy'), mmap_mode='r'))
       journal_node_features = journal_node_features.half()
-      torch.save(journal_node_features, "journal.pt")
+      torch.save(journal_node_features, self.dst_root + "journal.pt")
     
   def process(self):
     if self.in_memory:
@@ -138,6 +139,7 @@ class IGBHeteroDataset(object):
     paper_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', 'node_feat.npy')
     paper_lbl_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', label_file)
     num_paper_nodes = self.paper_nodes_num[self.dataset_size]
+    num_author_nodes = self.author_nodes_num[self.dataset_size]
     if self.in_memory:
       if self.dataset_size in ['large', 'full']:
         raise Exception(f"Cannot load related files into memory directly")
@@ -145,7 +147,10 @@ class IGBHeteroDataset(object):
       paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long) 
     else:
       if self.dataset_size in ['large', 'full']:
-        paper_node_features = torch.load("paper.pt")
+        if self.use_fp16:
+          paper_node_features = torch.load(self.dst_root + "paper.pt")
+        else:
+          paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
         paper_node_labels = torch.from_numpy(np.memmap(paper_lbl_path, dtype='float32', mode='r', shape=(num_paper_nodes))).to(torch.long)
       else:
         paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
@@ -161,7 +166,10 @@ class IGBHeteroDataset(object):
       author_node_features = torch.from_numpy(np.load(author_feat_path))
     else:
       if self.dataset_size in ['large', 'full']:
-        author_node_features = torch.load("author.pt")
+        if self.use_fp16:
+          author_node_features = torch.load(self.dst_root + "author.pt")
+        else:
+          author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
       else:
         author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
     self.feat_dict['author'] = author_node_features
@@ -170,8 +178,8 @@ class IGBHeteroDataset(object):
       institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'institute', 'node_feat.npy')))
     else:
-      if self.dataset_size in ['large', 'full']:
-        institute_node_features = torch.load("institute.pt")
+      if self.dataset_size in ['large', 'full'] and self.use_fp16:
+        institute_node_features = torch.load(self.dst_root + "institute.pt")
       else:
         institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
           'institute', 'node_feat.npy'), mmap_mode='r'))
@@ -181,18 +189,24 @@ class IGBHeteroDataset(object):
       fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'fos', 'node_feat.npy')))
     else:
-      if self.dataset_size in ['large', 'full']:
-        fos_node_features = torch.load("fos.pt")
+      if self.dataset_size in ['large', 'full'] and self.use_fp16:
+        fos_node_features = torch.load(self.dst_root + "fos.pt")
       else:
         fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
           'fos', 'node_feat.npy'), mmap_mode='r'))
     self.feat_dict['fos'] = fos_node_features
 
     if self.dataset_size in ['large', 'full']:
-      conference_node_features = torch.load("conference.pt")
-      self.feat_dict['conference'] = conference_node_features
+      if self.use_fp16:
+        conference_node_features = torch.load(self.dst_root + "conference.pt")
+        journal_node_features = torch.load(self.dst_root + "journal.pt")
+      else:
+        conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          'conference', 'node_feat.npy'), mmap_mode='r'))
+        journal_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          'journal', 'node_feat.npy'), mmap_mode='r'))
 
-      journal_node_features = torch.load("journal.pt")
+      self.feat_dict['conference'] = conference_node_features   
       self.feat_dict['journal'] = journal_node_features
 
 
