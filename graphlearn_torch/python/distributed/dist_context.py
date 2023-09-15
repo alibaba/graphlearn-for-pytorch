@@ -14,7 +14,7 @@
 # ==============================================================================
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 
 class DistRole(Enum):
@@ -101,19 +101,24 @@ class DistContext(object):
   def worker_name(self) -> str:
     r""" Get worker name of the current process of this context.
     """
-    return f"{self.group_name}-{self.rank}"
+    return f"{self.group_name}_{self.rank}"
 
 
 _dist_context: DistContext = None
 r""" Distributed context on the current process.
 """
-
+_clients_to_servers: dict = None
+r""" A dict mapping from client rank to server ranks. int -> List[int]"""
 
 def get_context() -> DistContext:
   r""" Get distributed context info of the current process.
   """
   return _dist_context
 
+def get_clients_to_servers() -> dict:
+  r""" Get client to servers mapping.
+  """
+  return _clients_to_servers
 
 def _set_worker_context(world_size: int, rank: int,
                         group_name: Optional[str] = None):
@@ -132,11 +137,11 @@ def _set_worker_context(world_size: int, rank: int,
   )
 
 
-def _set_server_context(num_servers: int, num_clients: int, server_rank: int,
-                        server_group_name: Optional[str] = None):
+def _set_server_context(num_servers: int, server_rank: int,
+                        server_group_name: Optional[str] = None, num_clients: int = 0):
   r""" Set distributed context info as a server on the current process.
   """
-  assert num_servers > 0 and num_clients > 0
+  assert num_servers > 0
   global _dist_context
   _dist_context = DistContext(
     role=DistRole.SERVER,
@@ -164,6 +169,31 @@ def _set_client_context(num_servers: int, num_clients: int, client_rank: int,
     global_world_size=num_servers+num_clients,
     global_rank=num_servers+client_rank
   )
+  assign_server_by_order()
+
+def assign_server_by_order():
+  r"""Assign servers to each client in turn.
+  e.g. 2 clients and 4 servers, then the assignment is: {0: [0, 1], 1: [2, 3]},
+  5 clients and 2 servers, then the assignment is: {0: [0], 1: [1], 2: [0], 3: [1], 4: [0]}."""
+  ctx = get_context()
+  assert ctx is not None and ctx.is_client()
+  client_num, server_num = ctx.world_size, ctx.global_world_size - ctx.world_size
+  global _clients_to_servers
+  _clients_to_servers = {}
+  cur_server = 0
+  for i in range(client_num):
+    if i not in _clients_to_servers:
+      _clients_to_servers[i] = []
+    for j in range(server_num // client_num):
+      _clients_to_servers[i].append(cur_server)
+      cur_server  = (cur_server + 1) % server_num
+    if i < server_num % client_num:
+      _clients_to_servers[i].append(cur_server)
+      cur_server = (cur_server + 1) % server_num
+    if len(_clients_to_servers[i]) == 0:
+      _clients_to_servers[i].append(cur_server)
+      cur_server = (cur_server + 1) % server_num
+  return _clients_to_servers[ctx.rank]
 
 
 def init_worker_group(world_size: int, rank: int,

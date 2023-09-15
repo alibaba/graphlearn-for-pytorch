@@ -14,13 +14,13 @@
 # ==============================================================================
 
 import os
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 
 import torch
 
 from ..utils import assign_device
 
-from .dist_context import DistContext
+from .dist_context import DistContext, assign_server_by_order
 
 
 class _BasicDistSamplingWorkerOptions(object):
@@ -208,8 +208,9 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
   produced by those remote sampling workers and consumed by the current process.
 
   Args:
-    server_rank (int): The rank of server to launch sampling workers. If set
-      to ``None``, it will be automatically assigned. (default: ``None``).
+    server_rank (int or List[int], optional): The rank of server to launch
+      sampling workers, can be multiple. If set to ``None``, it will be 
+      automatically assigned. (default: ``None``).
     num_workers (int): How many workers to launch on the remote server for
       distributed neighbor sampling of the current process. (default: ``1``).
     worker_devices (torch.device or List[torch.device], optional): List of
@@ -229,9 +230,12 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       ``None``. (default: ``None``).
     prefetch_size (int): The max prefetched sampled messages for consuming on
       the client side. (default: ``4``).
+    glt_graph: Used in GraphScope side to get parameters. (default: ``None``).
+    workload_type: Used in GraphScope side, indicates the type of option. This 
+      field must be set when ``workload_type`` is not None. (default: ``None``).
   """
   def __init__(self,
-               server_rank: Optional[int] = None,
+               server_rank: Optional[Union[int, List[int]]] = None,
                num_workers: int = 1,
                worker_devices: Optional[List[torch.device]] = None,
                worker_concurrency: int = 4,
@@ -241,11 +245,28 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                rpc_timeout: float = 180,
                buffer_size: Optional[Union[int, str]] = None,
                prefetch_size: int = 4,
-               worker_key: str = None):
+               worker_key: str = None,
+               glt_graph = None,
+               workload_type: Optional[Literal['train', 'validate', 'test']] = None):
+    # glt_graph is used in GraphScope side to get parameters
+    if glt_graph:
+      if not workload_type:
+        raise ValueError(f"'{self.__class__.__name__}': missing workload_type ")
+      master_addr = glt_graph.master_addr
+      if workload_type == 'train':
+        master_port = glt_graph.train_loader_master_port
+      elif workload_type == 'validate':
+        master_port = glt_graph.val_loader_master_port
+      elif workload_type == 'test':
+        master_port = glt_graph.test_loader_master_port
+      worker_key = str(master_port)
+    
     super().__init__(num_workers, worker_devices, worker_concurrency,
                      master_addr, master_port, num_rpc_threads, rpc_timeout)
-
-    self.server_rank = server_rank
+    if server_rank is not None:
+      self.server_rank = server_rank
+    else:
+      self.server_rank = assign_server_by_order()
     self.buffer_capacity = self.num_workers * self.worker_concurrency
     if buffer_size is None:
       self.buffer_size = f'{self.num_workers * 64}MB'
