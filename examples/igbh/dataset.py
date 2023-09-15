@@ -46,7 +46,8 @@ class IGBHeteroDataset(object):
     self.test_idx = None
     if not osp.exists(osp.join(path, self.dataset_size, 'processed')):
       download_dataset(path, 'heterogeneous', dataset_size)
-    self.float2half()
+    if not osp.exists("paper.pt"):
+      self.float2half()
     self.process()
 
   def float2half(self):
