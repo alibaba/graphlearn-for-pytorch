@@ -13,13 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-import os
 import unittest
-
-# TODO(hongyi): load data into vineyard from file
-
-os.environ["socket"] = '/var/run/vineyard.sock'
-os.environ["fid"] = '26586469478206803'
+import subprocess
+import re
 
 from graphlearn_torch.data import *
 from graphlearn_torch.distributed import DistDataset
@@ -32,10 +28,27 @@ except ImportError:
 
 @unittest.skipIf(not vineyard, "only test with vineyard")
 class VineyardDatasetTest(unittest.TestCase):
+  sock = "/tmp/vineyard.glt.unittest.sock"
+
+  @classmethod
+  def setUpClass(cls):
+    cls.vineyardd_process = subprocess.Popen(["vineyardd", "--socket", cls.sock])
+
+    command = f"vineyard-graph-loader --socket {cls.sock} --config vineyard_data/config.json"
+    output = subprocess.run(command, capture_output=True, text=True, shell=True)
+    match = re.search(r"\[fragment group id\]: (\d+)", str(output))
+    if match:
+      cls.fid = match.group(1)
+    else:
+      raise Exception("Fragment Group ID not found.")
+
+  @classmethod
+  def tearDownClass(cls):
+    cls.vineyardd_process.kill()
 
   def setUp(self):
-    self.sock = os.environ["socket"]
-    self.fid = os.environ["fid"]
+    self.sock = self.__class__.sock 
+    self.fid = self.__class__.fid
     self.homo_edges = [
       ("person", "knows", "person"),
     ]
