@@ -13,9 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifdef WITH_VINEYARD
-
-#include "graphlearn_torch/include/vineyard_utils.h"
+#include "graphlearn_torch/v6d/vineyard_utils.h"
 
 #include <vineyard/client/client.h>
 #include <vineyard/graph/fragment/arrow_fragment.h>
@@ -23,6 +21,9 @@ limitations under the License.
 #include <vineyard/graph/loader/arrow_fragment_loader.h>
 
 #include "glog/logging.h"
+
+namespace graphlearn_torch {
+namespace vineyard_utils {
 
 using GraphType = vineyard::ArrowFragment<vineyard::property_graph_types::OID_TYPE,
                                           vineyard::property_graph_types::VID_TYPE>;
@@ -260,4 +261,5 @@ torch::Tensor LoadEdgeFeatures(
   return feat;
 }
 
-#endif // WITH_VINEYARD
+} // namespace vineyard_utils
+}  // namespace graphlearn_torch
