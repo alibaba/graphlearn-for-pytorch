@@ -18,6 +18,8 @@ import sys
 from torch.utils.cpp_extension import BuildExtension
 from setuptools import setup
 import torch
+import subprocess
+import re
 
 # This version string should be updated when releasing a new version.
 _VERSION = '0.2.1'
@@ -30,15 +32,26 @@ WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
 sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
 from build import glt_ext_module, glt_v6d_ext_module
 
-
 GLT_V6D_EXT_NAME = "py_graphlearn_torch_vineyard"
 GLT_EXT_NAME = "py_graphlearn_torch"
 
+def get_gcc_use_cxx_abi():
+    output = subprocess.run("cmake .", capture_output=True, text=True, shell=True)
+    print('output', str(output))
+    match = re.search(r"GCC_USE_CXX11_ABI: (\d)", str(output))
+    if match:
+        return match.group(1)
+    else:
+        return None
+  
+GCC_USE_CXX11_ABI = get_gcc_use_cxx_abi()
+
 class CustomizedBuildExtension(BuildExtension):
   def _add_gnu_cpp_abi_flag(self, extension):
-    if extension.name != GLT_V6D_EXT_NAME:
-      # use the same CXX ABI as what PyTorch was compiled with
-      self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)))     
+    gcc_use_cxx_abi = GCC_USE_CXX11_ABI if extension.name == GLT_V6D_EXT_NAME else str(int(torch._C._GLIBCXX_USE_CXX11_ABI))
+    print('GCC_USE_CXX11_ABI for {}: {}', extension.name, gcc_use_cxx_abi)
+    self._add_compile_flag(extension, '-D_GLIBCXX_USE_CXX11_ABI=' + gcc_use_cxx_abi) 
+        
 
 ext_modules = [
   glt_ext_module(
