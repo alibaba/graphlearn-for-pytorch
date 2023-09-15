@@ -60,31 +60,31 @@ class IGBHeteroDataset(object):
     if self.dataset_size in ['large', 'full']:
       paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
       paper_node_features = paper_node_features.half()
-      torch.save("paper.pt")
+      torch.save(paper_node_features, "paper.pt")
 
       author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
       author_node_features = author_node_features.half()
-      torch.save("author.pt")
+      torch.save(author_node_features, "author.pt")
 
       institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'institute', 'node_feat.npy'), mmap_mode='r'))
       institute_node_features = institute_node_features.half()
-      institute_node_features = torch.save("institute.pt")
+      torch.save(institute_node_features, "institute.pt")
 
       fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'fos', 'node_feat.npy'), mmap_mode='r'))
       fos_node_features = fos_node_features.half()
-      torch.save("fos.pt")
+      torch.save(fos_node_features, "fos.pt")
 
       conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'conference', 'node_feat.npy'), mmap_mode='r'))
       conference_node_features = conference_node_features.half()
-      torch.save("conference.pt")
+      torch.save(conference_node_features, "conference.pt")
 
       journal_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'journal', 'node_feat.npy'), mmap_mode='r'))
       journal_node_features = journal_node_features.half()
-      torch.save("journal.pt")
+      torch.save(journal_node_features, "journal.pt")
     
   def process(self):
     if self.in_memory:
@@ -195,7 +195,7 @@ class IGBHeteroDataset(object):
       self.feat_dict['journal'] = journal_node_features
 
 
-    n_nodes = paper_node_features.shape[0]
+    n_nodes = num_paper_nodes
     n_train = int(n_nodes * 0.6)
     n_val = int(n_nodes * 0.2)
 
