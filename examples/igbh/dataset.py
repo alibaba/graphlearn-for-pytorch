@@ -197,7 +197,7 @@ class IGBHeteroDataset(object):
 
     if self.dataset_size in ['large', 'full']:
       if self.use_fp16:
-        conference_node_features = torch.load(self.dst_root + "conference.pt")
+        conference_node_features = torch.load(self.dst_root + "/conference.pt")
         journal_node_features = torch.load(self.dst_root + "/journal.pt")
       else:
         conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
