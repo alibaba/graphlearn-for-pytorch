@@ -13,29 +13,95 @@
 # limitations under the License.
 # ==============================================================================
 
-import os
 import unittest
-
-# TODO(hongyi): load data into vineyard from file
-
-os.environ["socket"] = '/var/run/vineyard.sock'
-os.environ["fid"] = '26586469478206803'
+import subprocess
+import re
+import json
 
 from graphlearn_torch.data import *
 from graphlearn_torch.distributed import DistDataset
+import os
 
 try:
-    import vineyard
+  import vineyard
 except ImportError:
-    vineyard = None
+  vineyard = None
 
 
 @unittest.skipIf(not vineyard, "only test with vineyard")
 class VineyardDatasetTest(unittest.TestCase):
+  sock = "/tmp/vineyard.glt.unittest.sock"
+
+  @classmethod
+  def setUpClass(cls):
+    cls.vineyardd_process = subprocess.Popen(
+      ["vineyardd", "--socket", cls.sock]
+    )
+    data_dir = os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), 'vineyard_data',
+      'modern_graph'
+    )
+
+    cfg = {
+      "vertices":
+        [
+          {
+            "data_path": os.path.join(data_dir, "person.csv"),
+            "label": "person",
+            "options": "header_row=true&delimiter=|"
+          }, {
+            "data_path": os.path.join(data_dir, "software.csv"),
+            "label": "software",
+            "options": "header_row=true&delimiter=|"
+          }
+        ],
+      "edges":
+        [
+          {
+            "data_path": os.path.join(data_dir, "knows.csv"),
+            "label": "knows",
+            "src_label": "person",
+            "dst_label": "person",
+            "options": "header_row=true&delimiter=|"
+          }, {
+            "data_path": os.path.join(data_dir, "created.csv"),
+            "label": "created",
+            "src_label": "person",
+            "dst_label": "software",
+            "options": "header_row=true&delimiter=|"
+          }
+        ],
+      "directed": 1,
+      "retain_oid": 1,
+      "generate_eid": 1,
+      "string_oid": 0,
+      "local_vertex_map": 0,
+      "print_normalized_schema": 1
+    }
+    json_path = os.path.join(data_dir, "config.json")
+
+    with open(json_path, 'w') as json_file:
+      json.dump(cfg, json_file)
+    try:
+      command = f"vineyard-graph-loader --socket {cls.sock} --config {json_path}"
+      output = subprocess.run(
+        command, capture_output=True, text=True, shell=True
+      )
+      match = re.search(r"\[fragment group id\]: (\d+)", str(output))
+      if match:
+        cls.fid = match.group(1)
+      else:
+        raise Exception("Fragment Group ID not found.")
+    finally:
+      os.remove(json_path)
+
+  @classmethod
+  def tearDownClass(cls):
+    cls.vineyardd_process.kill()
 
   def setUp(self):
-    self.sock = os.environ["socket"]
-    self.fid = os.environ["fid"]
+    self.sock = self.__class__.sock
+    self.fid = self.__class__.fid
     self.homo_edges = [
       ("person", "knows", "person"),
     ]
@@ -177,7 +243,7 @@ class VineyardDatasetTest(unittest.TestCase):
     )
     self.assertEqual(ds.node_pb["person"].shape, (4,))
     # self.assertEqual(ds.node_pb["software"].shape, (2,))
-    
+
     self.assertEqual(ds.edge_pb[("person", "knows", "person")].shape, (2,))
     self.assertEqual(ds.edge_pb[("person", "created", "software")].shape, (4,))
 
