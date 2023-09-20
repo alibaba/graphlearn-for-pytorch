@@ -13,25 +13,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef GRAPHLEARN_TORCH_INCLUDE_COMMON_H_
-#define GRAPHLEARN_TORCH_INCLUDE_COMMON_H_
+#include <torch/extension.h>
+namespace graphlearn_torch {
+namespace vineyard_utils {
 
-#include <stdexcept>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name, const std::string& e_label_id_name,
+  const std::string& edge_dir, bool has_eid);
 
-namespace graphlearn_torch
-{
-  
-inline void Check(bool val, const char* err_msg) {
-  if (val) { return; }
-  throw std::runtime_error(err_msg);
-}
+torch::Tensor LoadVertexFeatures(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name, std::vector<std::string>& vcols
+);
 
-template <typename T>
-inline void CheckEq(const T &x, const T &y) {
-  if (x == y) { return; }
-  throw std::runtime_error(std::string("CheckEq failed"));
-}
+torch::Tensor LoadEdgeFeatures(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& e_label_name, std::vector<std::string>& ecols
+);
 
+} // namespace vineyard_utils
 }  // namespace graphlearn_torch
-
-#endif // GRAPHLEARN_TORCH_INCLUDE_COMMON_H_

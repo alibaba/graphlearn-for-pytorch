@@ -20,7 +20,7 @@ limitations under the License.
 
 #include "graphlearn_torch/include/common.cuh"
 #include "graphlearn_torch/include/graph.h"
-#include "graphlearn_torch/include/vineyard_utils.h"
+#include "graphlearn_torch/v6d/vineyard_utils.h"
 
 #include <grape/communication/communicator.h>
 #include <grape/worker/comm_spec.h>

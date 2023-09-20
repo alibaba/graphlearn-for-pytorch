@@ -15,6 +15,7 @@
 
 from enum import Enum
 from typing import Optional, List
+from typing import Optional, List
 
 
 class DistRole(Enum):
@@ -169,6 +170,31 @@ def _set_client_context(num_servers: int, num_clients: int, client_rank: int,
     global_world_size=num_servers+num_clients,
     global_rank=num_servers+client_rank
   )
+  assign_server_by_order()
+
+def assign_server_by_order():
+  r"""Assign servers to each client in turn.
+  e.g. 2 clients and 4 servers, then the assignment is: {0: [0, 1], 1: [2, 3]},
+  5 clients and 2 servers, then the assignment is: {0: [0], 1: [1], 2: [0], 3: [1], 4: [0]}."""
+  ctx = get_context()
+  assert ctx is not None and ctx.is_client()
+  client_num, server_num = ctx.world_size, ctx.global_world_size - ctx.world_size
+  global _clients_to_servers
+  _clients_to_servers = {}
+  cur_server = 0
+  for i in range(client_num):
+    if i not in _clients_to_servers:
+      _clients_to_servers[i] = []
+    for j in range(server_num // client_num):
+      _clients_to_servers[i].append(cur_server)
+      cur_server  = (cur_server + 1) % server_num
+    if i < server_num % client_num:
+      _clients_to_servers[i].append(cur_server)
+      cur_server = (cur_server + 1) % server_num
+    if len(_clients_to_servers[i]) == 0:
+      _clients_to_servers[i].append(cur_server)
+      cur_server = (cur_server + 1) % server_num
+  return _clients_to_servers[ctx.rank]
   assign_server_by_order()
 
 def assign_server_by_order() -> List[int]:

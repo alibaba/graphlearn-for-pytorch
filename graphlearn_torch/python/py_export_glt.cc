@@ -31,7 +31,6 @@ limitations under the License.
 #include "graphlearn_torch/include/sampler.h"
 #include "graphlearn_torch/include/stitch_sample_results.h"
 #include "graphlearn_torch/include/types.h"
-#include "graphlearn_torch/include/vineyard_utils.h"
 
 #ifdef WITH_CUDA
 #include "graphlearn_torch/csrc/cuda/inducer.cuh"
@@ -50,18 +49,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 #ifdef WITH_CUDA
   m.def("cuda_stitch_sample_results", &CUDAStitchSampleResults);
 #endif
-#ifdef WITH_VINEYARD
-  m.def("vineyard_to_csr", &ToCSR);
-  m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
-  m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
-#endif
-
-  py::enum_<DataType>(m, "DataType")
-    .value("Int32", DataType::Int32)
-    .value("Int64", DataType::Int64)
-    .value("Float32", DataType::Float32)
-    .value("Float64", DataType::Float64);
-
   py::enum_<GraphMode>(m, "GraphMode")
     .value("DMA", GraphMode::DMA)
     .value("ZERO_COPY", GraphMode::ZERO_COPY);

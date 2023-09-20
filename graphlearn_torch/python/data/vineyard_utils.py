@@ -13,42 +13,32 @@
 # limitations under the License.
 # ==============================================================================
 
-from .. import py_graphlearn_torch as pywrap
+try:
+    from .. import py_graphlearn_torch_vineyard as pywrap
+except ImportError:
+   pass
 
-
-data_type = {'int32': pywrap.DataType.Int32,
-             'int64': pywrap.DataType.Int64,
-             'float32': pywrap.DataType.Float32,
-             'float64': pywrap.DataType.Float64
-            }
-
-def vineyard_to_csr(sock, fid, elid=0, vlid=0, haseid=0):
+def vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid=0):
   '''
     Wrap to_csr function to read graph from vineyard
     with return (indptr, indices, (Optional)edge_id)
   '''
-  return pywrap.vineyard_to_csr(sock, fid, elid, vlid, haseid)
+  return pywrap.vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid)
 
 
-def load_vertex_feature_from_vineyard(sock, fid, vcols,
-                                      vlid=0, dtype='float32'):
+def load_vertex_feature_from_vineyard(sock, fid, vcols, v_label_name):
   '''
     Wrap load_vertex_feature_from_vineyard function to read vertex feature
     from vineyard
-    dtype: torch data type
     return vertex_feature(torch.Tensor)
   '''
-  return pywrap.load_vertex_feature_from_vineyard(sock, fid, vlid, vcols,
-                                                  data_type[dtype])
+  return pywrap.load_vertex_feature_from_vineyard(sock, fid, v_label_name, vcols)
 
 
-def load_edge_feature_from_vineyard(sock, fid, ecols,
-                                    elid=0, dtype='float32'):
+def load_edge_feature_from_vineyard(sock, fid, ecols, e_label_name):
   '''
     Wrap load_edge_feature_from_vineyard function to read edge feature
     from vineyard
-    dtype: torch data type
     return edge_feature(torch.Tensor)
   '''
-  return pywrap.load_edge_feature_from_vineyard(sock, fid, elid, ecols,
-                                                data_type[dtype])
+  return pywrap.load_edge_feature_from_vineyard(sock, fid, e_label_name, ecols)

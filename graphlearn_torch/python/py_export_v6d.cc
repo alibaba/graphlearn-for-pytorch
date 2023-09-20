@@ -13,29 +13,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifdef WITH_VINEYARD
+#include <Python.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
 #include <torch/extension.h>
 
-#include "graphlearn_torch/include/graph.h"
-#include "graphlearn_torch/include/common.h"
+#include "graphlearn_torch/v6d/vineyard_utils.h"
 
+namespace py = pybind11;
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-ToCSR(
-  const std::string& ipc_socket, const std::string& object_id_str,
-  int v_label, int e_label,
-  bool has_eid);
+using namespace graphlearn_torch::vineyard_utils;
 
-
-torch::Tensor LoadVertexFeatures(
-  const std::string& ipc_socket, const std::string& object_id_str,
-  int v_label, std::vector<std::string>& vcols, graphlearn_torch::DataType dtype
-);
-
-torch::Tensor LoadEdgeFeatures(
-  const std::string& ipc_socket, const std::string& object_id_str,
-  int e_label, std::vector<std::string>& ecols, graphlearn_torch::DataType dtype
-);
-
-#endif // WITH_VINEYARD
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+  m.doc() = "Python bindings for vineyard utils C++ frontend";
+  m.def("vineyard_to_csr", &ToCSR);
+  m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
+  m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
+}
