@@ -16,6 +16,8 @@
 import os
 import pickle
 from abc import ABC, abstractmethod
+from threading import Thread
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
@@ -394,6 +396,19 @@ class PartitionerBase(ABC):
         save_feature_partition_chunk(self.output_dir, pidx, p_edge_feat_chunk,
                                      group='edge_feat', graph_type=etype)
 
+  def _process_node(self, ntype):
+    node_ids_list, node_pb = self._partition_node(ntype)
+    save_node_pb(self.output_dir, node_pb, ntype)
+    self.node_pb_dict[ntype] = node_pb
+    self._partition_and_save_node_feat(node_ids_list, ntype)
+  
+  def _process_edge(self, etype):
+    graph_list, edge_pb = self._partition_graph(self.node_pb_dict, etype)
+    save_edge_pb(self.output_dir, edge_pb, etype)
+    for pidx in range(self.num_parts):
+      save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
+    self._partition_and_save_edge_feat(graph_list, etype)
+  
   def partition(self):
     r""" Partition graph and feature data into different parts.
 
@@ -474,19 +489,22 @@ class PartitionerBase(ABC):
 
     """
     if 'hetero' == self.data_cls:
-      node_pb_dict = {}
+      self.node_pb_dict = defaultdict()
+      threads = []
       for ntype in self.node_types:
-        node_ids_list, node_pb = self._partition_node(ntype)
-        save_node_pb(self.output_dir, node_pb, ntype)
-        node_pb_dict[ntype] = node_pb
-        self._partition_and_save_node_feat(node_ids_list, ntype)
+        p = Thread(target=self._process_node, args=(ntype,))
+        p.start()
+        threads.append(p)
+      for p in threads:
+        p.join()
 
+      threads.clear()
       for etype in self.edge_types:
-        graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
-        save_edge_pb(self.output_dir, edge_pb, etype)
-        for pidx in range(self.num_parts):
-          save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
-        self._partition_and_save_edge_feat(graph_list, etype)
+        p = Thread(target=self._process_edge, args=(etype,))
+        p.start()
+        threads.append(p)
+      for p in threads:
+        p.join()
 
     else:
       node_ids_list, node_pb = self._partition_node()
