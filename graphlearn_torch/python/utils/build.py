@@ -14,11 +14,12 @@ def glt_v6d_ext_module(
   include_dirs.append(root_path)
   # We assume that glt_v6d is built in graphscope environment
   include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
-  include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard')
-  include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard/contrib')
-  include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include')
-
-  library_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/lib')
+  if 'GRAPHSCOPE_HOME' in os.environ:
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard')
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard/contrib')
+    include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include')
+    library_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/lib')
+ 
   library_dirs.append('/usr/local/lib')
 
   libraries.append('pthread')
