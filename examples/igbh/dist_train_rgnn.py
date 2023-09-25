@@ -42,6 +42,7 @@ def evaluate(model, dataloader):
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      batch_size = min(out.shape[0], batch_size)
       labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
       predictions.append(out.argmax(1).cpu().clone().numpy())
 
@@ -205,6 +206,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      batch_size = min(batch_size, out.shape[0])
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
       optimizer.zero_grad()
