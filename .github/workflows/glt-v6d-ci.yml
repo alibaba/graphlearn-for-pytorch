@@ -22,7 +22,7 @@ env:
   DESTDIR: /home/graphscope/graphlearn-for-pytorch
 
 jobs:
-  run-glt-unittests:
+  run-glt-v6d-unittests:
     runs-on: self-hosted
     if: ${{ github.repository == 'alibaba/graphlearn-for-pytorch' }}
     steps:
@@ -44,11 +44,10 @@ jobs:
         run: |
           docker exec ${JOBNAME} bash ${DESTDIR}/scripts/build_wheel.sh
 
-
       - name: Run python unit tests
         run: |
           docker exec ${JOBNAME} python3 ${DESTDIR}/test/python/test_vineyard.py
-          
+
       - name: Remove CI container
         if: always()
         working-directory: ${{github.workspace}}

@@ -32,8 +32,10 @@ if [ "$VINEYARD_OPTION" = "ON" ]; then
   python3 -m pip install vineyard
 fi
 
+# TODO(hongyi): build cpp with v6d
 # cmake -DWITH_CUDA=$CUDA_OPTION -DWITH_VINEYARD=$VINEYARD_OPTION .
-# make -j$CORES
+cmake -DWITH_CUDA=$CUDA_OPTION .
+make -j$CORES
 
 python3 setup.py bdist_wheel
 python3 -m pip install install dist/* --force-reinstall

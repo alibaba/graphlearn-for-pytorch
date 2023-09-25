@@ -17,9 +17,6 @@ import unittest
 import subprocess
 import re
 import json
-
-from graphlearn_torch.data import *
-from graphlearn_torch.distributed import DistDataset
 import os
 
 try:
@@ -27,6 +24,8 @@ try:
 except ImportError:
   vineyard = None
 
+from graphlearn_torch.data import *
+from graphlearn_torch.distributed import DistDataset
 
 @unittest.skipIf(not vineyard, "only test with vineyard")
 class VineyardDatasetTest(unittest.TestCase):
