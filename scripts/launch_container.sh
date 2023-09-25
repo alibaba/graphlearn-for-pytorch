@@ -7,6 +7,9 @@ IMAGE_NAME=$1
 JOB_NAME=$2
 DESTDIR=$3
 
+WITH_VINEYARD=${WITH_VINEYARD:-OFF}
+WITH_CUDA=${WITH_CUDA:-ON}
+
 ret=0
 for i in $(seq 1 3); do
   [ $i -gt 1 ] && echo "WARNING: pull image failed, will retry in $((i-1)) times later" && sleep 10
@@ -20,4 +23,11 @@ then
   exit $ret
 fi
 
-docker run -itd --name $JOB_NAME --shm-size=1g --gpus all -v $GLT_ROOT_DIR:$DESTDIR $IMAGE_NAME bash
+docker_args="-itd --name $JOB_NAME --shm-size=1g -e WITH_VINEYARD=$WITH_VINEYARD -e WITH_CUDA=$WITH_CUDA -v $GLT_ROOT_DIR:$DESTDIR"
+
+if [ "$WITH_CUDA" = "ON" ]
+then
+  docker_args+=" --gpus all"
+fi
+
+docker run $docker_args $IMAGE_NAME bash
