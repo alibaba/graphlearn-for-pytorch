@@ -29,7 +29,6 @@ if [ "$VINEYARD_OPTION" = "ON" ]; then
   python3 -m pip install torch==1.13 --index-url https://download.pytorch.org/whl/cpu
   python3 -m pip install torch_geometric ogb 
   python3 -m pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
-  python3 -m pip install vineyard
 fi
 
 # TODO(hongyi): build cpp with v6d

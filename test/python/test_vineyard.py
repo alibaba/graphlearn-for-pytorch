@@ -19,15 +19,10 @@ import re
 import json
 import os
 
-try:
-  import vineyard
-except ImportError:
-  vineyard = None
-
 from graphlearn_torch.data import *
 from graphlearn_torch.distributed import DistDataset
 
-@unittest.skipIf(not vineyard, "only test with vineyard")
+@unittest.skipIf(os.getenv("WITH_VINEYARD", "OFF") == "OFF", "only test with vineyard")
 class VineyardDatasetTest(unittest.TestCase):
   sock = "/tmp/vineyard.glt.unittest.sock"
 
