@@ -37,7 +37,7 @@ jobs:
       - name: Launch CI container
         working-directory: ${{github.workspace}}
         run: |
-          WITH_VINEYARD=ON WITH_CUDA=OFF bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR} && \
+          WITH_VINEYARD=ON WITH_CUDA=OFF MOUNT_VOLUME=FALSE bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR} && \
           docker exec ${JOBNAME} sudo chown -R graphscope ${DESTDIR}
 
       - name: Build wheel
