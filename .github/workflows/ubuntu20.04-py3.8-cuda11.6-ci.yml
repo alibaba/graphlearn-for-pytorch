@@ -8,13 +8,13 @@ on:
       - 'docs/**'
       - 'examples/**'
       - '**.md'
-  # pull_request:
-  #   branches: [ main ]
-  #   paths-ignore:
-  #     - 'benchmarks/**'
-  #     - 'docs/**'
-  #     - 'examples/**'
-  #     - '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'benchmarks/**'
+      - 'docs/**'
+      - 'examples/**'
+      - '**.md'
 
 env:
   IMAGE: graphlearn/graphlearn_for_pytorch:1.0.0-ubuntu20.04-py3.8-torch1.13-cuda11.6
