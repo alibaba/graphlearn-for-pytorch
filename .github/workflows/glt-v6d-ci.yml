@@ -38,7 +38,8 @@ jobs:
         working-directory: ${{github.workspace}}
         run: |
           WITH_VINEYARD=ON WITH_CUDA=OFF MOUNT_VOLUME=FALSE bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR} && \
-          docker exec ${JOBNAME} sudo chown -R graphscope ${DESTDIR}
+          docker exec ${JOBNAME} sudo chown -R graphscope ${DESTDIR} && \
+          docker exec ${JOBNAME} sudo rm -rf ${DESTDIR}/dist ${DESTDIR}/build ${DESTDIR}/built
 
       - name: Build wheel
         run: |

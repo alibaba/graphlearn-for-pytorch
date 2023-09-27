@@ -39,5 +39,5 @@ then
 else
   # Option 2: Using docker cp
   docker run $docker_args $IMAGE_NAME bash
-  docker cp --exclude=build --exclude=built --exclude=dist $GLT_ROOT_DIR $JOB_NAME:$DESTDIR
+  docker cp $GLT_ROOT_DIR $JOB_NAME:$DESTDIR
 fi
