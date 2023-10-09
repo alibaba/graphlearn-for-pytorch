@@ -97,7 +97,7 @@ endif()
 # Link to PyTorch
 # Auto-find CMAKE_PREFIX_PATH for PyTorch
 execute_process(COMMAND
-  python -c "import torch;print(torch.utils.cmake_prefix_path)"
+  python3 -c "import torch;print(torch.utils.cmake_prefix_path)"
   OUTPUT_VARIABLE TORCH_DIR
 )
 string(REGEX MATCH ".*/torch/" TORCH_DIR ${TORCH_DIR})

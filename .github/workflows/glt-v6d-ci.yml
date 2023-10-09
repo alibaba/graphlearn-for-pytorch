@@ -1,0 +1,56 @@
+name: GLT V6D CI
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'benchmarks/**'
+      - 'docs/**'
+      - 'examples/**'
+      - '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'benchmarks/**'
+      - 'docs/**'
+      - 'examples/**'
+      - '**.md'
+
+env:
+  IMAGE: registry.cn-hongkong.aliyuncs.com/graphscope/graphscope-dev:latest
+  JOBNAME: glt-v6d-ci-${{ github.run_id }}
+  DESTDIR: /home/graphscope/graphlearn-for-pytorch
+
+jobs:
+  run-glt-v6d-unittests:
+    runs-on: self-hosted
+    if: ${{ github.repository == 'alibaba/graphlearn-for-pytorch' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Update submodules
+        working-directory: ${{github.workspace}}
+        run: |
+          git submodule update --init
+
+      - name: Launch CI container
+        working-directory: ${{github.workspace}}
+        run: |
+          WITH_VINEYARD=ON WITH_CUDA=OFF MOUNT_VOLUME=FALSE bash scripts/launch_container.sh ${IMAGE} ${JOBNAME} ${DESTDIR} && \
+          docker exec ${JOBNAME} sudo chown -R graphscope ${DESTDIR} && \
+          docker exec ${JOBNAME} sudo rm -rf ${DESTDIR}/dist ${DESTDIR}/build ${DESTDIR}/built
+
+      - name: Build wheel
+        run: |
+          docker exec ${JOBNAME} bash ${DESTDIR}/scripts/build_wheel.sh
+
+      - name: Run python unit tests
+        run: |
+          docker exec ${JOBNAME} python3 ${DESTDIR}/test/python/test_vineyard.py
+
+      - name: Remove CI container
+        if: always()
+        working-directory: ${{github.workspace}}
+        run: |
+          bash scripts/remove_container.sh ${JOBNAME}
