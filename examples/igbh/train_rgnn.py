@@ -146,7 +146,8 @@ if __name__ == '__main__':
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
-  parser.add_argument("--with_trim", type=bool, default=False)
+  parser.add_argument("--with_trim", action="store_true",
+      help="use trim_to_layer function from pyG")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   device = torch.device('cuda' if args.with_gpu else 'cpu')
