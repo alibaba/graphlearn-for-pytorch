@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
+import os
 import shutil
 import unittest
 
@@ -30,9 +31,17 @@ class PartitionTestCase(unittest.TestCase):
       rows.extend([v for _ in range(degree)])
       cols.extend([((v + i + 1) % dst_num) for i in range(degree)])
     return torch.tensor([rows, cols], dtype=torch.int64)
-
+  
+  def _check_dir_and_del(self, dir):
+    if os.path.exists(dir):
+      try:
+        shutil.rmtree(dir)
+      except OSError as e:
+          print(f'Error when deleting {dir}: {e}')
+  
   def test_random_homo_partition(self):
     dir = 'random_homo_partition_ut'
+    self._check_dir_and_del(dir)
     nparts = 4
 
     node_num = 20
@@ -96,6 +105,7 @@ class PartitionTestCase(unittest.TestCase):
 
   def test_random_hetero_partition(self):
     dir = 'random_hetero_partition_ut'
+    self._check_dir_and_del(dir)
     nparts = 4
 
     user_num = 20
@@ -231,6 +241,7 @@ class PartitionTestCase(unittest.TestCase):
 
   def test_frequency_partition(self):
     dir = 'frequency_partition_ut'
+    self._check_dir_and_del(dir)
     nparts = 4
 
     node_num = 20
