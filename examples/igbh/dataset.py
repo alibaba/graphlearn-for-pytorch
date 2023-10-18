@@ -100,8 +100,6 @@ class IGBHeteroDataset(object):
     paper_lbl_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', label_file)
     num_paper_nodes = self.paper_nodes_num[self.dataset_size]
     if self.in_memory:
-      if self.dataset_size in ['large', 'full']:
-        raise Exception(f"Cannot load related files into memory directly")
       paper_node_features = torch.from_numpy(np.load(paper_feat_path))
       paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long) 
     else:
@@ -117,8 +115,6 @@ class IGBHeteroDataset(object):
     num_author_nodes = self.author_nodes_num[self.dataset_size]
     author_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'author', 'node_feat.npy')
     if self.in_memory:
-      if self.dataset_size in ['large', 'full']:
-        raise Exception(f"Cannot load related files into memory directly")
       author_node_features = torch.from_numpy(np.load(author_feat_path))
     else:
       if self.dataset_size in ['large', 'full']:
@@ -160,7 +156,7 @@ class IGBHeteroDataset(object):
       self.feat_dict['journal'] = journal_node_features
 
 
-    n_nodes = paper_node_features.shape[0]
+    n_nodes = self.paper_nodes_num[self.dataset_size]
     n_train = int(n_nodes * 0.6)
     n_val = int(n_nodes * 0.2)
 
