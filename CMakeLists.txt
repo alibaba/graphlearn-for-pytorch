@@ -118,9 +118,9 @@ function(add_library_graphlearn_torch_vineyard)
   set(GLT_V6D_CSRC_DIR ${GLT_ROOT}/graphlearn_torch/v6d)
   find_package(vineyard REQUIRED)
   add_library(graphlearn_torch_vineyard SHARED)
-  target_source_tree(graphlearn_torch_vineyard 
-    ${GLT_V6D_CSRC_DIR}/*.cc
-    PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+  target_source_tree(graphlearn_torch_vineyard
+    ${GLT_V6D_CSRC_DIR}/*.cc)
+  target_compile_options(graphlearn_torch_vineyard PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${GLT_CXX_FLAGS}>")
   target_include_directories(graphlearn_torch_vineyard
     PUBLIC ${GLT_ROOT})
   target_include_directories(graphlearn_torch_vineyard
@@ -140,11 +140,10 @@ endif()
 function(add_library_graphlearn_torch)
   add_library(graphlearn_torch SHARED)
   target_source_tree(graphlearn_torch
-    ${GLT_CSRC_DIR}/*.cc
-    PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+    ${GLT_CSRC_DIR}/*.cc)
   target_source_tree(graphlearn_torch
-    ${GLT_CSRC_DIR}/cpu/*.cc
-    PROPERTIES COMPILE_FLAGS ${GLT_CXX_FLAGS})
+    ${GLT_CSRC_DIR}/cpu/*.cc)
+  target_compile_options(graphlearn_torch PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${GLT_CXX_FLAGS}>")
   if(WITH_CUDA)
     target_source_tree(graphlearn_torch
       ${GLT_CSRC_DIR}/cuda/*.cu)
