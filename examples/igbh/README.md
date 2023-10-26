@@ -44,9 +44,31 @@ CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset
 ## 3. Distributed (multi nodes) examples
 
 We use 2 nodes as an example.
+
 ### 3.1 Data partitioning
+
+To partition the dataset (including both the topology and feature):
 ```
 python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19
+```
+
+GLT also supports two-stage partitioning, which splits the process of topology 
+partitioning and feature partitioning. After the topology partitioning is executed,
+the feature partitioning process can be conducted in each training node in parallel 
+to speedup the partitioning.
+
+The topology partitioning is conducted by setting  `--with_feature=0`:
+```
+python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19 --with_feature=0
+```
+
+The feature partitioning in conducted in each training node:
+```
+# node 0 which holds partition 0:
+python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=0
+
+# node 1 which holds partition 1:
+python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=1
 ```
 
 ### 3.2 Example of distributed training
