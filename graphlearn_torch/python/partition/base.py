@@ -495,22 +495,21 @@ class PartitionerBase(ABC):
 
     """
     if 'hetero' == self.data_cls:
-      self.node_pb_dict = defaultdict()
-      threads = []
+      node_pb_dict = {}
       for ntype in self.node_types:
-        p = Thread(target=self._process_node, args=(ntype, with_feature))
-        p.start()
-        threads.append(p)
-      for p in threads:
-        p.join()
+        node_ids_list, node_pb = self._partition_node(ntype)
+        save_node_pb(self.output_dir, node_pb, ntype)
+        node_pb_dict[ntype] = node_pb
+        if with_feature:
+          self._partition_and_save_node_feat(node_ids_list, ntype)
 
-      threads.clear()
       for etype in self.edge_types:
-        p = Thread(target=self._process_edge, args=(etype, with_feature))
-        p.start()
-        threads.append(p)
-      for p in threads:
-        p.join()
+        graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
+        save_edge_pb(self.output_dir, edge_pb, etype)
+        for pidx in range(self.num_parts):
+          save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
+        if with_feature:
+          self._partition_and_save_edge_feat(graph_list, etype)
 
     else:
       node_ids_list, node_pb = self._partition_node()
@@ -591,7 +590,7 @@ def build_partition_feature(
     # step 2: build and persist the edge feature partition
     if edge_feat is None:
       return
-    graph = _load_graph_partition_data(graph_dir, device)
+    graph = load_graph_partition_data(graph_dir, device)
     eids = graph.eids
     eids_chunks = torch.chunk(
       eids, chunks=((eids.shape[0] + chunk_size - 1) // chunk_size)
@@ -609,7 +608,7 @@ def build_partition_feature(
   else:  
     # step 1: build and persist the node feature partition
     node_pb_dir = os.path.join(root_dir, 'node_pb')
-    for ntype in meta['node_types']:
+    for ntype in node_feat.keys():
       node_pb = torch.load(
         os.path.join(node_pb_dir, f'{as_str(ntype)}.pt'), map_location=device)
       feat = node_feat[ntype]
@@ -630,11 +629,11 @@ def build_partition_feature(
         save_feature_partition_chunk(root_dir, partition_idx, p_node_feat_chunk,
                                     group='node_feat', graph_type=ntype)
     # step 2: build and persist the edge feature partition
-    for etype in meta['edge_types']:
-      feat = edge_feat[etype]
-      if feat is None:
+    if edge_feat is None:
         return
-      graph = _load_graph_partition_data(
+    for etype in edge_feat.keys():
+      feat = edge_feat[etype]
+      graph = load_graph_partition_data(
         os.path.join(graph_dir, as_str(etype)), device)
       eids = graph.eids
       eids_chunks = torch.chunk(
@@ -650,7 +649,7 @@ def build_partition_feature(
         save_feature_partition_chunk(root_dir, partition_idx, p_edge_feat_chunk,
                                     group='edge_feat', graph_type=etype)
 
-def _load_graph_partition_data(
+def load_graph_partition_data(
   graph_data_dir: str,
   device: torch.device
 ) -> GraphPartitionData:
@@ -674,7 +673,7 @@ def _load_graph_partition_data(
   return pdata
 
 
-def _load_feature_partition_data(
+def load_feature_partition_data(
   feature_data_dir: str,
   device: torch.device
 ) -> FeaturePartitionData:
@@ -747,9 +746,9 @@ def load_partition(
   # homogenous
 
   if meta['data_cls'] == 'homo':
-    graph = _load_graph_partition_data(graph_dir, device)
-    node_feat = _load_feature_partition_data(node_feat_dir, device)
-    edge_feat = _load_feature_partition_data(edge_feat_dir, device)
+    graph = load_graph_partition_data(graph_dir, device)
+    node_feat = load_feature_partition_data(node_feat_dir, device)
+    edge_feat = load_feature_partition_data(edge_feat_dir, device)
     node_pb = torch.load(os.path.join(root_dir, 'node_pb.pt'),
                          map_location=device)
     edge_pb = torch.load(os.path.join(root_dir, 'edge_pb.pt'),
@@ -763,12 +762,12 @@ def load_partition(
 
   graph_dict = {}
   for etype in meta['edge_types']:
-    graph_dict[etype] = _load_graph_partition_data(
+    graph_dict[etype] = load_graph_partition_data(
       os.path.join(graph_dir, as_str(etype)), device)
 
   node_feat_dict = {}
   for ntype in meta['node_types']:
-    node_feat = _load_feature_partition_data(
+    node_feat = load_feature_partition_data(
       os.path.join(node_feat_dir, as_str(ntype)), device)
     if node_feat is not None:
       node_feat_dict[ntype] = node_feat
@@ -777,7 +776,7 @@ def load_partition(
 
   edge_feat_dict = {}
   for etype in meta['edge_types']:
-    edge_feat = _load_feature_partition_data(
+    edge_feat = load_feature_partition_data(
       os.path.join(edge_feat_dir, as_str(etype)), device)
     if edge_feat is not None:
       edge_feat_dict[etype] = edge_feat

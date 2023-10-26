@@ -105,8 +105,8 @@ if __name__ == '__main__':
       help="Chunk size for feature partitioning.")
   parser.add_argument("--edge_assign_strategy", type=str, default='by_src',
       help="edge assign strategy can be either 'by_src' or 'by_dst'")
-  parser.add_argument("--with_feature", action="store_true",
-      help="use trim_to_layer function from pyG")
+  parser.add_argument('--with_feature', type=int, default=1,
+      choices=[0, 1], help='0:do not partition feature, 1:partition feature')
 
   args = parser.parse_args()
 
@@ -119,5 +119,5 @@ if __name__ == '__main__':
     in_memory=args.in_memory,
     edge_assign_strategy=args.edge_assign_strategy,
     use_label_2K=args.num_classes==2983,
-    with_feature=args.with_feature
+    with_feature=args.with_feature==1
   )
