@@ -15,8 +15,8 @@
 
 import logging
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal, Tuple
-from enum import Enum
+from typing import Dict, List, Optional, Union, Literal, Tuple, Callable
+from collections.abc import Sequence
 
 import torch
 
@@ -125,6 +125,7 @@ class Dataset(object):
     self,
     num_val: Union[float, int],
     num_test: Union[float, int],
+    id_filter: Callable = None
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the
@@ -161,6 +162,7 @@ class Dataset(object):
     node_features: Dict[NodeType, List[str]] = None,
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
+    id2idx: Dict[NodeType, Sequence] = None,
   ):
     # TODO(hongyi): GPU support
     is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
@@ -198,7 +200,7 @@ class Dataset(object):
           load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, ntype)
       if is_homo:
         node_feature_data = node_feature_data[edges[0][0]]
-      self.init_node_features(node_feature_data=node_feature_data, with_gpu=False)
+      self.init_node_features(node_feature_data=node_feature_data, id2idx=id2idx, with_gpu=False)
     
     # load edge features
     if edge_features:
@@ -221,12 +223,13 @@ class Dataset(object):
 
       if is_homo:
         node_label_data = node_label_data[edges[0][0]]
-      self.init_node_labels(node_label_data=node_label_data)
+      self.init_node_labels(node_label_data=node_label_data, id2idx=id2idx, with_gpu=False)
 
   def init_node_features(
     self,
     node_feature_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
-    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType],
+                  Sequence, Dict[NodeType, Sequence]] = None,
     sort_func = None,
     split_ratio: Union[float, Dict[NodeType, float]] = 0.0,
     device_group_list: Optional[List[DeviceGroup]] = None,
@@ -331,7 +334,10 @@ class Dataset(object):
 
   def init_node_labels(
     self,
-    node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None
+    node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType],
+                  Sequence, Dict[NodeType, Sequence]] = None,
+    with_gpu: bool = False,
   ):
     r""" Initialize the node label storage.
 
@@ -341,7 +347,13 @@ class Dataset(object):
         (default: ``None``)
     """
     if node_label_data is not None:
-      self.node_labels = squeeze(convert_to_tensor(node_label_data))
+      self.node_labels = convert_to_tensor(node_label_data, dtype=torch.int64)
+      id2idx = convert_to_tensor(id2idx)
+      if id2idx is not None:
+        self.node_labels = _build_features(
+          self.node_labels, id2idx, 0.0, None, None, with_gpu, None
+        )
+    print(f'label ::: {self.node_labels}')
 
   def init_node_split(
     self,
@@ -413,7 +425,7 @@ class Dataset(object):
     return None
 
   def get_node_label(self, ntype: Optional[NodeType] = None):
-    if isinstance(self.node_labels, torch.Tensor):
+    if isinstance(self.node_labels, torch.Tensor | Feature):
       return self.node_labels
     if isinstance(self.node_labels, dict):
       assert ntype is not None

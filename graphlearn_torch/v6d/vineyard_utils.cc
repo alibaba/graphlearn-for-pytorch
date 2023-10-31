@@ -16,21 +16,16 @@ limitations under the License.
 #include "graphlearn_torch/v6d/vineyard_utils.h"
 
 #include <vineyard/client/client.h>
-#include <vineyard/graph/fragment/arrow_fragment.h>
-#include <vineyard/graph/fragment/graph_schema.h>
-#include <vineyard/graph/loader/arrow_fragment_loader.h>
 
 #include "glog/logging.h"
 
 namespace graphlearn_torch {
 namespace vineyard_utils {
 
-using GraphType = vineyard::ArrowFragment<vineyard::property_graph_types::OID_TYPE,
-                                          vineyard::property_graph_types::VID_TYPE>;
-
 vineyard::Client vyclient;
 
-std::shared_ptr<GraphType> GetGraphFromVineyard(const std::string& ipc_socket, const std::string& object_id_str) {
+std::shared_ptr<GraphType> GetGraphFromVineyard(
+  const std::string& ipc_socket, const std::string& object_id_str) {
   // Get the graph via vineyard fragment id from vineyard server.
   VINEYARD_CHECK_OK(vyclient.Connect(ipc_socket));
 
@@ -53,8 +48,7 @@ std::shared_ptr<GraphType> GetGraphFromVineyard(const std::string& ipc_socket, c
       }
     }
   }
-  // LOG(INFO) << "object id: " << object_id;
-  
+
   // try get the fragment
   std::shared_ptr<GraphType> frag;
   VINEYARD_CHECK_OK(vyclient.GetObject(object_id, frag));
@@ -74,16 +68,16 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
 
   auto v_label_id =  vineyard_graph->schema().GetVertexLabelId(v_label_name);
   if (v_label_id < 0) {
-      throw std::runtime_error("v_label_name not exist");
+    throw std::runtime_error("v_label_name not exist");
   }
   auto e_label_id =  vineyard_graph->schema().GetEdgeLabelId(e_label_name);
   if (e_label_id < 0) {
-      throw std::runtime_error("e_label_name not exist");
+    throw std::runtime_error("e_label_name not exist");
   }
 
   int64_t* offsets;
   int64_t offset_len;
-  
+
   if (edge_dir == "out") {
     offsets = const_cast<int64_t*>(
       vineyard_graph->GetOutgoingOffsetArray(v_label_id, e_label_id));
@@ -116,7 +110,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
     if (edge_dir == "out") {
       auto oe = vineyard_graph->GetOutgoingAdjList(v, e_label_id);
       for (auto& e : oe) {
-        cols[i] = vineyard_graph->vertex_offset(e.get_neighbor());
+        // cols[i] = vineyard_graph->(e.get_neighbor());
+        cols[i] = vineyard_graph->Vertex2Gid(e.get_neighbor());
         if (has_eid) {
           eids[i++] = e.edge_id();
         } else {
@@ -126,7 +121,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
     } else {
       auto oe = vineyard_graph->GetIncomingAdjList(v, e_label_id);
       for (auto& e : oe) {
-        cols[i] = vineyard_graph->vertex_offset(e.get_neighbor());
+        // cols[i] = vineyard_graph->vertex_offset(e.get_neighbor());
+        cols[i] = vineyard_graph->Vertex2Gid(e.get_neighbor());
         if (has_eid) {
           eids[i++] = e.edge_id();
         } else {
@@ -202,8 +198,7 @@ torch::Tensor LoadVertexFeatures(
       )->values();
     } catch(...) {
       LOG(ERROR) << "Possibly different column types OR wrong column names.\n";
-      throw std::runtime_error(
-        "ERROR: Unable to merge!");
+      throw std::runtime_error("ERROR: Unable to merge!");
     }
   } else if (vcols.size() == 1) {
     try {
@@ -259,6 +254,50 @@ torch::Tensor LoadEdgeFeatures(
   }
   feat = ArrowArray2Tensor(fscol, ecols.size());
   return feat;
+}
+
+
+int64_t GetFragVertexOffset(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name) {
+
+  auto vineyard_graph = GetGraphFromVineyard(ipc_socket, object_id_str);
+  auto v_label_id =  vineyard_graph->schema().GetVertexLabelId(v_label_name);
+  auto ivbase = vineyard_graph->InnerVertices(v_label_id).begin();
+  return vineyard_graph->Vertex2Gid(*ivbase);
+}
+
+
+uint32_t GetFragVertexNum(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name) {
+  
+  auto vineyard_graph = GetGraphFromVineyard(ipc_socket, object_id_str);
+  auto v_label_id =  vineyard_graph->schema().GetVertexLabelId(v_label_name);
+  return vineyard_graph->InnerVertices(v_label_id).size();
+}
+
+
+VineyardFragHandle::VineyardFragHandle(
+  const std::string& ipc_socket, const std::string& object_id_str) {
+    frag_ = GetGraphFromVineyard(ipc_socket, object_id_str);
+}
+
+int64_t VineyardFragHandle::GetFidFromGid(int64_t gid) {
+  return frag_->GetFragId(gid);
+}
+
+torch::Tensor VineyardFragHandle::GetInnerVertices(const std::string& v_label_name) {
+  auto v_label_id = frag_->schema().GetVertexLabelId(v_label_name);
+  auto iv = frag_->InnerVertices(v_label_id);
+  int64_t* iv_ = new int64_t[iv.size()];
+  int64_t i = 0;
+  for (auto& v : iv) {
+    iv_[i++] = frag_->Vertex2Gid(v);
+  }
+  auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
+  torch::Tensor vertices = torch::from_blob(iv_, {iv.size()}, options);
+  return vertices;
 }
 
 } // namespace vineyard_utils

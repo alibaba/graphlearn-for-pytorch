@@ -16,7 +16,7 @@
 import queue
 import time
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 import torch
 import torch.multiprocessing as mp
@@ -59,9 +59,11 @@ def _sampling_worker_loop(rank,
                           channel: ChannelBase,
                           task_queue: mp.Queue,
                           sampling_completed_worker_count: mp.Value,
-                          mp_barrier):
+                          mp_barrier,
+                          id_select: Callable=torch.masked_select):
   r""" Subprocess work loop for sampling worker.
   """
+  # print(f"sampler input::: {sampler_input}")
   dist_sampler = None
   try:
     init_worker_group(
@@ -125,10 +127,10 @@ def _sampling_worker_loop(rank,
 
         if sampling_config.sampling_type == SamplingType.NODE:
           for index in loader:
-            dist_sampler.sample_from_nodes(sampler_input[index])
+            dist_sampler.sample_from_nodes(sampler_input[index], id_select=id_select)
         elif sampling_config.sampling_type == SamplingType.LINK:
           for index in loader:
-            dist_sampler.sample_from_edges(sampler_input[index])
+            dist_sampler.sample_from_edges(sampler_input[index], id_select=id_select)
         elif sampling_config.sampling_type == SamplingType.SUBGRAPH:
           for index in loader:
             dist_sampler.subgraph(sampler_input[index])
@@ -199,7 +201,8 @@ class DistMpSamplingProducer(object):
         target=_sampling_worker_loop,
         args=(rank, self.data, self.sampler_input, unshuffled_indexes[rank],
               self.sampling_config, self.worker_options, self.output_channel,
-              task_queue, self.sampling_completed_worker_count, barrier)
+              task_queue, self.sampling_completed_worker_count, barrier,
+              self.worker_options.id_select)
       )
       w.daemon = True
       w.start()

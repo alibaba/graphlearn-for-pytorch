@@ -15,7 +15,8 @@
 
 import threading
 from multiprocessing.reduction import ForkingPickler
-from typing import List, Optional
+from typing import List, Optional, Union
+from collections.abc import Sequence
 
 import torch
 
@@ -100,7 +101,7 @@ class Feature(object):
   """
   def __init__(self,
                feature_tensor: TensorDataType,
-               id2index: Optional[torch.Tensor] = None,
+               id2index: Optional[Union[torch.Tensor, Sequence]] = None,
                split_ratio: float = 0.0,
                device_group_list: Optional[List[DeviceGroup]] = None,
                device: Optional[int] = None,
@@ -141,6 +142,7 @@ class Feature(object):
     r""" Perform feature lookups with GPU part and CPU part.
     """
     if not self.with_gpu:
+      # print(f'ids: {ids}')
       return self.cpu_get(ids)
     self.lazy_init_with_ipc_handle()
     ids = ids.to(self.device)
@@ -157,8 +159,13 @@ class Feature(object):
     """
     self.lazy_init_with_ipc_handle()
     ids = ids.to('cpu')
+    # print(f'ids:::: {ids}')
     if self.id2index is not None:
       ids = self.id2index[ids]
+      # print(f'ids: {min(ids)}')
+    # if max(ids) > self.feature_tensor.shape[0] or min(ids) < 0:
+    #   print(f'max ids: {max(ids)} feature shape {self.feature_tensor.shape[0]} min {min(ids)}')
+    # print(f"label: {self.feature_tensor[ids]}")
     return self.feature_tensor[ids]
 
   def _check_and_set_device(self):
@@ -210,7 +217,7 @@ class Feature(object):
     if self._ipc_handle is not None:
       return self._ipc_handle
 
-    if self.id2index is not None:
+    if self.id2index is not None and isinstance(self.id2index, torch.Tensor):
       self.id2index = self.id2index.cpu()
       self.id2index.share_memory_()
 
