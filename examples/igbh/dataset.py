@@ -51,7 +51,7 @@ class IGBHeteroDataset(object):
     self.process()
 
   def process(self):
-    if not self.with_edges:
+    if self.with_edges:
       if self.in_memory:
         paper_paper_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
         'paper__cites__paper', 'edge_index.npy'))).t()
