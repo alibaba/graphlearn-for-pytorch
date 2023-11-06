@@ -163,7 +163,6 @@ class IGBHeteroDataset(object):
           n_labeled_idx = 157675969
       else:
           n_labeled_idx = 227130858
-    n_labeled_idx = self.paper_nodes_num[self.dataset_size]
     n_train = int(n_labeled_idx * 0.6)
     n_val = int(n_labeled_idx * 0.2)
 
