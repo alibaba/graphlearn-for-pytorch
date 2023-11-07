@@ -42,8 +42,6 @@ def partition_dataset(src_path: str,
 
   print('-- Partitioning training idx ...')
   train_idx = data.train_idx
-  shuffle_idx = torch.randperm(train_idx.size(0))
-  train_idx = train_idx[shuffle_idx]
   train_idx = train_idx.split(train_idx.size(0) // num_partitions)
   train_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-train-partitions')
   glt.utils.ensure_dir(train_idx_partitions_dir)
@@ -52,8 +50,6 @@ def partition_dataset(src_path: str,
 
   print('-- Partitioning validation idx ...')
   val_idx = data.val_idx
-  shuffle_idx = torch.randperm(val_idx.size(0))
-  val_idx = val_idx[shuffle_idx]
   val_idx = val_idx.split(val_idx.size(0) // num_partitions)
   val_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-val-partitions')
   glt.utils.ensure_dir(val_idx_partitions_dir)
@@ -62,8 +58,6 @@ def partition_dataset(src_path: str,
 
   print('-- Partitioning test idx ...')
   test_idx = data.test_idx
-  shuffle_idx = torch.randperm(test_idx.size(0))
-  test_idx = test_idx[shuffle_idx]
   test_idx = test_idx.split(test_idx.size(0) // num_partitions)
   test_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-test-partitions')
   glt.utils.ensure_dir(test_idx_partitions_dir)

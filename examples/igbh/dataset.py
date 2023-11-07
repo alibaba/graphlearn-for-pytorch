@@ -158,14 +158,17 @@ class IGBHeteroDataset(object):
         'journal', 'node_feat.npy'), mmap_mode='r'))
       self.feat_dict['journal'] = journal_node_features
 
+    n_labeled_idx = self.paper_nodes_num[self.dataset_size]
     if self.dataset_size == 'full':
       if self.use_label_2K:
           n_labeled_idx = 157675969
       else:
           n_labeled_idx = 227130858
+
+    shuffled_index = torch.randperm(n_labeled_idx)
     n_train = int(n_labeled_idx * 0.6)
     n_val = int(n_labeled_idx * 0.2)
 
-    self.train_idx = torch.arange(0, n_train)
-    self.val_idx = torch.arange(n_train, n_train + n_val)
-    self.test_idx = torch.arange(n_train + n_val, n_labeled_idx)
+    self.train_idx = shuffled_index[:n_train]
+    self.val_idx = shuffled_index[n_train : n_train + n_val]
+    self.test_idx = shuffled_index[n_train + n_val:]
