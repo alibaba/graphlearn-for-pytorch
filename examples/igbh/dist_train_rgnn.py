@@ -248,6 +248,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
   model.eval()
   test_acc = evaluate(model, test_loader).item()*100
   print("Rank {:02d} Test Acc {:.2f}%".format(current_ctx.rank, test_acc))
+  if with_gpu:
+    torch.cuda.synchronize()
+    torch.distributed.barrier()
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
