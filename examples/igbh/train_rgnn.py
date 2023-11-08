@@ -138,7 +138,7 @@ if __name__ == '__main__':
   parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=5120)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.01)
+  parser.add_argument('--learning_rate', type=float, default=0.01)
   parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
