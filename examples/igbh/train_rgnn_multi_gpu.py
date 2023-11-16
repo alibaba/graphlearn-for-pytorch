@@ -55,7 +55,7 @@ def evaluate(model, dataloader):
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, batch_size, learning_rate, log_every,
-    dataset, train_idx, val_idx, test_idx, with_gpu):
+    dataset, train_idx, val_idx, with_gpu):
   
   os.environ['MASTER_ADDR'] = 'localhost'
   os.environ['MASTER_PORT'] = '12355'
@@ -203,15 +203,17 @@ if __name__ == '__main__':
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
+  parser.add_argument('--layout', type=str, default='COO',
+      help="Layout of input graph. Default is COO.")
   parser.add_argument("--pin_feature", action="store_true",
       help="Pin the feature in host memory. Default is False.")
   parser.add_argument("--use_fp16", action="store_true", 
       help="To use FP16 for loading the features. Default is False.")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
-
+  assert args.layout in ['COO', 'CSC', 'CSR']
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
-                                  args.num_classes==2983)
+                                  args.num_classes==2983, True, args.layout)
   if args.use_fp16:
     for node_name, node_feat in igbh_dataset.feat_dict.items():
       igbh_dataset.feat_dict[node_name] = node_feat.half()
@@ -226,6 +228,7 @@ if __name__ == '__main__':
 
   glt_dataset.init_graph(
     edge_index=igbh_dataset.edge_dict,
+    layout = args.layout,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
   )
   
@@ -242,7 +245,7 @@ if __name__ == '__main__':
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
           args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
           args.learning_rate, args.log_every,
-          glt_dataset, train_idx, val_idx, test_idx, args.with_gpu),
+          glt_dataset, train_idx, val_idx, args.with_gpu),
     nprocs=world_size,
     join=True
   )
