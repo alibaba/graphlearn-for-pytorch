@@ -26,27 +26,70 @@ bash download_igbh_large.sh
 ```
 
 For the `tiny`, `small` or `medium` dataset, the download procedure is included
-in the training script below.
-
-Note that in `dataset.py`, we have converted the graph into an undirected graph.
+in the training script below. Note that in `dataset.py`, we have converted the graph i
+nto an undirected graph.
 
 ## 2. Single node training:
 ```
 python train_rgnn.py --model='rgat' --dataset_size='tiny' --num_classes=19
 ```
-The script uses a single GPU, please add `--cpu_mode` if you want to use CPU only.
+The script uses a single GPU, please add `--cpu_mode` if you want to use CPU only. 
+To save the memory costs while training large datasets, add `--use_fp16` to store
+feature data in FP16 format. Option `--pin_feature` decides if the feature data will be
+pinned in host memory, which enables zero-copy feature access from GPU but will 
+incur extra memory costs.
 
-To train the model using multiple GPUs:
+To train the model using multiple GPUs using FP16 format wihtout pinning the feature:
 ```
-CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19
+CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19 --use_fp16
 ```
+
+Note that the original graph is in COO fornat, the above scripts will transform
+the graph from COO to CSC or CSR according to the edge direction of sampling. This process
+is time consuming when the graph is large. We provide a script to convert and persist
+the graph in CSC or CSR format:
+```
+python compress_graph.py --dataset_size='tiny' --layout='CSC'
+```
+
+Once the CSC or CSR is persisted, train the model with `--cpu_mode='CSC'`
+or `--cpu_mode='CSR'`.
+
+```
+CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19 --use_fp16 --layout='CSC'
+```
+
+Note that, when the sampling edge direction is `in`, the layout should be `CSC`. When the sampling edge direction is `out`, the layout should be `CSR`.
+
 
 ## 3. Distributed (multi nodes) examples
 
 We use 2 nodes as an example.
+
 ### 3.1 Data partitioning
+
+To partition the dataset (including both the topology and feature):
 ```
 python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19
+```
+
+GLT also supports two-stage partitioning, which splits the process of topology 
+partitioning and feature partitioning. After the topology partitioning is executed,
+the feature partitioning process can be conducted in each training node in parallel 
+to speedup the partitioning.
+
+The topology partitioning is conducted by setting  `--with_feature=0`:
+```
+python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19 --with_feature=0
+```
+
+The feature partitioning in conducted in each training node:
+```
+# node 0 which holds partition 0:
+python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=0
+
+# node 1 which holds partition 1:
+python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=1
 ```
 
 ### 3.2 Example of distributed training

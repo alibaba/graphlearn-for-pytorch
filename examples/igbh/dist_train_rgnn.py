@@ -136,30 +136,6 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     )
   )
 
-  # Create distributed neighbor loader for testing.
-  test_idx = test_idx.split(test_idx.size(0) // num_training_procs)[local_proc_rank]
-  test_loader = glt.distributed.DistNeighborLoader(
-    data=dataset,
-    num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
-    input_nodes=('paper', test_idx),
-    batch_size=batch_size,
-    shuffle=False,
-    edge_dir=edge_dir,
-    collect_features=True,
-    to_device=current_device,
-    worker_options = glt.distributed.MpDistSamplingWorkerOptions(
-      num_workers=1,
-      worker_devices=current_device,
-      worker_concurrency=4,
-      master_addr=master_addr,
-      master_port=test_loader_master_port,
-      channel_size='16GB',
-      pin_memory=True,
-      rpc_timeout=rpc_timeout,
-      num_rpc_threads=2
-    )
-  )
-
   # Define model and optimizer.
   if with_gpu:
     torch.cuda.set_device(current_device)
@@ -224,7 +200,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     gpu_mem_alloc /= idx
     if with_gpu:
       torch.cuda.synchronize()
-      torch.distributed.barrier()
+    torch.distributed.barrier()
     if epoch%log_every == 0:
       model.eval()
       val_acc = evaluate(model, val_loader).item()*100
@@ -232,7 +208,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         best_accuracy = val_acc
       if with_gpu:
         torch.cuda.synchronize()
-        torch.distributed.barrier()
+      torch.distributed.barrier()
       tqdm.tqdm.write(
           "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
               current_ctx.rank,
@@ -244,10 +220,6 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
               gpu_mem_alloc
           )
       )
-
-  model.eval()
-  test_acc = evaluate(model, test_loader).item()*100
-  print("Rank {:02d} Test Acc {:.2f}%".format(current_ctx.rank, test_acc))
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
@@ -271,7 +243,7 @@ if __name__ == '__main__':
   parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=int, default=0.001)
+  parser.add_argument('--learning_rate', type=float, default=0.001)
   parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
@@ -327,12 +299,8 @@ if __name__ == '__main__':
   val_idx = torch.load(
     osp.join(args.path, f'{args.dataset_size}-val-partitions', f'partition{data_pidx}.pt')
   )
-  test_idx = torch.load(
-    osp.join(args.path, f'{args.dataset_size}-test-partitions', f'partition{data_pidx}.pt')
-  )
   train_idx.share_memory_()
   val_idx.share_memory_()
-  test_idx.share_memory_()
 
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
