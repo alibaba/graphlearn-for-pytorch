@@ -30,13 +30,15 @@ class IGBHeteroDataset(object):
                in_memory=True,
                use_label_2K=False,
                with_edges=True,
-               layout: Literal['CSC', 'CSR', 'COO'] = 'COO',):
+               layout: Literal['CSC', 'CSR', 'COO'] = 'COO',
+               use_fp16=False):
     self.dir = path
     self.dataset_size = dataset_size
     self.in_memory = in_memory
     self.use_label_2K = use_label_2K
     self.with_edges = with_edges
     self.layout = layout
+    self.use_fp16 = use_fp16
 
     self.ntypes = ['paper', 'author', 'institute', 'fos']
     self.etypes = None
@@ -49,40 +51,94 @@ class IGBHeteroDataset(object):
     self.train_idx = None
     self.val_idx = None
     self.test_idx = None
-    if not osp.exists(osp.join(path, self.dataset_size, 'processed')):
+    self.base_path = osp.join(path, self.dataset_size, 'processed')
+    if not osp.exists(self.base_path):
       download_dataset(path, 'heterogeneous', dataset_size)
+    if self.use_fp16:
+      self.float2half()
     self.process()
 
+  def float2half(self):
+    # paper node
+    paper_feat_path = osp.join(self.base_path, 'paper', 'node_feat.npy')
+    paper_fp16_feat_path = osp.join(self.base_path, 'paper', 'node_feat_fp16.pt')
+    if not osp.exists(paper_fp16_feat_path):
+      paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
+      paper_node_features = paper_node_features.half()
+      torch.save(paper_node_features, paper_fp16_feat_path)
+
+    # author node
+    author_feat_path = osp.join(self.base_path, 'author', 'node_feat.npy')
+    author_fp16_feat_path = osp.join(self.base_path, 'author', 'node_feat_fp16.pt')
+    if not osp.exists(author_fp16_feat_path):
+      author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
+      author_node_features = author_node_features.half()
+      torch.save(author_node_features, author_fp16_feat_path)
+
+    # institute node
+    institute_feat_path = osp.join(self.base_path, 'institute', 'node_feat.npy')
+    institute_fp16_feat_path = osp.join(self.base_path, 'institute', 'node_feat_fp16.pt')
+    if not osp.exists(institute_fp16_feat_path):
+      institute_node_features = torch.from_numpy(np.load(institute_feat_path, mmap_mode='r'))
+      institute_node_features = institute_node_features.half()
+      torch.save(institute_node_features, institute_fp16_feat_path)
+
+    # fos node
+    fos_feat_path = osp.join(self.base_path, 'fos', 'node_feat.npy')
+    fos_fp16_feat_path = osp.join(self.base_path, 'fos', 'node_feat_fp16.pt')
+    if not osp.exists(fos_fp16_feat_path):
+      fos_node_features = torch.from_numpy(np.load(fos_feat_path, mmap_mode='r'))
+      fos_node_features = fos_node_features.half()
+      torch.save(fos_node_features, fos_fp16_feat_path)
+      
+    if self.dataset_size in ['large', 'full']:
+      # conference node
+      conference_feat_path = osp.join(self.base_path, 'conference', 'node_feat.npy')
+      conference_fp16_feat_path = osp.join(self.base_path, 'conference', 'node_feat_fp16.pt')
+      if not osp.exists(conference_fp16_feat_path):
+        conference_node_features = torch.from_numpy(np.load(conference_feat_path, mmap_mode='r'))
+        conference_node_features = conference_node_features.half()
+        torch.save(conference_node_features, conference_fp16_feat_path)
+
+      # journal node
+      journal_feat_path = osp.join(self.base_path, 'journal', 'node_feat.npy')
+      journal_fp16_feat_path = osp.join(self.base_path, 'journal', 'node_feat_fp16.pt')
+      if not osp.exists(journal_fp16_feat_path):
+        journal_node_features = torch.from_numpy(np.load(journal_feat_path, mmap_mode='r'))
+        journal_node_features = journal_node_features.half()
+        torch.save(journal_node_features, journal_fp16_feat_path)
+
   def process(self):
+    # load edges
     if self.with_edges:
       if self.layout == 'COO':
         if self.in_memory:
-          paper_paper_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          paper_paper_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__cites__paper', 'edge_index.npy'))).t()
-          author_paper_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          author_paper_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__written_by__author', 'edge_index.npy'))).t()
-          affiliation_author_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          affiliation_author_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'author__affiliated_to__institute', 'edge_index.npy'))).t()
-          paper_fos_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          paper_fos_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__topic__fos', 'edge_index.npy'))).t()
           if self.dataset_size in ['large', 'full']:
-            paper_published_journal = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+            paper_published_journal = torch.from_numpy(np.load(osp.join(self.base_path,
             'paper__published__journal', 'edge_index.npy'))).t()
-            paper_venue_conference = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+            paper_venue_conference = torch.from_numpy(np.load(osp.join(self.base_path,
             'paper__venue__conference', 'edge_index.npy'))).t()
         else:
-          paper_paper_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          paper_paper_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__cites__paper', 'edge_index.npy'), mmap_mode='r')).t()
-          author_paper_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          author_paper_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__written_by__author', 'edge_index.npy'), mmap_mode='r')).t()
-          affiliation_author_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          affiliation_author_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'author__affiliated_to__institute', 'edge_index.npy'), mmap_mode='r')).t()
-          paper_fos_edges = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+          paper_fos_edges = torch.from_numpy(np.load(osp.join(self.base_path,
           'paper__topic__fos', 'edge_index.npy'), mmap_mode='r')).t()
           if self.dataset_size in ['large', 'full']:
-            paper_published_journal = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+            paper_published_journal = torch.from_numpy(np.load(osp.join(self.base_path,
             'paper__published__journal', 'edge_index.npy'), mmap_mode='r')).t()
-            paper_venue_conference = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
+            paper_venue_conference = torch.from_numpy(np.load(osp.join(self.base_path,
             'paper__venue__conference', 'edge_index.npy'), mmap_mode='r')).t()
 
         cites_edge = add_self_loops(remove_self_loops(paper_paper_edges)[0])[0]
@@ -118,9 +174,9 @@ class IGBHeteroDataset(object):
           compress_edge_dict[('conference', 'rev_venue', 'paper')] = 'conference__rev_venue__paper'
         
         for etype in compress_edge_dict.keys():
-          edge_path = osp.join(self.dir, self.dataset_size, 'processed', self.layout, compress_edge_dict[etype])
+          edge_path = osp.join(self.base_path, self.layout, compress_edge_dict[etype])
           try:
-            edge_path = osp.join(self.dir, self.dataset_size, 'processed', self.layout, compress_edge_dict[etype])
+            edge_path = osp.join(self.base_path, self.layout, compress_edge_dict[etype])
             indptr = torch.load(osp.join(edge_path, 'indptr.pt'))
             indices = torch.load(osp.join(edge_path, 'indices.pt'))
             if self.layout == 'CSC':
@@ -128,20 +184,23 @@ class IGBHeteroDataset(object):
             else:
               self.edge_dict[etype] = (indptr, indices)
           except FileNotFoundError:
-            print(f"FileNotFound: {file_path}")
+            print(f"FileNotFound: {e}")
             exit()
           except Exception as e:
             print(f"Exception: {e}")
             exit()
-
       self.etypes = list(self.edge_dict.keys())
-
+    
+    # load features and labels
     label_file = 'node_label_19.npy' if not self.use_label_2K else 'node_label_2K.npy'
-    paper_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', 'node_feat.npy')
-    paper_lbl_path = osp.join(self.dir, self.dataset_size, 'processed', 'paper', label_file)
+    paper_feat_path = osp.join(self.base_path, 'paper', 'node_feat.npy')
+    paper_lbl_path = osp.join(self.base_path, 'paper', label_file)
     num_paper_nodes = self.paper_nodes_num[self.dataset_size]
     if self.in_memory:
-      paper_node_features = torch.from_numpy(np.load(paper_feat_path))
+      if self.use_fp16:
+        paper_node_features = torch.load(osp.join(self.base_path, 'paper', 'node_feat_fp16.pt'))
+      else:
+        paper_node_features = torch.from_numpy(np.load(paper_feat_path))
       paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long) 
     else:
       if self.dataset_size in ['large', 'full']:
@@ -154,9 +213,12 @@ class IGBHeteroDataset(object):
     self.label = paper_node_labels
 
     num_author_nodes = self.author_nodes_num[self.dataset_size]
-    author_feat_path = osp.join(self.dir, self.dataset_size, 'processed', 'author', 'node_feat.npy')
+    author_feat_path = osp.join(self.base_path, 'author', 'node_feat.npy')
     if self.in_memory:
-      author_node_features = torch.from_numpy(np.load(author_feat_path))
+      if self.use_fp16:
+        author_node_features = torch.load(osp.join(self.base_path, 'author', 'node_feat_fp16.pt'))
+      else:  
+        author_node_features = torch.from_numpy(np.load(author_feat_path))
     else:
       if self.dataset_size in ['large', 'full']:
         author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
@@ -165,35 +227,40 @@ class IGBHeteroDataset(object):
     self.feat_dict['author'] = author_node_features
 
     if self.in_memory:
-      institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'institute', 'node_feat.npy')))
+      if self.use_fp16:
+        institute_node_features = torch.load(osp.join(self.base_path, 'institute', 'node_feat_fp16.pt'))
+      else:
+        institute_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'institute', 'node_feat.npy')))
     else:
-      institute_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'institute', 'node_feat.npy'), mmap_mode='r'))
+      institute_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'institute', 'node_feat.npy'), mmap_mode='r'))
     self.feat_dict['institute'] = institute_node_features
 
     if self.in_memory:
-      fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'fos', 'node_feat.npy')))
+      if self.use_fp16:
+        fos_node_features = torch.load(osp.join(self.base_path, 'fos', 'node_feat_fp16.pt'))
+      else:
+        fos_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'fos', 'node_feat.npy')))
     else:
-      fos_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-      'fos', 'node_feat.npy'), mmap_mode='r'))
+      fos_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'fos', 'node_feat.npy'), mmap_mode='r'))
     self.feat_dict['fos'] = fos_node_features
 
     if self.dataset_size in ['large', 'full']:
       if self.in_memory:
-        conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-        'conference', 'node_feat.npy')))
+        if self.use_fp16:
+          conference_node_features = torch.load(osp.join(self.base_path, 'conference', 'node_feat_fp16.pt'))
+        else:
+          conference_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'conference', 'node_feat.npy')))
       else:
-        conference_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-        'conference', 'node_feat.npy'), mmap_mode='r'))
+        conference_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'conference', 'node_feat.npy'), mmap_mode='r'))
       self.feat_dict['conference'] = conference_node_features
+      
       if self.in_memory:
-        journal_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-        'journal', 'node_feat.npy')))
+        if self.use_fp16:
+          journal_node_features = torch.load(osp.join(self.base_path, 'journal', 'node_feat_fp16.pt'))
+        else:
+          journal_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'journal', 'node_feat.npy')))
       else:
-        journal_node_features = torch.from_numpy(np.load(osp.join(self.dir, self.dataset_size, 'processed',
-        'journal', 'node_feat.npy'), mmap_mode='r'))
+        journal_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'journal', 'node_feat.npy'), mmap_mode='r'))
       self.feat_dict['journal'] = journal_node_features
 
     n_labeled_idx = self.paper_nodes_num[self.dataset_size]
