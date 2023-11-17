@@ -26,13 +26,14 @@ def partition_feature(src_path: str,
                       partition_idx: int,
                       chunk_size: int,
                       dataset_size: str='tiny',
-                      in_memory: bool=True):
+                      in_memory: bool=True,
+                      use_fp16: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
   data = IGBHeteroDataset(src_path, dataset_size, in_memory, with_edges=False)
 
   print(f'-- Build feature for partition {partition_idx} ...')
   dst_path = osp.join(dst_path, f'{dataset_size}-partitions')
-  glt.partition.base.build_partition_feature(dst_path, partition_idx, chunk_size, data.feat_dict)
+  glt.partition.base.build_partition_feature(dst_path, partition_idx, chunk_size, data.feat_dict, use_fp16)
 
 
 if __name__ == '__main__':
@@ -52,6 +53,8 @@ if __name__ == '__main__':
       help="Index of a partition")
   parser.add_argument("--chunk_size", type=int, default=10000,
       help="Chunk size for feature partitioning.")
+  parser.add_argument("--use_fp16", action="store_true",
+      help="save node/edge feature using fp16 format")
 
 
   args = parser.parse_args()
@@ -62,5 +65,6 @@ if __name__ == '__main__':
     partition_idx=args.partition_idx,
     chunk_size=args.chunk_size,
     dataset_size=args.dataset_size,
-    in_memory=args.in_memory==1
+    in_memory=args.in_memory==1,
+    use_fp16=args.use_fp16
   )

@@ -30,7 +30,8 @@ def partition_dataset(src_path: str,
                       in_memory: bool=True,
                       edge_assign_strategy: str='by_src',
                       use_label_2K: bool=False,
-                      with_feature: bool=True):
+                      with_feature: bool=True,
+                      use_fp16: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
   data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
@@ -75,7 +76,7 @@ def partition_dataset(src_path: str,
     edge_assign_strategy=edge_assign_strategy,
     chunk_size=chunk_size,
   )
-  partitioner.partition(with_feature)
+  partitioner.partition(with_feature, use_fp16)
 
 
 if __name__ == '__main__':
@@ -101,6 +102,8 @@ if __name__ == '__main__':
       help="edge assign strategy can be either 'by_src' or 'by_dst'")
   parser.add_argument('--with_feature', type=int, default=1,
       choices=[0, 1], help='0:do not partition feature, 1:partition feature')
+  parser.add_argument('--use_fp16', action="store_true",
+      help="save partitioned node/edge feature into fp16 format")
 
   args = parser.parse_args()
 
@@ -113,5 +116,6 @@ if __name__ == '__main__':
     in_memory=args.in_memory,
     edge_assign_strategy=args.edge_assign_strategy,
     use_label_2K=args.num_classes==2983,
-    with_feature=args.with_feature==1
+    with_feature=args.with_feature==1,
+    use_fp16=args.use_fp16
   )

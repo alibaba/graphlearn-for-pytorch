@@ -32,13 +32,16 @@ from rgnn import RGNN
 torch.manual_seed(42)
 
 
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, use_fp16):
   predictions = []
   labels = []
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict,
+      x_dict = batch.x_dict
+      if use_fp16:
+        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+      out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
@@ -54,14 +57,13 @@ def evaluate(model, dataloader):
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, batch_size, learning_rate, log_every,
-    dataset, train_idx, val_idx, test_idx,
+    dataset, train_idx, val_idx,
     master_addr,
     training_pg_master_port,
     train_loader_master_port,
     val_loader_master_port,
-    test_loader_master_port,
-    with_gpu, trim_to_layer, edge_dir,
-    rpc_timeout):
+    with_gpu, trim_to_layer, use_fp16,
+    edge_dir, rpc_timeout):
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
     world_size=num_nodes*num_training_procs,
@@ -178,7 +180,10 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(batch.x_dict,
+      x_dict = batch.x_dict
+      if use_fp16:
+        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+      out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
@@ -203,7 +208,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     torch.distributed.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader).item()*100
+      val_acc = evaluate(model, val_loader, use_fp16).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
@@ -263,8 +268,6 @@ if __name__ == '__main__':
       help="The port used for RPC initialization across all sampling workers of train loader.")
   parser.add_argument("--val_loader_master_port", type=int, default=12113,
       help="The port used for RPC initialization across all sampling workers of val loader.")
-  parser.add_argument("--test_loader_master_port", type=int, default=12114,
-      help="The port used for RPC initialization across all sampling workers of test loader.")
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='out',
@@ -275,6 +278,8 @@ if __name__ == '__main__':
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
       help="use trim_to_layer function from pyG")
+  parser.add_argument("--use_fp16", action="store_true",
+      help="load node/edge feature using fp16 format to reduce memory usage")
   args = parser.parse_args()
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
@@ -291,6 +296,7 @@ if __name__ == '__main__':
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
     feature_with_gpu=args.with_gpu,
+    feature_with_fp16=args.use_fp16,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )
   train_idx = torch.load(
@@ -308,14 +314,14 @@ if __name__ == '__main__':
     args=(args.num_nodes, args.node_rank, args.num_training_procs, args.split_training_sampling,
           args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
           args.epochs, args.batch_size, args.learning_rate, args.log_every,
-          dataset, train_idx, val_idx, test_idx,
+          dataset, train_idx, val_idx,
           args.master_addr,
           args.training_pg_master_port,
           args.train_loader_master_port,
           args.val_loader_master_port,
-          args.test_loader_master_port,
           args.with_gpu,
           args.with_trim,
+          args.use_fp16,
           args.edge_dir,
           args.rpc_timeout),
     nprocs=args.num_training_procs,
