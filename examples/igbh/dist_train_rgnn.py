@@ -38,9 +38,10 @@ def evaluate(model, dataloader, use_fp16):
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
-      x_dict = batch.x_dict
       if use_fp16:
         x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+      else:
+        x_dict = batch.x_dict
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
@@ -180,9 +181,10 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
-      x_dict = batch.x_dict
       if use_fp16:
         x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+      else:
+        x_dict = batch.x_dict
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
