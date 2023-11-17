@@ -196,7 +196,7 @@ if __name__ == '__main__':
   parser.add_argument('--batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.01)
-  parser.add_argument('--epochs', type=int, default=20)
+  parser.add_argument('--epochs', type=int, default=1)
   parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
@@ -213,11 +213,8 @@ if __name__ == '__main__':
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
-                                  args.num_classes==2983, True, args.layout)
-  if args.use_fp16:
-    for node_name, node_feat in igbh_dataset.feat_dict.items():
-      igbh_dataset.feat_dict[node_name] = node_feat.half()
-    
+                                  args.num_classes==2983, True, args.layout, args.use_fp16)
+
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
 
@@ -232,7 +229,6 @@ if __name__ == '__main__':
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
   )
   
-
   glt_dataset.init_node_labels(node_label_data={'paper': igbh_dataset.label})
 
   train_idx = igbh_dataset.train_idx.clone().share_memory_()
