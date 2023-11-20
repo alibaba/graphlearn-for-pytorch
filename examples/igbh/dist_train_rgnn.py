@@ -298,7 +298,6 @@ if __name__ == '__main__':
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
     feature_with_gpu=args.with_gpu,
-    feature_with_fp16=args.use_fp16,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )
   train_idx = torch.load(

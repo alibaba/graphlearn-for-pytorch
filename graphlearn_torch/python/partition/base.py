@@ -675,17 +675,14 @@ def load_graph_partition_data(
 
 def load_feature_partition_data(
   feature_data_dir: str,
-  device: torch.device,
-  use_fp16: bool=False
+  device: torch.device
 ) -> FeaturePartitionData:
   r""" Load a feature partition data from the specified directory.
   """
   if not os.path.exists(feature_data_dir):
     return None
+
   feats = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'feats.pkl'), device)
-  if use_fp16 and feats.format == torch.float32:
-    feats = feats.half()
- 
   ids = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'ids.pkl'), device)
   cache_feats_path = os.path.join(feature_data_dir, 'cache_feats.pt')
   cache_ids_path = os.path.join(feature_data_dir, 'cache_ids.pt')
@@ -703,7 +700,6 @@ def load_feature_partition_data(
 def load_partition(
   root_dir: str,
   partition_idx: int,
-  use_fp16: bool=False,
   device: torch.device = torch.device('cpu')
 ) -> Union[Tuple[int, int,
                  GraphPartitionData,
@@ -722,7 +718,6 @@ def load_partition(
   Args:
     root_dir (str): The root directory for saved files.
     partition_idx (int): The partition idx to load.
-    use_fp16: (bool): Whether use fp16 format for node/edge feature.
     device (torch.device): The device where loaded graph partition data locates.
 
   Returns:
@@ -752,8 +747,8 @@ def load_partition(
 
   if meta['data_cls'] == 'homo':
     graph = load_graph_partition_data(graph_dir, device)
-    node_feat = load_feature_partition_data(node_feat_dir, device, use_fp16)
-    edge_feat = load_feature_partition_data(edge_feat_dir, device, use_fp16)
+    node_feat = load_feature_partition_data(node_feat_dir, device)
+    edge_feat = load_feature_partition_data(edge_feat_dir, device)
     node_pb = torch.load(os.path.join(root_dir, 'node_pb.pt'),
                          map_location=device)
     edge_pb = torch.load(os.path.join(root_dir, 'edge_pb.pt'),
@@ -773,7 +768,7 @@ def load_partition(
   node_feat_dict = {}
   for ntype in meta['node_types']:
     node_feat = load_feature_partition_data(
-      os.path.join(node_feat_dir, as_str(ntype)), device, use_fp16)
+      os.path.join(node_feat_dir, as_str(ntype)), device)
     if node_feat is not None:
       node_feat_dict[ntype] = node_feat
   if len(node_feat_dict) == 0:
@@ -782,7 +777,7 @@ def load_partition(
   edge_feat_dict = {}
   for etype in meta['edge_types']:
     edge_feat = load_feature_partition_data(
-      os.path.join(edge_feat_dir, as_str(etype)), device, use_fp16)
+      os.path.join(edge_feat_dir, as_str(etype)), device)
     if edge_feat is not None:
       edge_feat_dict[etype] = edge_feat
   if len(edge_feat_dict) == 0:

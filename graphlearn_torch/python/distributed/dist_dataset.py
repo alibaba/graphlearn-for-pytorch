@@ -83,7 +83,6 @@ class DistDataset(Dataset):
     partition_idx: int,
     graph_mode: str = 'ZERO_COPY',
     feature_with_gpu: bool = True,
-    feature_with_fp16: bool = False,
     device_group_list: Optional[List[DeviceGroup]] = None,
     whole_node_label_file: Union[str, Dict[NodeType, str]] = None,
     device: Optional[int] = None
@@ -102,8 +101,6 @@ class DistDataset(Dataset):
         If True, it means ``Feature`` consists of ``UnifiedTensor``, otherwise
         ``Feature`` is a PyTorch CPU Tensor, the ``device_group_list`` and
         ``device`` will be invliad. (default: ``True``)
-      feature_with_fp16 (bool): A Boolean value indicating whether use fp16 format
-        when loading node/edge feature 
       device_group_list (List[DeviceGroup], optional): A list of device groups
         used for feature lookups, the GPU part of feature data will be
         replicated on each device group in this list during the initialization.
@@ -123,7 +120,7 @@ class DistDataset(Dataset):
       edge_feat_data,
       self.node_pb,
       self.edge_pb
-    ) = load_partition(root_dir, partition_idx, feature_with_fp16)
+    ) = load_partition(root_dir, partition_idx)
 
     # init graph partition
     if isinstance(graph_data, dict):
