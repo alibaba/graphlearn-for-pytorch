@@ -29,11 +29,11 @@ def partition_feature(src_path: str,
                       in_memory: bool=True,
                       use_fp16: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
-  data = IGBHeteroDataset(src_path, dataset_size, in_memory, with_edges=False)
+  data = IGBHeteroDataset(src_path, dataset_size, in_memory, with_edges=False, use_fp16=use_fp16)
 
   print(f'-- Build feature for partition {partition_idx} ...')
   dst_path = osp.join(dst_path, f'{dataset_size}-partitions')
-  glt.partition.base.build_partition_feature(dst_path, partition_idx, chunk_size, data.feat_dict, use_fp16)
+  glt.partition.base.build_partition_feature(dst_path, partition_idx, chunk_size, data.feat_dict)
 
 
 if __name__ == '__main__':

@@ -33,7 +33,7 @@ def partition_dataset(src_path: str,
                       with_feature: bool=True,
                       use_fp16: bool=False):
   print(f'-- Loading igbh_{dataset_size} ...')
-  data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K)
+  data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K, use_fp16=use_fp16)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
 
   print('-- Saving label ...')
@@ -76,7 +76,7 @@ def partition_dataset(src_path: str,
     edge_assign_strategy=edge_assign_strategy,
     chunk_size=chunk_size,
   )
-  partitioner.partition(with_feature, use_fp16)
+  partitioner.partition(with_feature)
 
 
 if __name__ == '__main__':

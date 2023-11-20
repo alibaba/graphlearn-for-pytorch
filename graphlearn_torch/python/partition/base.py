@@ -124,7 +124,6 @@ def save_feature_partition_chunk(
   partition_idx: int,
   feature_partition: FeaturePartitionData,
   group: str = 'node_feat',
-  use_fp16 = False,
   graph_type: Optional[Union[NodeType, EdgeType]] = None
 ):
   r""" Append a chunk of a feature partition to files in the output directory.
@@ -133,10 +132,7 @@ def save_feature_partition_chunk(
   if graph_type is not None:
     subdir = os.path.join(subdir, as_str(graph_type))
   ensure_dir(subdir)
-  if use_fp16:
-    append_tensor_to_file(os.path.join(subdir, 'feats_fp16.pkl'), feature_partition.feats)
-  else:
-    append_tensor_to_file(os.path.join(subdir, 'feats.pkl'), feature_partition.feats)
+  append_tensor_to_file(os.path.join(subdir, 'feats.pkl'), feature_partition.feats)
   append_tensor_to_file(os.path.join(subdir,'ids.pkl'), feature_partition.ids)
 
 def save_feature_partition_cache(
@@ -342,7 +338,6 @@ class PartitionerBase(ABC):
   def _partition_and_save_node_feat(
     self,
     node_ids_list: List[torch.Tensor],
-    use_fp16: bool=False,
     ntype: Optional[NodeType] = None,
   ):
     r""" Partition node features by the partitioned node results, and calculate
@@ -368,18 +363,17 @@ class PartitionerBase(ABC):
       n_ids_chunks = torch.chunk(n_ids, chunks=((n_ids.shape[0] + self.chunk_size - 1) // self.chunk_size))
       for chunk in n_ids_chunks:
         p_node_feat_chunk = FeaturePartitionData(
-          feats=node_feat[chunk].half() if use_fp16 else node_feat[chunk],
+          feats=node_feat[chunk],
           ids=chunk.clone(),
           cache_feats=None,
           cache_ids=None
         )
         save_feature_partition_chunk(self.output_dir, pidx, p_node_feat_chunk,
-                                     group='node_feat', use_fp16=use_fp16, graph_type=ntype)
+                                     group='node_feat', graph_type=ntype)
 
   def _partition_and_save_edge_feat(
     self,
     graph_list: List[GraphPartitionData],
-    use_fp16: bool=False,
     etype: Optional[EdgeType] = None
   ):
     r""" Partition edge features by the partitioned edge results.
@@ -394,13 +388,13 @@ class PartitionerBase(ABC):
       )
       for chunk in eids_chunks:
         p_edge_feat_chunk = FeaturePartitionData(
-          feats=edge_feat[chunk].half() if use_fp16 else edge_feat[chunk],
+          feats=edge_feat[chunk],
           ids=chunk.clone(),
           cache_feats=None,
           cache_ids=None
         )
         save_feature_partition_chunk(self.output_dir, pidx, p_edge_feat_chunk,
-                                     group='edge_feat', use_fp16=use_fp16, graph_type=etype)
+                                     group='edge_feat', graph_type=etype)
 
   def _process_node(self, ntype, with_feature):
     node_ids_list, node_pb = self._partition_node(ntype)
@@ -417,14 +411,12 @@ class PartitionerBase(ABC):
     if with_feature:
       self._partition_and_save_edge_feat(graph_list, etype)
   
-  def partition(self, with_feature=True, use_fp16=False):
+  def partition(self, with_feature=True):
     r""" Partition graph and feature data into different parts. 
     
     Args:
       with_feature (bool): A flag indicating if the feature should be 
         partitioned with the graph (default: ``True``).
-      use_fp16 (bool): A flag indicating if the feature should be 
-        saved into fp16 format to save the memory (default: ``False``).
 
     The output directory of partitioned graph data will be like:
 
@@ -509,7 +501,7 @@ class PartitionerBase(ABC):
         save_node_pb(self.output_dir, node_pb, ntype)
         node_pb_dict[ntype] = node_pb
         if with_feature:
-          self._partition_and_save_node_feat(node_ids_list, use_fp16, ntype)
+          self._partition_and_save_node_feat(node_ids_list, ntype)
 
       for etype in self.edge_types:
         graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
@@ -517,20 +509,20 @@ class PartitionerBase(ABC):
         for pidx in range(self.num_parts):
           save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
         if with_feature:
-          self._partition_and_save_edge_feat(graph_list, use_fp16, etype)
+          self._partition_and_save_edge_feat(graph_list, etype)
 
     else:
       node_ids_list, node_pb = self._partition_node()
       save_node_pb(self.output_dir, node_pb)
       if with_feature:
-        self._partition_and_save_node_feat(node_ids_list, use_fp16)
+        self._partition_and_save_node_feat(node_ids_list)
 
       graph_list, edge_pb = self._partition_graph(node_pb)
       save_edge_pb(self.output_dir, edge_pb)
       for pidx in range(self.num_parts):
         save_graph_partition(self.output_dir, pidx, graph_list[pidx])
       if with_feature:
-        self._partition_and_save_edge_feat(graph_list, use_fp16)
+        self._partition_and_save_edge_feat(graph_list)
 
     # save meta.
     save_meta(self.output_dir, self.num_parts, self.data_cls,
@@ -544,7 +536,6 @@ def build_partition_feature(
   node_feat: Optional[Union[TensorDataType, Dict[NodeType, TensorDataType]]] = None,
   node_feat_dtype: torch.dtype = torch.float32,
   edge_feat: Optional[Union[TensorDataType, Dict[EdgeType, TensorDataType]]] = None,
-  use_fp16: bool=False,
   edge_feat_dtype: torch.dtype = torch.float32):
   
   r""" In the case that the graph topology is partitioned, but the feature
@@ -594,7 +585,7 @@ def build_partition_feature(
         cache_ids=None
       )
       save_feature_partition_chunk(root_dir, partition_idx, p_node_feat_chunk,
-                                   group='node_feat', use_fp16=use_fp16, graph_type=None)
+                                   group='node_feat', graph_type=None)
     
     # step 2: build and persist the edge feature partition
     if edge_feat is None:
@@ -612,7 +603,7 @@ def build_partition_feature(
         cache_ids=None
       )
       save_feature_partition_chunk(root_dir, partition_idx, p_edge_feat_chunk,
-                                   group='edge_feat', use_fp16=use_fp16, graph_type=None)
+                                   group='edge_feat', graph_type=None)
   # heterogenous
   else:  
     # step 1: build and persist the node feature partition
@@ -636,7 +627,7 @@ def build_partition_feature(
           cache_ids=None
         )
         save_feature_partition_chunk(root_dir, partition_idx, p_node_feat_chunk,
-                                    group='node_feat', use_fp16=use_fp16, graph_type=ntype)
+                                    group='node_feat', graph_type=ntype)
     # step 2: build and persist the edge feature partition
     if edge_feat is None:
         return
@@ -656,7 +647,7 @@ def build_partition_feature(
           cache_ids=None
         )
         save_feature_partition_chunk(root_dir, partition_idx, p_edge_feat_chunk,
-                                    group='edge_feat', use_fp16=use_fp16, graph_type=etype)
+                                    group='edge_feat', graph_type=etype)
 
 def load_graph_partition_data(
   graph_data_dir: str,
@@ -691,15 +682,10 @@ def load_feature_partition_data(
   """
   if not os.path.exists(feature_data_dir):
     return None
-  if use_fp16:
-    fp16_feats_path = os.path.join(feature_data_dir, 'feats_fp16.pkl')
-    if os.path.exists(fp16_feats_path):
-      feats = load_and_concatenate_tensors(fp16_feats_path, device)
-    else:
-      feats = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'feats.pkl'), device)
-      feats = feats.half()
-  else:
-      feats = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'feats.pkl'), device)
+  feats = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'feats.pkl'), device)
+  if use_fp16 and feats.format == torch.float32:
+    feats = feats.half()
+ 
   ids = load_and_concatenate_tensors(os.path.join(feature_data_dir, 'ids.pkl'), device)
   cache_feats_path = os.path.join(feature_data_dir, 'cache_feats.pt')
   cache_ids_path = os.path.join(feature_data_dir, 'cache_ids.pt')
