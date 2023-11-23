@@ -74,12 +74,12 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   current_ctx = glt.distributed.get_context()
   if with_gpu:
-    current_device = torch.device(local_proc_rank % torch.cuda.device_count())
+    current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
   else:
     current_device = torch.device('cpu')
   
   if split_training_sampling:
-    sampling_device = torch.device((local_proc_rank + 1) % torch.cuda.device_count())
+    sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
   else: 
     sampling_device = current_device
 
