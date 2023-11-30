@@ -63,7 +63,11 @@ class IGBHeteroDataset(object):
     paper_feat_path = osp.join(self.base_path, 'paper', 'node_feat.npy')
     paper_fp16_feat_path = osp.join(self.base_path, 'paper', 'node_feat_fp16.pt')
     if not osp.exists(paper_fp16_feat_path):
-      paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
+      if self.dataset_size in ['large', 'full']:
+        num_paper_nodes = self.paper_nodes_num[self.dataset_size]
+        paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
+      else:
+        paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
       paper_node_features = paper_node_features.half()
       torch.save(paper_node_features, paper_fp16_feat_path)
 
@@ -71,7 +75,11 @@ class IGBHeteroDataset(object):
     author_feat_path = osp.join(self.base_path, 'author', 'node_feat.npy')
     author_fp16_feat_path = osp.join(self.base_path, 'author', 'node_feat_fp16.pt')
     if not osp.exists(author_fp16_feat_path):
-      author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
+      if self.dataset_size in ['large', 'full']:
+        num_author_nodes = self.author_nodes_num[self.dataset_size]
+        author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
+      else:
+        author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
       author_node_features = author_node_features.half()
       torch.save(author_node_features, author_fp16_feat_path)
 
