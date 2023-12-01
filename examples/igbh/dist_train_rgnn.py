@@ -86,6 +86,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
   # Initialize training process group of PyTorch.
   torch.distributed.init_process_group(
     backend='nccl' if with_gpu else 'gloo',
+    timeout=datetime.timedelta(seconds=rpc_timeout),
     rank=current_ctx.rank,
     world_size=current_ctx.world_size,
     init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port)
