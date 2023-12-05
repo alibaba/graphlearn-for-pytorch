@@ -19,6 +19,7 @@ import os.path as osp
 
 import graphlearn_torch as glt
 
+from dataset import float2half
 from download import download_dataset
 from torch_geometric.utils import add_self_loops, remove_self_loops
 from typing import Literal
@@ -119,9 +120,14 @@ if __name__ == '__main__':
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument("--layout", type=str, default='CSC')
+  parser.add_argument('--use_fp16', action="store_true",
+    help="convert the node/edge feature into fp16 format")
   args = parser.parse_args()
   print(f"Start constructing the {args.layout} graph...")
   igbh_dataset = IGBHeteroDatasetCompress(args.path, args.dataset_size, args.layout)
+  if args.use_fp16:
+    base_path = osp.join(args.path, args.dataset_size, 'processed')
+    float2half(base_path, args.dataset_size)
   
 
 

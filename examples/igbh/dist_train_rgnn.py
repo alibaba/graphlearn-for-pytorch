@@ -248,12 +248,12 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='15,10,5')
+  parser.add_argument('--fan_out', type=str, default='15,10')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=float, default=0.001)
-  parser.add_argument('--epochs', type=int, default=20)
-  parser.add_argument('--num_layers', type=int, default=3)
+  parser.add_argument('--learning_rate', type=float, default=0.01)
+  parser.add_argument('--epochs', type=int, default=1)
+  parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=2)
   # Distributed settings.
@@ -275,6 +275,8 @@ if __name__ == '__main__':
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='out',
       help="sampling direction, can be 'in' for 'by_dst' or 'out' for 'by_src' for partitions.")
+  parser.add_argument('--layout', type=str, default='COO',
+      help="Layout of input graph: CSC, CSR, COO. Default is COO.")
   parser.add_argument("--rpc_timeout", type=int, default=180,
                       help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
@@ -284,6 +286,7 @@ if __name__ == '__main__':
   parser.add_argument("--use_fp16", action="store_true",
       help="load node/edge feature using fp16 format to reduce memory usage")
   args = parser.parse_args()
+  assert args.layout in ['COO', 'CSC', 'CSR']
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
@@ -298,6 +301,7 @@ if __name__ == '__main__':
     root_dir=osp.join(args.path, f'{args.dataset_size}-partitions'),
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
+    input_layout = args.layout,
     feature_with_gpu=args.with_gpu,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )

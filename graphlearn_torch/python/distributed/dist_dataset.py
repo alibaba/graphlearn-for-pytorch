@@ -82,6 +82,7 @@ class DistDataset(Dataset):
     root_dir: str,
     partition_idx: int,
     graph_mode: str = 'ZERO_COPY',
+    input_layout: Literal['COO', 'CSR', 'CSC'] = 'COO',
     feature_with_gpu: bool = True,
     device_group_list: Optional[List[DeviceGroup]] = None,
     whole_node_label_file: Union[str, Dict[NodeType, str]] = None,
@@ -94,8 +95,10 @@ class DistDataset(Dataset):
       root_dir (str): The directory path to load the graph and feature
         partition data.
       partition_idx (int): Partition idx to load.
-      graph_mode (str): Mode for creating graphlearn_torch's `Graph`, including
-        'CPU', 'ZERO_COPY' or 'CUDA'. (default: 'ZERO_COPY')
+      graph_mode (str): Mode for creating graphlearn_torch's ``Graph``, including
+        ``CPU``, ``ZERO_COPY`` or ``CUDA``. (default: ``ZERO_COPY``)
+      input_layout (str): layout of the input graph, including ``CSR``, ``CSC`` 
+        or ``COO``. (default: ``COO``)
       feature_with_gpu (bool): A Boolean value indicating whether the created
         ``Feature`` objects of node/edge features use ``UnifiedTensor``.
         If True, it means ``Feature`` consists of ``UnifiedTensor``, otherwise
@@ -135,7 +138,7 @@ class DistDataset(Dataset):
       edge_index = graph_data.edge_index
       edge_ids = graph_data.eids
       edge_weights = graph_data.weights
-    self.init_graph(edge_index, edge_ids, edge_weights, layout='COO',
+    self.init_graph(edge_index, edge_ids, edge_weights, layout=input_layout,
                     graph_mode=graph_mode, device=device)
 
     # load node feature partition

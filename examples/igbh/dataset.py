@@ -23,6 +23,66 @@ from torch_geometric.utils import add_self_loops, remove_self_loops
 from download import download_dataset
 from typing import Literal
 
+def float2half(base_path, dataset_size):
+  paper_nodes_num = {'tiny':100000, 'small':1000000, 'medium':10000000, 'large':100000000, 'full':269346174}
+  author_nodes_num = {'tiny':357041, 'small':1926066, 'medium':15544654, 'large':116959896, 'full':277220883}
+  # paper node
+  paper_feat_path = osp.join(base_path, 'paper', 'node_feat.npy')
+  paper_fp16_feat_path = osp.join(base_path, 'paper', 'node_feat_fp16.pt')
+  if not osp.exists(paper_fp16_feat_path):
+    if dataset_size in ['large', 'full']:
+      num_paper_nodes = paper_nodes_num[dataset_size]
+      paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
+    else:
+      paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
+    paper_node_features = paper_node_features.half()
+    torch.save(paper_node_features, paper_fp16_feat_path)
+
+  # author node
+  author_feat_path = osp.join(base_path, 'author', 'node_feat.npy')
+  author_fp16_feat_path = osp.join(base_path, 'author', 'node_feat_fp16.pt')
+  if not osp.exists(author_fp16_feat_path):
+    if dataset_size in ['large', 'full']:
+      num_author_nodes = author_nodes_num[dataset_size]
+      author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
+    else:
+      author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
+    author_node_features = author_node_features.half()
+    torch.save(author_node_features, author_fp16_feat_path)
+
+  # institute node
+  institute_feat_path = osp.join(base_path, 'institute', 'node_feat.npy')
+  institute_fp16_feat_path = osp.join(base_path, 'institute', 'node_feat_fp16.pt')
+  if not osp.exists(institute_fp16_feat_path):
+    institute_node_features = torch.from_numpy(np.load(institute_feat_path, mmap_mode='r'))
+    institute_node_features = institute_node_features.half()
+    torch.save(institute_node_features, institute_fp16_feat_path)
+
+  # fos node
+  fos_feat_path = osp.join(base_path, 'fos', 'node_feat.npy')
+  fos_fp16_feat_path = osp.join(base_path, 'fos', 'node_feat_fp16.pt')
+  if not osp.exists(fos_fp16_feat_path):
+    fos_node_features = torch.from_numpy(np.load(fos_feat_path, mmap_mode='r'))
+    fos_node_features = fos_node_features.half()
+    torch.save(fos_node_features, fos_fp16_feat_path)
+    
+  if dataset_size in ['large', 'full']:
+    # conference node
+    conference_feat_path = osp.join(base_path, 'conference', 'node_feat.npy')
+    conference_fp16_feat_path = osp.join(base_path, 'conference', 'node_feat_fp16.pt')
+    if not osp.exists(conference_fp16_feat_path):
+      conference_node_features = torch.from_numpy(np.load(conference_feat_path, mmap_mode='r'))
+      conference_node_features = conference_node_features.half()
+      torch.save(conference_node_features, conference_fp16_feat_path)
+
+    # journal node
+    journal_feat_path = osp.join(base_path, 'journal', 'node_feat.npy')
+    journal_fp16_feat_path = osp.join(base_path, 'journal', 'node_feat_fp16.pt')
+    if not osp.exists(journal_fp16_feat_path):
+      journal_node_features = torch.from_numpy(np.load(journal_feat_path, mmap_mode='r'))
+      journal_node_features = journal_node_features.half()
+      torch.save(journal_node_features, journal_fp16_feat_path)
+
 class IGBHeteroDataset(object):
   def __init__(self,
                path,
@@ -55,66 +115,8 @@ class IGBHeteroDataset(object):
     if not osp.exists(self.base_path):
       download_dataset(path, 'heterogeneous', dataset_size)
     if self.use_fp16:
-      self.float2half()
+      float2half(self.base_path, self.dataset_size)
     self.process()
-
-  def float2half(self):
-    # paper node
-    paper_feat_path = osp.join(self.base_path, 'paper', 'node_feat.npy')
-    paper_fp16_feat_path = osp.join(self.base_path, 'paper', 'node_feat_fp16.pt')
-    if not osp.exists(paper_fp16_feat_path):
-      if self.dataset_size in ['large', 'full']:
-        num_paper_nodes = self.paper_nodes_num[self.dataset_size]
-        paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
-      else:
-        paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
-      paper_node_features = paper_node_features.half()
-      torch.save(paper_node_features, paper_fp16_feat_path)
-
-    # author node
-    author_feat_path = osp.join(self.base_path, 'author', 'node_feat.npy')
-    author_fp16_feat_path = osp.join(self.base_path, 'author', 'node_feat_fp16.pt')
-    if not osp.exists(author_fp16_feat_path):
-      if self.dataset_size in ['large', 'full']:
-        num_author_nodes = self.author_nodes_num[self.dataset_size]
-        author_node_features = torch.from_numpy(np.memmap(author_feat_path, dtype='float32', mode='r', shape=(num_author_nodes,1024)))
-      else:
-        author_node_features = torch.from_numpy(np.load(author_feat_path, mmap_mode='r'))
-      author_node_features = author_node_features.half()
-      torch.save(author_node_features, author_fp16_feat_path)
-
-    # institute node
-    institute_feat_path = osp.join(self.base_path, 'institute', 'node_feat.npy')
-    institute_fp16_feat_path = osp.join(self.base_path, 'institute', 'node_feat_fp16.pt')
-    if not osp.exists(institute_fp16_feat_path):
-      institute_node_features = torch.from_numpy(np.load(institute_feat_path, mmap_mode='r'))
-      institute_node_features = institute_node_features.half()
-      torch.save(institute_node_features, institute_fp16_feat_path)
-
-    # fos node
-    fos_feat_path = osp.join(self.base_path, 'fos', 'node_feat.npy')
-    fos_fp16_feat_path = osp.join(self.base_path, 'fos', 'node_feat_fp16.pt')
-    if not osp.exists(fos_fp16_feat_path):
-      fos_node_features = torch.from_numpy(np.load(fos_feat_path, mmap_mode='r'))
-      fos_node_features = fos_node_features.half()
-      torch.save(fos_node_features, fos_fp16_feat_path)
-      
-    if self.dataset_size in ['large', 'full']:
-      # conference node
-      conference_feat_path = osp.join(self.base_path, 'conference', 'node_feat.npy')
-      conference_fp16_feat_path = osp.join(self.base_path, 'conference', 'node_feat_fp16.pt')
-      if not osp.exists(conference_fp16_feat_path):
-        conference_node_features = torch.from_numpy(np.load(conference_feat_path, mmap_mode='r'))
-        conference_node_features = conference_node_features.half()
-        torch.save(conference_node_features, conference_fp16_feat_path)
-
-      # journal node
-      journal_feat_path = osp.join(self.base_path, 'journal', 'node_feat.npy')
-      journal_fp16_feat_path = osp.join(self.base_path, 'journal', 'node_feat_fp16.pt')
-      if not osp.exists(journal_fp16_feat_path):
-        journal_node_features = torch.from_numpy(np.load(journal_feat_path, mmap_mode='r'))
-        journal_node_features = journal_node_features.half()
-        torch.save(journal_node_features, journal_fp16_feat_path)
 
   def process(self):
     # load edges

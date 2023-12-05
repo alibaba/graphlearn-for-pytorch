@@ -45,21 +45,22 @@ CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset
 ```
 
 Note that the original graph is in COO fornat, the above scripts will transform
-the graph from COO to CSC or CSR according to the edge direction of sampling. This process
-is time consuming when the graph is large. We provide a script to convert and persist
-the graph in CSC or CSR format:
+the graph from COO to CSC or CSR according to the edge direction of sampling. 
+If `--use_fp16` is enabled, the feature will be converted from `fp32`into `fp16`. 
+This process could be time consuming. We provide a script to convert and persist
+the graph layout (from `COO` to `CSC` or `CSR`) and the data type of feature:
 ```
-python compress_graph.py --dataset_size='tiny' --layout='CSC'
+python compress_graph.py --dataset_size='tiny' --layout='CSC' --use_fp16
 ```
 
-Once the CSC or CSR is persisted, train the model with `--cpu_mode='CSC'`
-or `--cpu_mode='CSR'`.
+Once the conversion is completed, train the model:
 
 ```
 CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19 --use_fp16 --layout='CSC'
 ```
 
-Note that, when the sampling edge direction is `in`, the layout should be `CSC`. When the sampling edge direction is `out`, the layout should be `CSR`.
+Note that, when the sampling edge direction is `in`, the layout should be `CSC`. 
+When the sampling edge direction is `out`, the layout should be `CSR`.
 
 
 ## 3. Distributed (multi nodes) examples
