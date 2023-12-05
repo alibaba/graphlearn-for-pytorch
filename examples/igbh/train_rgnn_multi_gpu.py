@@ -98,7 +98,7 @@ def run_training_proc(rank, world_size,
 
   # Define model and optimizer.
   model = RGNN(dataset.get_edge_types(),
-               dataset.node_features['paper'].shape[1],
+               (dataset.node_features['paper'].shape[1] if feat_store is None else feat_store['paper'].shape[1]),
                hidden_channels,
                num_classes,
                num_layers=num_layers,
