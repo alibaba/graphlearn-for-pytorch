@@ -31,17 +31,24 @@ from rgnn import RGNN
 torch.manual_seed(42)
 warnings.filterwarnings("ignore")
 
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, feat_store, current_device):
   predictions = []
   labels = []
   with torch.no_grad():
     for batch in dataloader:
       batch_size = batch['paper'].batch_size
-      out = model(
-        {
+      if feat_store is None:
+        batch_inputs = {
           node_name: node_feat.to(torch.float32)
           for node_name, node_feat in batch.x_dict.items()
-        },  
+        }
+      else:
+        batch_inputs = {
+          key: feat_store[key][batch[key].node.to("cpu")].to(current_device).to(torch.float32) 
+          for key in batch.node_types
+        }
+      out = model(
+        batch_inputs,
         batch.edge_index_dict
       )[:batch_size]
       labels.append(batch['paper'].y[:batch_size].cpu().numpy())
@@ -55,7 +62,7 @@ def evaluate(model, dataloader):
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, batch_size, learning_rate, log_every,
-    dataset, train_idx, val_idx, with_gpu):
+    dataset, train_idx, val_idx, with_gpu, feat_store):
   
   os.environ['MASTER_ADDR'] = 'localhost'
   os.environ['MASTER_PORT'] = '12355'
@@ -128,11 +135,18 @@ def run_training_proc(rank, world_size,
     for batch in train_loader:
       idx += 1
       batch_size = batch['paper'].batch_size
-      out = model(
-        {
+      if feat_store is None:
+        batch_inputs = {
           node_name: node_feat.to(torch.float32)
           for node_name, node_feat in batch.x_dict.items()
-        },  
+        }
+      else:
+        batch_inputs = {
+          key: feat_store[key][batch[key].node.to("cpu")].to(current_device).to(torch.float32) 
+          for key in batch.node_types
+        }
+      out = model(
+        batch_inputs,
         batch.edge_index_dict
       )[:batch_size]
       y = batch['paper'].y[:batch_size]
@@ -155,7 +169,7 @@ def run_training_proc(rank, world_size,
     dist.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader).item()*100
+      val_acc = evaluate(model, val_loader, feat_store, current_device).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
@@ -209,6 +223,7 @@ if __name__ == '__main__':
       help="Pin the feature in host memory. Default is False.")
   parser.add_argument("--use_fp16", action="store_true", 
       help="To use FP16 for loading the features. Default is False.")
+  parser.add_argument("--separate_sampling_aggregation", action="store_true")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
@@ -217,6 +232,14 @@ if __name__ == '__main__':
 
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
+
+  feat_store = None
+  if args.separate_sampling_aggregation:
+    # We move all features to shared memory
+    feat_store = {key: value.share_memory_() for key, value in igbh_dataset.feat_dict.items()}
+    # and set the new node features as the node ID
+    # so that we can easily fetch the features
+    igbh_dataset.feat_dict = {key: torch.arange(0, feat_store[key].shape[0]).reshape((-1, 1)).to(torch.float32) for key in feat_store}
 
   glt_dataset.init_node_features(
     node_feature_data=igbh_dataset.feat_dict,
@@ -241,7 +264,7 @@ if __name__ == '__main__':
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
           args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
           args.learning_rate, args.log_every,
-          glt_dataset, train_idx, val_idx, args.with_gpu),
+          glt_dataset, train_idx, val_idx, args.with_gpu, feat_store),
     nprocs=world_size,
     join=True
   )
