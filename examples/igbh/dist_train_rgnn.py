@@ -32,16 +32,18 @@ from rgnn import RGNN
 torch.manual_seed(42)
 
 
-def evaluate(model, dataloader, use_fp16):
+def evaluate(model, dataloader, current_device, use_fp16):
   predictions = []
   labels = []
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
       if use_fp16:
-        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name, node_feat in batch.x_dict.items()}
       else:
-        x_dict = batch.x_dict
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name, node_feat in batch.x_dict.items()}
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
@@ -184,9 +186,11 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       idx += 1
       batch_size = batch['paper'].batch_size
       if use_fp16:
-        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name,node_feat in batch.x_dict.items()}
       else:
-        x_dict = batch.x_dict
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name,node_feat in batch.x_dict.items()}
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
@@ -212,7 +216,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     torch.distributed.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader, use_fp16).item()*100
+      val_acc = evaluate(model, val_loader, current_device, use_fp16).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
@@ -249,12 +253,12 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='15,10')
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=float, default=0.01)
-  parser.add_argument('--epochs', type=int, default=1)
-  parser.add_argument('--num_layers', type=int, default=2)
+  parser.add_argument('--learning_rate', type=float, default=0.001)
+  parser.add_argument('--epochs', type=int, default=20)
+  parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=2)
   # Distributed settings.
