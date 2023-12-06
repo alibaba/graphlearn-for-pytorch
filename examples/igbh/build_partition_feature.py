@@ -17,6 +17,7 @@ import argparse
 import os.path as osp
 
 import graphlearn_torch as glt
+import torch
 
 from dataset import IGBHeteroDataset
 
@@ -33,7 +34,12 @@ def partition_feature(src_path: str,
 
   print(f'-- Build feature for partition {partition_idx} ...')
   dst_path = osp.join(dst_path, f'{dataset_size}-partitions')
-  glt.partition.base.build_partition_feature(dst_path, partition_idx, chunk_size, data.feat_dict)
+  node_feat_dtype = torch.float16 if use_fp16 else torch.float32
+  glt.partition.base.build_partition_feature(root_dir = dst_path,
+                                             partition_idx = partition_idx,
+                                             chunk_size = chunk_size,
+                                             node_feat = data.feat_dict,
+                                             node_feat_dtype = node_feat_dtype)
 
 
 if __name__ == '__main__':

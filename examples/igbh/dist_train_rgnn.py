@@ -32,16 +32,18 @@ from rgnn import RGNN
 torch.manual_seed(42)
 
 
-def evaluate(model, dataloader, use_fp16):
+def evaluate(model, dataloader, current_device, use_fp16):
   predictions = []
   labels = []
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
       if use_fp16:
-        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name, node_feat in batch.x_dict.items()}
       else:
-        x_dict = batch.x_dict
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name, node_feat in batch.x_dict.items()}
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
@@ -74,13 +76,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   current_ctx = glt.distributed.get_context()
   if with_gpu:
-    current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
+    if split_training_sampling:
+      current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
+      sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
+    else:
+      current_device = torch.device(local_proc_rank % torch.cuda.device_count())
+      sampling_device = current_device
   else:
     current_device = torch.device('cpu')
-  
-  if split_training_sampling:
-    sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
-  else: 
     sampling_device = current_device
 
   # Initialize training process group of PyTorch.
@@ -183,9 +186,11 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       idx += 1
       batch_size = batch['paper'].batch_size
       if use_fp16:
-        x_dict = {node_name: node_feat.to(torch.float32)  for node_name,node_feat in batch.x_dict.items()}
+        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
+                  for node_name,node_feat in batch.x_dict.items()}
       else:
-        x_dict = batch.x_dict
+        x_dict = {node_name: node_feat.to(current_device)
+                  for node_name,node_feat in batch.x_dict.items()}
       out = model(x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
@@ -211,7 +216,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     torch.distributed.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader, use_fp16).item()*100
+      val_acc = evaluate(model, val_loader, current_device, use_fp16).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
@@ -275,8 +280,10 @@ if __name__ == '__main__':
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='out',
       help="sampling direction, can be 'in' for 'by_dst' or 'out' for 'by_src' for partitions.")
+  parser.add_argument('--layout', type=str, default='COO',
+      help="Layout of input graph: CSC, CSR, COO. Default is COO.")
   parser.add_argument("--rpc_timeout", type=int, default=180,
-                      help="rpc timeout in seconds")
+      help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
@@ -284,6 +291,7 @@ if __name__ == '__main__':
   parser.add_argument("--use_fp16", action="store_true",
       help="load node/edge feature using fp16 format to reduce memory usage")
   args = parser.parse_args()
+  assert args.layout in ['COO', 'CSC', 'CSR']
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
@@ -298,6 +306,7 @@ if __name__ == '__main__':
     root_dir=osp.join(args.path, f'{args.dataset_size}-partitions'),
     partition_idx=data_pidx,
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
+    input_layout = args.layout,
     feature_with_gpu=args.with_gpu,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )

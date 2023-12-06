@@ -31,7 +31,7 @@ from rgnn import RGNN
 torch.manual_seed(42)
 warnings.filterwarnings("ignore")
 
-def evaluate(model, dataloader):
+def evaluate(model, dataloader, current_device):
   predictions = []
   labels = []
   with torch.no_grad():
@@ -39,7 +39,7 @@ def evaluate(model, dataloader):
       batch_size = batch['paper'].batch_size
       out = model(
         {
-          node_name: node_feat.to(torch.float32)
+          node_name: node_feat.to(current_device).to(torch.float32)
           for node_name, node_feat in batch.x_dict.items()
         },  
         batch.edge_index_dict
@@ -130,7 +130,7 @@ def run_training_proc(rank, world_size,
       batch_size = batch['paper'].batch_size
       out = model(
         {
-          node_name: node_feat.to(torch.float32)
+          node_name: node_feat.to(current_device).to(torch.float32)
           for node_name, node_feat in batch.x_dict.items()
         },  
         batch.edge_index_dict
@@ -155,7 +155,7 @@ def run_training_proc(rank, world_size,
     dist.barrier()
     if epoch%log_every == 0:
       model.eval()
-      val_acc = evaluate(model, val_loader).item()*100
+      val_acc = evaluate(model, val_loader, current_device).item()*100
       if best_accuracy < val_acc:
         best_accuracy = val_acc
       if with_gpu:
