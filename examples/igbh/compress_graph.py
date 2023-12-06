@@ -99,7 +99,7 @@ class IGBHeteroDatasetCompress(object):
 
     for etype in self.etypes:
       graph = glt_dataset.get_graph(etype)
-      indptr, indices = graph.export_topology()
+      indptr, indices, _ = graph.export_topology()
       path = os.path.join(self.dir, self.dataset_size, 'processed', self.layout, compress_edge_dict[etype])
       if not os.path.exists(path):
         os.makedirs(path)

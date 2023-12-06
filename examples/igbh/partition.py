@@ -22,7 +22,6 @@ import torch
 from dataset import IGBHeteroDataset
 from typing import Literal
 
-
 def partition_dataset(src_path: str,
                       dst_path: str,
                       num_partitions: int,
@@ -33,7 +32,7 @@ def partition_dataset(src_path: str,
                       use_label_2K: bool=False,
                       with_feature: bool=True,
                       use_fp16: bool=False,
-                      layout: Literal['CSC', 'CSR', 'COO'] = 'CSC'):
+                      layout: Literal['CSC', 'CSR', 'COO'] = 'COO'):
   print(f'-- Loading igbh_{dataset_size} ...')
   data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K, use_fp16=use_fp16)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
@@ -117,7 +116,7 @@ def partition_dataset(src_path: str,
 
       for etype in graph_dict:
         graph = dataset.get_graph(etype)
-        indptr, indices = graph.export_topology()
+        indptr, indices, _ = graph.export_topology()
         path = osp.join(base_path, compress_edge_dict[etype])
         if layout == 'CSR':
           torch.save(indptr, osp.join(path, 'rows.pt'))
@@ -125,7 +124,6 @@ def partition_dataset(src_path: str,
         else:
           torch.save(indptr, osp.join(path, 'cols.pt'))
           torch.save(indices, osp.join(path, 'rows.pt'))
-
 
 if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')
@@ -152,7 +150,7 @@ if __name__ == '__main__':
       choices=[0, 1], help='0:do not partition feature, 1:partition feature')
   parser.add_argument('--use_fp16', action="store_true",
       help="save partitioned node/edge feature into fp16 format")
-  parser.add_argument("--layout", type=str, default='CSC', 
+  parser.add_argument("--layout", type=str, default='COO', 
       help="layout of the partitioned graph: CSC, CSR, COO")
 
   args = parser.parse_args()

@@ -74,13 +74,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   current_ctx = glt.distributed.get_context()
   if with_gpu:
-    current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
+    if split_training_sampling:
+      current_device = torch.device((local_proc_rank * 2) % torch.cuda.device_count())
+      sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
+    else:
+      current_device = torch.device(local_proc_rank % torch.cuda.device_count())
+      sampling_device = current_device
   else:
     current_device = torch.device('cpu')
-  
-  if split_training_sampling:
-    sampling_device = torch.device((local_proc_rank * 2 + 1) % torch.cuda.device_count())
-  else: 
     sampling_device = current_device
 
   # Initialize training process group of PyTorch.
@@ -278,7 +279,7 @@ if __name__ == '__main__':
   parser.add_argument('--layout', type=str, default='COO',
       help="Layout of input graph: CSC, CSR, COO. Default is COO.")
   parser.add_argument("--rpc_timeout", type=int, default=180,
-                      help="rpc timeout in seconds")
+      help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
