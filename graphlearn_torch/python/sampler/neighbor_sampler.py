@@ -45,7 +45,8 @@ class NeighborSampler(BaseSampler):
                with_neg: bool=False,
                with_weight: bool=False,
                strategy: str = 'random',
-               edge_dir: Literal['in', 'out'] = 'out'):
+               edge_dir: Literal['in', 'out'] = 'out',
+               seed: int = None):
     self.graph = graph
     self.num_neighbors = num_neighbors
     self.device = device
@@ -58,6 +59,9 @@ class NeighborSampler(BaseSampler):
     self._sampler = None
     self._neg_sampler = None
     self._inducer = None
+    
+    if seed is not None:
+      pywrap.RandomSeedManager.getInstance().setSeed(100)
     if isinstance(self.graph, Graph): #homo
       self._g_cls = 'homo'
       if self.graph.mode == 'CPU':

@@ -29,9 +29,7 @@ from torch.nn.parallel import DistributedDataParallel
 from rgnn import RGNN
 
 
-torch.manual_seed(42)
-
-
+glt.utils.common.seed_everything(42)
 def evaluate(model, dataloader, current_device, use_fp16):
   predictions = []
   labels = []
@@ -67,6 +65,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     val_loader_master_port,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout):
+  glt.utils.common.seed_everything(42)
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
     world_size=num_nodes*num_training_procs,
@@ -107,6 +106,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
+    random_seed=42,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
       worker_devices=sampling_device,
@@ -130,6 +130,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
+    random_seed=42,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
       worker_devices=sampling_device,

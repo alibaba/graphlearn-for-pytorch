@@ -28,7 +28,7 @@ from torch.nn.parallel import DistributedDataParallel
 from dataset import IGBHeteroDataset
 from rgnn import RGNN
 
-torch.manual_seed(42)
+glt.utils.common.seed_everything(42)
 warnings.filterwarnings("ignore")
 
 def evaluate(model, dataloader, current_device):
@@ -61,9 +61,9 @@ def run_training_proc(rank, world_size,
   os.environ['MASTER_PORT'] = '12355'
   dist.init_process_group('nccl', rank=rank, world_size=world_size)
   torch.cuda.set_device(rank)
-  torch.manual_seed(42)
+  glt.utils.common.seed_everything(42)
   current_device =torch.device(rank)
-
+  
   print(f'Rank {rank} init graphlearn_torch NeighborLoader...')
   # Create rank neighbor loader for training
   train_idx = train_idx.split(train_idx.size(0) // world_size)[rank]
@@ -74,7 +74,8 @@ def run_training_proc(rank, world_size,
     batch_size=batch_size,
     shuffle=True,
     drop_last=False,
-    device=current_device
+    device=current_device,
+    seed=42
   )
 
   # Create rank neighbor loader for validation.
@@ -86,7 +87,8 @@ def run_training_proc(rank, world_size,
     batch_size=batch_size,
     shuffle=True,
     drop_last=False,
-    device=current_device
+    device=current_device,
+    seed=42
   )
 
   # Define model and optimizer.
@@ -212,6 +214,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
+  glt.utils.common.seed_everything(100)
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983, True, args.layout, args.use_fp16)
 

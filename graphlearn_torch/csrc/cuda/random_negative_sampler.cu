@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "graphlearn_torch/include/common.h"
 #include "graphlearn_torch/csrc/cuda/random_negative_sampler.cuh"
 
 #include <ATen/cuda/CUDAContext.h>
@@ -21,7 +22,6 @@ limitations under the License.
 #include <c10/cuda/CUDAStream.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <random>
 #include <thrust/copy.h>
 #include <thrust/gather.h>
 #include <thrust/iterator/counting_iterator.h>
@@ -135,8 +135,8 @@ CUDARandomNegativeSampler::Sample(int32_t req_num,
 
   int block_size = 0;
   int grid_size = 0;
-  thread_local static std::random_device rd;
-  thread_local static std::mt19937 engine(rd());
+  uint32_t seed = RandomSeedManager::getInstance().getSeed();
+  thread_local static std::mt19937 engine(seed);
   std::uniform_int_distribution<int64_t> dist(0, 1e10);
   cudaOccupancyMaxPotentialBlockSize(
     &grid_size, &block_size, RandomNegativeSampleKernel);

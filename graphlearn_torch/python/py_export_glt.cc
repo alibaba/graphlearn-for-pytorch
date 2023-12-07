@@ -25,6 +25,7 @@ limitations under the License.
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
 #include "graphlearn_torch/csrc/cpu/weighted_sampler.h"
 #include "graphlearn_torch/csrc/cpu/subgraph_op.h"
+#include "graphlearn_torch/include/common.h"
 #include "graphlearn_torch/include/graph.h"
 #include "graphlearn_torch/include/negative_sampler.h"
 #include "graphlearn_torch/include/sample_queue.h"
@@ -79,6 +80,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def_readwrite("rows", &SubGraph::rows)
     .def_readwrite("cols", &SubGraph::cols)
     .def_readwrite("eids", &SubGraph::eids);
+  
+  py::class_<RandomSeedManager>(m, "RandomSeedManager")
+    .def_static("getInstance", &RandomSeedManager::getInstance, py::return_value_policy::reference)
+    .def("setSeed", &RandomSeedManager::setSeed, py::arg("seed"))
+    .def("getSeed", &RandomSeedManager::getSeed);
 
   py::class_<CPURandomSampler>(m, "CPURandomSampler")
     .def(py::init<const Graph*>())
