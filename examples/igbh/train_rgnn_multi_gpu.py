@@ -28,7 +28,6 @@ from torch.nn.parallel import DistributedDataParallel
 from dataset import IGBHeteroDataset
 from rgnn import RGNN
 
-glt.utils.common.seed_everything(42)
 warnings.filterwarnings("ignore")
 
 def evaluate(model, dataloader, current_device):
@@ -54,14 +53,14 @@ def evaluate(model, dataloader, current_device):
 
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every,
+    epochs, batch_size, learning_rate, log_every, random_seed,
     dataset, train_idx, val_idx, with_gpu):
   
   os.environ['MASTER_ADDR'] = 'localhost'
   os.environ['MASTER_PORT'] = '12355'
   dist.init_process_group('nccl', rank=rank, world_size=world_size)
   torch.cuda.set_device(rank)
-  glt.utils.common.seed_everything(42)
+  glt.utils.common.seed_everything(random_seed)
   current_device =torch.device(rank)
   
   print(f'Rank {rank} init graphlearn_torch NeighborLoader...')
@@ -75,7 +74,7 @@ def run_training_proc(rank, world_size,
     shuffle=True,
     drop_last=False,
     device=current_device,
-    seed=42
+    seed=random_seed
   )
 
   # Create rank neighbor loader for validation.
@@ -88,7 +87,7 @@ def run_training_proc(rank, world_size,
     shuffle=True,
     drop_last=False,
     device=current_device,
-    seed=42
+    seed=random_seed
   )
 
   # Define model and optimizer.
@@ -194,7 +193,7 @@ if __name__ == '__main__':
   parser.add_argument('--model', type=str, default='rgat',
                       choices=['rgat', 'rsage'])
   # Model parameters
-  parser.add_argument('--fan_out', type=str, default='15,10')
+  parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.01)
@@ -202,6 +201,7 @@ if __name__ == '__main__':
   parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=5)
+  parser.add_argument('--random_seed', type=int, default=42)
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
   parser.add_argument("--edge_dir", type=str, default='in')
@@ -214,7 +214,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
-  glt.utils.common.seed_everything(100)
+  glt.utils.common.seed_everything(args.random_seed)
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983, True, args.layout, args.use_fp16)
 
@@ -243,7 +243,7 @@ if __name__ == '__main__':
     run_training_proc,
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
           args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
-          args.learning_rate, args.log_every,
+          args.learning_rate, args.log_every, args.random_seed,
           glt_dataset, train_idx, val_idx, args.with_gpu),
     nprocs=world_size,
     join=True

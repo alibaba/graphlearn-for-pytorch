@@ -29,7 +29,6 @@ from torch.nn.parallel import DistributedDataParallel
 from rgnn import RGNN
 
 
-glt.utils.common.seed_everything(42)
 def evaluate(model, dataloader, current_device, use_fp16):
   predictions = []
   labels = []
@@ -57,7 +56,7 @@ def evaluate(model, dataloader, current_device, use_fp16):
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every,
+    epochs, batch_size, learning_rate, log_every, random_seed,
     dataset, train_idx, val_idx,
     master_addr,
     training_pg_master_port,
@@ -65,7 +64,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     val_loader_master_port,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout):
-  glt.utils.common.seed_everything(42)
+  glt.utils.common.seed_everything(random_seed)
   # Initialize graphlearn_torch distributed worker group context.
   glt.distributed.init_worker_group(
     world_size=num_nodes*num_training_procs,
@@ -106,7 +105,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
-    random_seed=42,
+    random_seed=random_seed,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
       worker_devices=sampling_device,
@@ -130,7 +129,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
-    random_seed=42,
+    random_seed=random_seed,
     worker_options = glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=1,
       worker_devices=sampling_device,
@@ -262,6 +261,7 @@ if __name__ == '__main__':
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--log_every', type=int, default=2)
+  parser.add_argument('--random_seed', type=int, default=42)
   # Distributed settings.
   parser.add_argument("--num_nodes", type=int, default=2,
       help="Number of distributed nodes.")
@@ -293,6 +293,7 @@ if __name__ == '__main__':
       help="load node/edge feature using fp16 format to reduce memory usage")
   args = parser.parse_args()
   assert args.layout in ['COO', 'CSC', 'CSR']
+  glt.utils.common.seed_everything(args.random_seed)
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
@@ -325,7 +326,7 @@ if __name__ == '__main__':
     run_training_proc,
     args=(args.num_nodes, args.node_rank, args.num_training_procs, args.split_training_sampling,
           args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
-          args.epochs, args.batch_size, args.learning_rate, args.log_every,
+          args.epochs, args.batch_size, args.learning_rate, args.log_every, args.random_seed,
           dataset, train_idx, val_idx,
           args.master_addr,
           args.training_pg_master_port,
