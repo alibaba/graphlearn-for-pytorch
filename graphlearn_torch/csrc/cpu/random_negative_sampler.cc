@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "graphlearn_torch/include/common.h"
 #include "graphlearn_torch/csrc/cpu/random_negative_sampler.h"
 
 #include <algorithm>
-#include <random>
 
 
 namespace graphlearn_torch {
@@ -27,8 +27,8 @@ std::tuple<torch::Tensor, torch::Tensor> CPURandomNegativeSampler::Sample(
   const int64_t* col_idx = graph_->GetColIdx();
   int64_t row_num = graph_->GetRowCount();
   int64_t col_num = graph_->GetColCount();
-  thread_local static std::random_device rd;
-  thread_local static std::mt19937 engine(rd());
+  uint32_t seed = RandomSeedManager::getInstance().getSeed();
+  thread_local static std::mt19937 engine(seed);
   std::uniform_int_distribution<int64_t> row_dist(0, row_num - 1);
   std::uniform_int_distribution<int64_t> col_dist(0, col_num - 1);
   int64_t row_data[req_num];

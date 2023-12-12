@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "graphlearn_torch/include/common.h"
 #include "graphlearn_torch/csrc/cuda/random_sampler.cuh"
 
 #include <c10/cuda/CUDAGuard.h>
@@ -21,7 +22,6 @@ limitations under the License.
 #include <cub/cub.cuh>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <random>
 
 #include "graphlearn_torch/include/common.cuh"
 
@@ -233,8 +233,8 @@ void CSRRowWiseSample(cudaStream_t stream,
                       int64_t* out_nbrs) {
   const dim3 block(WARP_SIZE, BLOCK_WARPS);
   const dim3 grid((bs + TILE_SIZE - 1) / TILE_SIZE);
-  thread_local static std::random_device rd;
-  thread_local static std::mt19937 engine(rd());
+  uint32_t seed = RandomSeedManager::getInstance().getSeed();
+  thread_local static std::mt19937 engine(seed);
   std::uniform_int_distribution<int64_t> dist(0, 1e10);
   CSRRowWiseSampleKernel<<<grid, block, 0, stream>>>(
     dist(engine), req_num, bs, row_count,
@@ -255,8 +255,8 @@ void CSRRowWiseSample(cudaStream_t stream,
                       int64_t* out_eid) {
   const dim3 block(WARP_SIZE, BLOCK_WARPS);
   const dim3 grid((bs + TILE_SIZE - 1) / TILE_SIZE);
-  thread_local static std::random_device rd;
-  thread_local static std::mt19937 engine(rd());
+  uint32_t seed = RandomSeedManager::getInstance().getSeed();
+  thread_local static std::mt19937 engine(seed);
   std::uniform_int_distribution<int64_t> dist(0, 1e10);
   CSRRowWiseSampleKernel<<<grid, block, 0, stream>>>(
     dist(engine), req_num, bs, row_count, nodes, row_ptr, col_idx, edge_ids,

@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "graphlearn_torch/include/common.h"
 #include "graphlearn_torch/csrc/cpu/random_sampler.h"
 
 #include <cstdint>
-#include <random>
 #include <cassert>
 
 namespace graphlearn_torch {
@@ -141,8 +141,8 @@ void CPURandomSampler::UniformSample(const int64_t* col_begin,
   // with replacement
   const auto cap = col_end - col_begin;
   if (req_num < cap) {
-    thread_local static std::random_device rd;
-    thread_local static std::mt19937 engine(rd());
+    uint32_t seed = RandomSeedManager::getInstance().getSeed();
+    thread_local static std::mt19937 engine(seed);
     std::uniform_int_distribution<> dist(0, cap-1);
     for (int32_t i = 0; i < req_num; ++i) {
       out_nbrs[i] = col_begin[dist(engine)];
@@ -162,8 +162,8 @@ void CPURandomSampler::UniformSample(const int64_t* col_begin,
   // with replacement
   const auto cap = col_end - col_begin;
   if (req_num < cap) {
-    thread_local static std::random_device rd;
-    thread_local static std::mt19937 engine(rd());
+    uint32_t seed = RandomSeedManager::getInstance().getSeed();
+    thread_local static std::mt19937 engine(seed);
     std::uniform_int_distribution<> dist(0, cap-1);
     for (int32_t i = 0; i < req_num; ++i) {
       auto idx = dist(engine);

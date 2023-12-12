@@ -19,6 +19,8 @@ from typing import Any, Dict, Callable, Optional, Literal
 from ..typing import reverse_edge_type
 from .tensor import id2idx
 
+import numpy
+import random
 import torch
 import pickle
 
@@ -26,7 +28,18 @@ def ensure_dir(dir_path: str):
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
 
+def seed_everything(seed: int):
+    r"""Sets the seed for generating random numbers in :pytorch:`PyTorch`,
+    :obj:`numpy` and :python:`Python`.
 
+    Args:
+        seed (int): The desired seed.
+    """
+    random.seed(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+  
 def merge_dict(in_dict: Dict[Any, Any], out_dict: Dict[Any, Any]):
   for k, v in in_dict.items():
     vals = out_dict.get(k, [])

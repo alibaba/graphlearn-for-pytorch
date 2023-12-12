@@ -17,8 +17,6 @@ import numpy as np
 import torch
 import os.path as osp
 
-import graphlearn_torch as glt
-
 from torch_geometric.utils import add_self_loops, remove_self_loops
 from download import download_dataset
 from typing import Literal
