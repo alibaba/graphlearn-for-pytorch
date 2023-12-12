@@ -61,7 +61,7 @@ class NeighborSampler(BaseSampler):
     self._inducer = None
     
     if seed is not None:
-      pywrap.RandomSeedManager.getInstance().setSeed(100)
+      pywrap.RandomSeedManager.getInstance().setSeed(seed)
     if isinstance(self.graph, Graph): #homo
       self._g_cls = 'homo'
       if self.graph.mode == 'CPU':

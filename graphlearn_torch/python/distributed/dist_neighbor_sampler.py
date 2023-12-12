@@ -173,7 +173,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     self.sampler = NeighborSampler(
       self.dist_graph.local_graph, self.num_neighbors,
       self.device, self.with_edge, self.with_neg, self.with_weight, 
-      self.edge_dir, self.seed
+      self.edge_dir, seed=self.seed
     )
     self.inducer_pool = queue.Queue(maxsize=self.concurrency)
 

@@ -28,6 +28,7 @@ from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput, SamplingType, SamplingConfig
 )
 from ..utils import ensure_device
+from ..utils import seed_everything
 
 from ..distributed.dist_context import get_context
 from .dist_context import init_worker_group
@@ -88,11 +89,13 @@ def _sampling_worker_loop(rank,
       rpc_timeout=worker_options.rpc_timeout
     )
 
+    if sampling_config.seed is not None:
+      seed_everything(sampling_config.seed)
     dist_sampler = DistNeighborSampler(
       data, sampling_config.num_neighbors, sampling_config.with_edge,
       sampling_config.with_neg, sampling_config.with_weight,
       sampling_config.edge_dir, sampling_config.collect_features, channel,
-      worker_options.worker_concurrency, current_device, sampling_config.seed
+      worker_options.worker_concurrency, current_device, seed=sampling_config.seed
     )
     dist_sampler.start_loop()
 
@@ -184,6 +187,8 @@ class DistMpSamplingProducer(object):
   def init(self):
     r""" Create the subprocess pool. Init samplers and rpc server.
     """
+    if self.sampling_config.seed is not None:
+      seed_everything(self.sampling_config.seed)
     if not self.sampling_config.shuffle:
       unshuffled_indexes = self._get_seeds_indexes()
     else:
