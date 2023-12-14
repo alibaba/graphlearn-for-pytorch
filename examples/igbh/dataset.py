@@ -191,7 +191,7 @@ class IGBHeteroDataset(object):
               self.edge_dict[etype] = (indices, indptr)
             else:
               self.edge_dict[etype] = (indptr, indices)
-          except FileNotFoundError:
+          except FileNotFoundError as e:
             print(f"FileNotFound: {e}")
             exit()
           except Exception as e:
@@ -209,14 +209,15 @@ class IGBHeteroDataset(object):
         paper_node_features = torch.load(osp.join(self.base_path, 'paper', 'node_feat_fp16.pt'))
       else:
         paper_node_features = torch.from_numpy(np.load(paper_feat_path))
-      paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long) 
     else:
       if self.dataset_size in ['large', 'full']:
         paper_node_features = torch.from_numpy(np.memmap(paper_feat_path, dtype='float32', mode='r', shape=(num_paper_nodes,1024)))
-        paper_node_labels = torch.from_numpy(np.memmap(paper_lbl_path, dtype='float32', mode='r', shape=(num_paper_nodes))).to(torch.long)
       else:
         paper_node_features = torch.from_numpy(np.load(paper_feat_path, mmap_mode='r'))
-        paper_node_labels = torch.from_numpy(np.load(paper_lbl_path, mmap_mode='r')).to(torch.long)
+    if self.dataset_size in ['large', 'full']:
+      paper_node_labels = torch.from_numpy(np.memmap(paper_lbl_path, dtype='float32', mode='r', shape=(num_paper_nodes))).to(torch.long)
+    else:
+      paper_node_labels = torch.from_numpy(np.load(paper_lbl_path)).to(torch.long)
     self.feat_dict['paper'] = paper_node_features
     self.label = paper_node_labels
 
@@ -271,17 +272,14 @@ class IGBHeteroDataset(object):
         journal_node_features = torch.from_numpy(np.load(osp.join(self.base_path, 'journal', 'node_feat.npy'), mmap_mode='r'))
       self.feat_dict['journal'] = journal_node_features
 
-    n_labeled_idx = self.paper_nodes_num[self.dataset_size]
-    if self.dataset_size == 'full':
-      if self.use_label_2K:
-          n_labeled_idx = 157675969
-      else:
-          n_labeled_idx = 227130858
+    # Please ensure that train_idx and val_idx have been generated using split_seeds.py
+    try:
+      self.train_idx = torch.load(osp.join(self.base_path, 'train_idx.pt'))
+      self.val_idx = torch.load(osp.join(self.base_path, 'val_idx.pt'))
+    except FileNotFoundError as e:
+      print(f"FileNotFound: {e}, please ensure that train_idx and val_idx have been generated using split_seeds.py")
+      exit()
+    except Exception as e:
+      print(f"Exception: {e}")
+      exit()
 
-    shuffled_index = torch.randperm(n_labeled_idx)
-    n_train = int(n_labeled_idx * 0.6)
-    n_val = int(n_labeled_idx * 0.2)
-
-    self.train_idx = shuffled_index[:n_train]
-    self.val_idx = shuffled_index[n_train : n_train + n_val]
-    self.test_idx = shuffled_index[n_train + n_val:]
