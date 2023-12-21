@@ -17,6 +17,7 @@ import math
 from typing import Dict, Optional, Union, Literal
 
 import torch
+import threading
 
 from .. import py_graphlearn_torch as pywrap
 from ..data import Graph
@@ -59,6 +60,7 @@ class NeighborSampler(BaseSampler):
     self._sampler = None
     self._neg_sampler = None
     self._inducer = None
+    self._sampler_lock = threading.Lock()
     
     if seed is not None:
       pywrap.RandomSeedManager.getInstance().setSeed(seed)
@@ -86,48 +88,54 @@ class NeighborSampler(BaseSampler):
 
   def lazy_init_sampler(self):
     if self._sampler is None:
-      if self._g_cls == 'homo':
-        if self.device.type == 'cuda':
-          self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
-        elif self.with_weight == False:
-          self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
-        else:
-          self._sampler = pywrap.CPUWeightedSampler(self.graph.graph_handler)
+      with self._sampler_lock: 
+        if self._sampler is None:
+          if self._g_cls == 'homo':
+            if self.device.type == 'cuda':
+              self._sampler = pywrap.CUDARandomSampler(self.graph.graph_handler)
+            elif self.with_weight == False:
+              self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
+            else:
+              self._sampler = pywrap.CPUWeightedSampler(self.graph.graph_handler)
 
-      else: # hetero
-        self._sampler = {}
-        for etype, g in self.graph.items():
-          if self.device != torch.device('cpu'):
-            self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
-          elif self.with_weight == False:
-            self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
-          else:
-            self._sampler[etype] = pywrap.CPUWeightedSampler(g.graph_handler)
+          else: # hetero
+            self._sampler = {}
+            for etype, g in self.graph.items():
+              if self.device != torch.device('cpu'):
+                self._sampler[etype] = pywrap.CUDARandomSampler(g.graph_handler)
+              elif self.with_weight == False:
+                self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
+              else:
+                self._sampler[etype] = pywrap.CPUWeightedSampler(g.graph_handler)
 
 
   def lazy_init_neg_sampler(self):
     if self._neg_sampler is None and self.with_neg:
-      if self._g_cls == 'homo':
-        self._neg_sampler = RandomNegativeSampler(
-          graph=self.graph,
-          mode=self.device.type.upper(),
-          edge_dir=self.edge_dir
-        )
-      else: # hetero
-        self._neg_sampler = {}
-        for etype, g in self.graph.items():
-          self._neg_sampler[etype] = RandomNegativeSampler(
-            graph=g,
-            mode=self.device.type.upper(),
-            edge_dir=self.edge_dir
-          )
+      with self._sampler_lock: 
+        if self._neg_sampler is None:
+          if self._g_cls == 'homo':
+            self._neg_sampler = RandomNegativeSampler(
+              graph=self.graph,
+              mode=self.device.type.upper(),
+              edge_dir=self.edge_dir
+            )
+          else: # hetero
+            self._neg_sampler = {}
+            for etype, g in self.graph.items():
+              self._neg_sampler[etype] = RandomNegativeSampler(
+                graph=g,
+                mode=self.device.type.upper(),
+                edge_dir=self.edge_dir
+              )
 
   def lazy_init_subgraph_op(self):
     if self._subgraph_op is None:
-      if self.device.type == 'cuda':
-        self._subgraph_op = pywrap.CUDASubGraphOp(self.graph.graph_handler)
-      else:
-        self._subgraph_op = pywrap.CPUSubGraphOp(self.graph.graph_handler)
+      with self._sampler_lock: 
+        if self._subgraph_op is None:
+          if self.device.type == 'cuda':
+            self._subgraph_op = pywrap.CUDASubGraphOp(self.graph.graph_handler)
+          else:
+            self._subgraph_op = pywrap.CPUSubGraphOp(self.graph.graph_handler)
 
   def sample_one_hop(
     self,
