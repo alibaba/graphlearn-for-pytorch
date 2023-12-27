@@ -61,6 +61,7 @@ class NeighborSampler(BaseSampler):
     self._neg_sampler = None
     self._inducer = None
     self._sampler_lock = threading.Lock()
+    self.is_sampler_initialized = False
     
     if seed is not None:
       pywrap.RandomSeedManager.getInstance().setSeed(seed)
@@ -87,8 +88,8 @@ class NeighborSampler(BaseSampler):
     return self._subgraph_op
 
   def lazy_init_sampler(self):
-    if self._sampler is None:
-      with self._sampler_lock: 
+    if not self.is_sampler_initialized:
+      with self._sampler_lock:
         if self._sampler is None:
           if self._g_cls == 'homo':
             if self.device.type == 'cuda':
@@ -97,6 +98,7 @@ class NeighborSampler(BaseSampler):
               self._sampler = pywrap.CPURandomSampler(self.graph.graph_handler)
             else:
               self._sampler = pywrap.CPUWeightedSampler(self.graph.graph_handler)
+            self.is_sampler_initialized = True
 
           else: # hetero
             self._sampler = {}
@@ -107,11 +109,12 @@ class NeighborSampler(BaseSampler):
                 self._sampler[etype] = pywrap.CPURandomSampler(g.graph_handler)
               else:
                 self._sampler[etype] = pywrap.CPUWeightedSampler(g.graph_handler)
+            self.is_sampler_initialized = True
 
 
   def lazy_init_neg_sampler(self):
-    if self._neg_sampler is None and self.with_neg:
-      with self._sampler_lock: 
+    if not self.is_sampler_initialized and self.with_neg:
+      with self._sampler_lock:
         if self._neg_sampler is None:
           if self._g_cls == 'homo':
             self._neg_sampler = RandomNegativeSampler(
@@ -119,6 +122,7 @@ class NeighborSampler(BaseSampler):
               mode=self.device.type.upper(),
               edge_dir=self.edge_dir
             )
+            self.is_sampler_initialized = True
           else: # hetero
             self._neg_sampler = {}
             for etype, g in self.graph.items():
@@ -127,10 +131,11 @@ class NeighborSampler(BaseSampler):
                 mode=self.device.type.upper(),
                 edge_dir=self.edge_dir
               )
+            self.is_sampler_initialized = True
 
   def lazy_init_subgraph_op(self):
     if self._subgraph_op is None:
-      with self._sampler_lock: 
+      with self._sampler_lock:
         if self._subgraph_op is None:
           if self.device.type == 'cuda':
             self._subgraph_op = pywrap.CUDASubGraphOp(self.graph.graph_handler)
