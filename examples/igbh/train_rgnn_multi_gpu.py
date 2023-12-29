@@ -78,8 +78,9 @@ def evaluate(model, dataloader, current_device, rank, world_size, epoch_num):
 
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every, random_seed, dataset, 
-    train_idx, val_idx, with_gpu, validation_acc, validation_frac_within_epoch):
+    epochs, batch_size, learning_rate, random_seed, dataset, 
+    train_idx, val_idx, with_gpu, validation_acc, validation_frac_within_epoch,
+    evaluate_on_epoch_end):
   if rank == 0:
     mllogger.start(key=mllog_constants.RUN_START)
   os.environ['MASTER_ADDR'] = 'localhost'
@@ -145,6 +146,7 @@ def run_training_proc(rank, world_size,
   batch_num = len(train_idx) // batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
+  rank_val_acc = 0
 
   training_start = time.time()
   for epoch in tqdm.tqdm(range(epochs)):
@@ -184,7 +186,8 @@ def run_training_proc(rank, world_size,
         dist.barrier()
         epoch_num = epoch + idx / batch_num
         model.eval()
-        _, global_acc = evaluate(model, val_loader, current_device, rank, world_size, epoch_num)
+        rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
+                                 rank, world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
             if rank == 0:
                 mllogger.end(
@@ -197,16 +200,17 @@ def run_training_proc(rank, world_size,
             is_success = True
             break
         model.train()
-    if is_success:
-      break
-    train_acc /= idx
-    gpu_mem_alloc /= idx
+
     if with_gpu:
       torch.cuda.synchronize()
     dist.barrier()
-    if epoch%log_every == 0:
+
+    # evaluate at the end of epoch
+    if  idx == batch_num and evaluate_on_epoch_end:
+      print(f"I am in the end {idx} == {batch_num}")
       model.eval()
-      rank_val_acc, global_acc = evaluate(model, val_loader, current_device, rank, world_size, epoch)
+      rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
+                                          rank, world_size, epoch)
       if validation_acc is not None and global_acc >= validation_acc:
         if rank == 0:
             mllogger.end(
@@ -217,18 +221,25 @@ def run_training_proc(rank, world_size,
                 },
             )
         is_success = True
-        break
-      tqdm.tqdm.write(
-          "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
-              rank,
-              epoch,
-              total_loss,
-              train_acc,
-              rank_val_acc*100,
-              str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
-              gpu_mem_alloc
-          )
-      )
+      
+    #tqdm
+    train_acc /= idx
+    gpu_mem_alloc /= idx
+    tqdm.tqdm.write(
+        "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
+            rank,
+            epoch,
+            total_loss,
+            train_acc,
+            rank_val_acc*100,
+            str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
+            gpu_mem_alloc
+        )
+    )
+    if is_success:
+      break
+  
+  #log run status
   if rank == 0:
     status = mllog_constants.SUCCESS if is_success else mllog_constants.ABORTED
     mllogger.end(key=mllog_constants.RUN_STOP,
@@ -236,7 +247,7 @@ def run_training_proc(rank, world_size,
                            mllog_constants.EPOCH_NUM: epochs,
                  }
     )
-    print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
+  print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
 if __name__ == '__main__':
@@ -266,7 +277,6 @@ if __name__ == '__main__':
   parser.add_argument('--epochs', type=int, default=1)
   parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
-  parser.add_argument('--log_every', type=int, default=5)
   parser.add_argument('--random_seed', type=int, default=42)
   parser.add_argument("--cpu_mode", action="store_true",
       help="Only use CPU for sampling and training, default is False.")
@@ -281,6 +291,8 @@ if __name__ == '__main__':
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
+  parser.add_argument("--evaluate_on_epoch_end", action="store_true",
+        help="Evaluate using validation set on each epoch end.")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
@@ -293,7 +305,8 @@ if __name__ == '__main__':
 
   glt.utils.common.seed_everything(args.random_seed)
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
-                                  args.num_classes==2983, True, args.layout, args.use_fp16)
+                                  args.num_classes==2983, True, args.layout, 
+                                  args.use_fp16)
 
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
@@ -320,9 +333,10 @@ if __name__ == '__main__':
     run_training_proc,
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
           args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
-          args.learning_rate, args.log_every, args.random_seed,
+          args.learning_rate, args.random_seed,
           glt_dataset, train_idx, val_idx, args.with_gpu,
-          args.validation_acc, args.validation_frac_within_epoch),
+          args.validation_acc, args.validation_frac_within_epoch, 
+          args.evaluate_on_epoch_end),
     nprocs=world_size,
     join=True
   )

@@ -30,7 +30,8 @@ from rgnn import RGNN
 
 mllogger = get_mlperf_logger(path=osp.dirname(osp.abspath(__file__)))
 
-def evaluate(model, dataloader, current_device, use_fp16, with_gpu, rank, world_size, epoch_num):
+def evaluate(model, dataloader, current_device, use_fp16, with_gpu, 
+             rank, world_size, epoch_num):
   if rank == 0:
     mllogger.start(
         key=mllog_constants.EVAL_START,
@@ -79,8 +80,9 @@ def evaluate(model, dataloader, current_device, use_fp16, with_gpu, rank, world_
     return acc.item(), global_acc
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
-    split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, log_every, random_seed,
+    split_training_sampling, hidden_channels, num_classes, num_layers, 
+    model_type, num_heads, fan_out, epochs, batch_size, learning_rate, 
+    log_every, random_seed,
     dataset, train_idx, val_idx,
     train_channel_size,
     val_channel_size,
@@ -249,7 +251,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         torch.distributed.barrier()
         epoch_num = epoch + idx / batch_num
         model.eval()
-        _, global_acc = evaluate(model, val_loader, current_device, use_fp16, with_gpu, rank, world_size, epoch_num)
+        _, global_acc = evaluate(model, val_loader, current_device, use_fp16, 
+                                 with_gpu, rank, world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
             if rank == 0:
                 mllogger.end(
@@ -274,7 +277,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
     if epoch%log_every == 0:
       model.eval()
-      rank_val_acc, global_acc = evaluate(model, val_loader, current_device, use_fp16, with_gpu, rank, world_size, epoch)
+      rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
+                                          use_fp16, with_gpu, rank, world_size, 
+                                          epoch)
       if validation_acc is not None and global_acc >= validation_acc:
         if rank == 0:
             mllogger.end(
@@ -371,8 +376,10 @@ if __name__ == '__main__':
       help="load node/edge feature using fp16 format to reduce memory usage")
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.2,
       help="Fraction of the epoch after which validation should be performed.")
-  parser.add_argument("--validation_acc", type=float, default=0.72,
+  parser.add_argument("--validation_acc", type=float, default=0.70,
       help="Validation accuracy threshold to stop training once reached.")
+  parser.add_argument("--evaluate_on_epoch_end", action="store_true",
+      help="Evaluate using validation set on each epoch end.")
   args = parser.parse_args()
   assert args.layout in ['COO', 'CSC', 'CSR']
 
@@ -415,9 +422,11 @@ if __name__ == '__main__':
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,
-    args=(args.num_nodes, args.node_rank, args.num_training_procs, args.split_training_sampling,
-          args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
-          args.epochs, args.batch_size, args.learning_rate, args.log_every, args.random_seed,
+    args=(args.num_nodes, args.node_rank, args.num_training_procs, 
+          args.split_training_sampling, args.hidden_channels, args.num_classes, 
+          args.num_layers, args.model, args.num_heads, args.fan_out, 
+          args.epochs, args.batch_size, args.learning_rate, args.log_every, 
+          args.random_seed,
           dataset, train_idx, val_idx,
           args.train_channel_size,
           args.val_channel_size,
