@@ -81,8 +81,8 @@ def evaluate(model, dataloader, current_device, use_fp16, with_gpu,
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     split_training_sampling, hidden_channels, num_classes, num_layers, 
-    model_type, num_heads, fan_out, epochs, batch_size, learning_rate, 
-    log_every, random_seed,
+    model_type, num_heads, fan_out, epochs, batch_size, learning_rate,
+    random_seed,
     dataset, train_idx, val_idx,
     train_channel_size,
     val_channel_size,
@@ -92,7 +92,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     val_loader_master_port,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout,
-    validation_acc, validation_frac_within_epoch):
+    validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end):
   
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
@@ -251,8 +251,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         torch.distributed.barrier()
         epoch_num = epoch + idx / batch_num
         model.eval()
-        _, global_acc = evaluate(model, val_loader, current_device, use_fp16, 
-                                 with_gpu, rank, world_size, epoch_num)
+        rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
+                                            use_fp16, with_gpu, rank, 
+                                            world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
             if rank == 0:
                 mllogger.end(
@@ -266,16 +267,15 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
             break
         model.train()      
     
-    if is_success:
-      break
     train_acc /= idx
     gpu_mem_alloc /= idx
 
     if with_gpu:
       torch.cuda.synchronize()
     torch.distributed.barrier()
-
-    if epoch%log_every == 0:
+    
+    # evaluate at the end of epoch
+    if idx == batch_num and evaluate_on_epoch_end:
       model.eval()
       rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
                                           use_fp16, with_gpu, rank, world_size, 
@@ -290,18 +290,22 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                 },
             )
         is_success = True
-        break
-      tqdm.tqdm.write(
-          "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
-              current_ctx.rank,
-              epoch,
-              total_loss,
-              train_acc,
-              rank_val_acc*100,
-              str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
-              gpu_mem_alloc
-          )
-      )
+    
+    #tqdm
+    tqdm.tqdm.write(
+        "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
+            current_ctx.rank,
+            epoch,
+            total_loss,
+            train_acc,
+            rank_val_acc*100,
+            str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
+            gpu_mem_alloc
+        )
+    )
+    if is_success:
+      break
+
   if rank == 0:
     status = mllog_constants.SUCCESS if is_success else mllog_constants.ABORTED
     mllogger.end(key=mllog_constants.RUN_STOP,
@@ -339,7 +343,6 @@ if __name__ == '__main__':
   parser.add_argument('--epochs', type=int, default=20)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
-  parser.add_argument('--log_every', type=int, default=2)
   parser.add_argument('--random_seed', type=int, default=42)
   # Distributed settings.
   parser.add_argument("--num_nodes", type=int, default=2,
@@ -425,7 +428,7 @@ if __name__ == '__main__':
     args=(args.num_nodes, args.node_rank, args.num_training_procs, 
           args.split_training_sampling, args.hidden_channels, args.num_classes, 
           args.num_layers, args.model, args.num_heads, args.fan_out, 
-          args.epochs, args.batch_size, args.learning_rate, args.log_every, 
+          args.epochs, args.batch_size, args.learning_rate,
           args.random_seed,
           dataset, train_idx, val_idx,
           args.train_channel_size,
@@ -439,7 +442,9 @@ if __name__ == '__main__':
           args.use_fp16,
           args.edge_dir,
           args.rpc_timeout,
-          args.validation_acc, args.validation_frac_within_epoch),
+          args.validation_acc, 
+          args.validation_frac_within_epoch,
+          args.evaluate_on_epoch_end),
     nprocs=args.num_training_procs,
     join=True
   )
