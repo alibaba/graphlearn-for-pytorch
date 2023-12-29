@@ -58,7 +58,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     split_training_sampling, hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, batch_size, learning_rate, log_every, random_seed,
     dataset, train_idx, val_idx,
-    shm_channel_size,
+    train_channel_size,
+    val_channel_size,
     master_addr,
     training_pg_master_port,
     train_loader_master_port,
@@ -113,7 +114,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       worker_concurrency=4,
       master_addr=master_addr,
       master_port=train_loader_master_port,
-      channel_size=shm_channel_size,
+      channel_size=train_channel_size,
       pin_memory=True,
       rpc_timeout=rpc_timeout,
       num_rpc_threads=2
@@ -137,7 +138,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       worker_concurrency=4,
       master_addr=master_addr,
       master_port=val_loader_master_port,
-      channel_size=shm_channel_size,
+      channel_size=val_channel_size,
       pin_memory=True,
       rpc_timeout=rpc_timeout,
       num_rpc_threads=2
@@ -284,8 +285,10 @@ if __name__ == '__main__':
       help="sampling direction, can be 'in' for 'by_dst' or 'out' for 'by_src' for partitions.")
   parser.add_argument('--layout', type=str, default='COO',
       help="Layout of input graph: CSC, CSR, COO. Default is COO.")
-  parser.add_argument('--channel_size', type=str, default='16GB',
-      help="Size of shared memory queue to put sampled results")
+  parser.add_argument('--train_channel_size', type=str, default='16GB',
+      help="Size of shared memory queue to put sampled results for train dataset")
+  parser.add_argument('--val_channel_size', type=str, default='16GB',
+      help="Size of shared memory queue to put sampled results for val dataset")
   parser.add_argument("--rpc_timeout", type=int, default=180,
       help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
@@ -331,7 +334,8 @@ if __name__ == '__main__':
           args.hidden_channels, args.num_classes, args.num_layers, args.model, args.num_heads, args.fan_out,
           args.epochs, args.batch_size, args.learning_rate, args.log_every, args.random_seed,
           dataset, train_idx, val_idx,
-          args.channel_size,
+          args.train_channel_size,
+          args.val_channel_size,
           args.master_addr,
           args.training_pg_master_port,
           args.train_loader_master_port,
