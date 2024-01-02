@@ -205,9 +205,10 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-  batch_num = len(train_idx) // batch_size
+  batch_num = (len(train_idx) + batch_size - 1) // batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
+  epoch_num = 0
 
   training_start = time.time()
   for epoch in range(epochs):
@@ -255,16 +256,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                                             use_fp16, with_gpu, rank, 
                                             world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
-            if rank == 0:
-                mllogger.end(
-                    key=mllog_constants.RUN_STOP,
-                    metadata={
-                        mllog_constants.STATUS: mllog_constants.SUCCESS,
-                        mllog_constants.EPOCH_NUM: epoch_num,
-                    },
-                )
-            is_success = True
-            break
+          is_success = True
+          break
         model.train()      
     
     train_acc /= idx
@@ -275,34 +268,28 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     torch.distributed.barrier()
     
     # evaluate at the end of epoch
-    if idx == batch_num and evaluate_on_epoch_end:
+    if evaluate_on_epoch_end and not is_success:
+      epoch_num = epoch + 1
       model.eval()
       rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
                                           use_fp16, with_gpu, rank, world_size, 
-                                          epoch)
+                                          epoch_num)
       if validation_acc is not None and global_acc >= validation_acc:
-        if rank == 0:
-            mllogger.end(
-                key=mllog_constants.RUN_STOP,
-                metadata={
-                    mllog_constants.STATUS: mllog_constants.SUCCESS,
-                    mllog_constants.EPOCH_NUM: epoch,
-                },
-            )
         is_success = True
     
-    #tqdm
-    tqdm.tqdm.write(
-        "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
-            current_ctx.rank,
-            epoch,
-            total_loss,
-            train_acc,
-            rank_val_acc*100,
-            str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
-            gpu_mem_alloc
-        )
-    )
+      tqdm.tqdm.write(
+          "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
+              current_ctx.rank,
+              epoch,
+              total_loss,
+              train_acc,
+              rank_val_acc*100,
+              str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
+              gpu_mem_alloc
+          )
+      )
+    
+    # stop training if success
     if is_success:
       break
 
@@ -310,7 +297,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     status = mllog_constants.SUCCESS if is_success else mllog_constants.ABORTED
     mllogger.end(key=mllog_constants.RUN_STOP,
                  metadata={mllog_constants.STATUS: status,
-                           mllog_constants.EPOCH_NUM: epochs,
+                           mllog_constants.EPOCH_NUM: epoch_num,
                  }
     )
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
@@ -379,7 +366,7 @@ if __name__ == '__main__':
       help="load node/edge feature using fp16 format to reduce memory usage")
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.2,
       help="Fraction of the epoch after which validation should be performed.")
-  parser.add_argument("--validation_acc", type=float, default=0.70,
+  parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
   parser.add_argument("--evaluate_on_epoch_end", action="store_true",
       help="Evaluate using validation set on each epoch end.")

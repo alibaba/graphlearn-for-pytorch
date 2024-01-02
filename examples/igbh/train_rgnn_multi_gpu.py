@@ -143,10 +143,10 @@ def run_training_proc(rank, world_size,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-  batch_num = len(train_idx) // batch_size
+  batch_num = (len(train_idx) + batch_size - 1) // batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
-  rank_val_acc = 0
+  epoch_num = 0
 
   training_start = time.time()
   for epoch in tqdm.tqdm(range(epochs)):
@@ -189,16 +189,8 @@ def run_training_proc(rank, world_size,
         rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
                                  rank, world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
-            if rank == 0:
-                mllogger.end(
-                    key=mllog_constants.RUN_STOP,
-                    metadata={
-                        mllog_constants.STATUS: mllog_constants.SUCCESS,
-                        mllog_constants.EPOCH_NUM: epoch_num,
-                    },
-                )
-            is_success = True
-            break
+          is_success = True
+          break
         model.train()
 
     if with_gpu:
@@ -206,36 +198,30 @@ def run_training_proc(rank, world_size,
     dist.barrier()
 
     # evaluate at the end of epoch
-    if  idx == batch_num and evaluate_on_epoch_end:
-      print(f"I am in the end {idx} == {batch_num}")
+    if  evaluate_on_epoch_end and not is_success:
+      epoch_num = epoch + 1
       model.eval()
       rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
-                                          rank, world_size, epoch)
+                                          rank, world_size, epoch_num)
       if validation_acc is not None and global_acc >= validation_acc:
-        if rank == 0:
-            mllogger.end(
-                key=mllog_constants.RUN_STOP,
-                metadata={
-                    mllog_constants.STATUS: mllog_constants.SUCCESS,
-                    mllog_constants.EPOCH_NUM: epoch,
-                },
-            )
         is_success = True
       
-    #tqdm
-    train_acc /= idx
-    gpu_mem_alloc /= idx
-    tqdm.tqdm.write(
-        "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
-            rank,
-            epoch,
-            total_loss,
-            train_acc,
-            rank_val_acc*100,
-            str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
-            gpu_mem_alloc
-        )
-    )
+      #tqdm
+      train_acc /= idx
+      gpu_mem_alloc /= idx
+      tqdm.tqdm.write(
+          "Rank{:02d} | Epoch {:03d} | Loss {:.4f} | Train Acc {:.2f} | Val Acc {:.2f} | Time {} | GPU {:.1f} MB".format(
+              rank,
+              epoch,
+              total_loss,
+              train_acc,
+              rank_val_acc*100,
+              str(datetime.timedelta(seconds = int(time.time() - epoch_start))),
+              gpu_mem_alloc
+          )
+      )
+
+    # stop training if success
     if is_success:
       break
   
@@ -244,7 +230,7 @@ def run_training_proc(rank, world_size,
     status = mllog_constants.SUCCESS if is_success else mllog_constants.ABORTED
     mllogger.end(key=mllog_constants.RUN_STOP,
                  metadata={mllog_constants.STATUS: status,
-                           mllog_constants.EPOCH_NUM: epochs,
+                           mllog_constants.EPOCH_NUM: epoch_num,
                  }
     )
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
@@ -274,7 +260,7 @@ if __name__ == '__main__':
   parser.add_argument('--batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.01)
-  parser.add_argument('--epochs', type=int, default=1)
+  parser.add_argument('--epochs', type=int, default=3)
   parser.add_argument('--num_layers', type=int, default=2)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--random_seed', type=int, default=42)
