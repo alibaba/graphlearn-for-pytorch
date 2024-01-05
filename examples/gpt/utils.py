@@ -43,7 +43,7 @@ def node_classification(batch):
   return message
 
 
-def link_prediction(batch, titles):
+def link_prediction(batch, titles, reason=False):
   message = "This is a directed subgraph of arxiv citation network with " + str(batch.x.shape[0]) + " nodes numbered from 0 to " + str(batch.x.shape[0]-1) + ".\n"
   graph = batch.edge_index.T.unique(dim=0).tolist()
   message += "The titles of each paper:\n"
@@ -56,7 +56,9 @@ def link_prediction(batch, titles):
   message += "Question 2: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[3])+".\n"
   message += "Question 3: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[2])+".\n"
   message += "Question 4: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[0])+".\n"
-
-  message += "Answer yes or no and show reasoning process.\n\n"
+  if reason:
+    message += "Answer yes or no and show reasoning process.\n\n"
+  else:
+    message += "Answer yes or no and don't show any reasoning process.\n\n"
 
   return message

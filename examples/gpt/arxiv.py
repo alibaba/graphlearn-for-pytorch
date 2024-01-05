@@ -22,15 +22,15 @@ import graphlearn_torch as glt
 from utils import get_gpt_response, link_prediction
 
 
-def run(rank, glt_ds, raw_text):
+def run(rank, glt_ds, raw_text, reason):
   neg_sampling = glt.sampler.NegativeSampling('binary')
   train_loader = glt.loader.LinkNeighborLoader(glt_ds,
-                                           [12, 6],
-                                           neg_sampling=neg_sampling,
-                                           batch_size=2,
-                                           drop_last=True,
-                                           shuffle=True,
-                                           device=torch.device(rank))
+                                              [12, 6],
+                                              neg_sampling=neg_sampling,
+                                              batch_size=2,
+                                              drop_last=True,
+                                              shuffle=True,
+                                              device=torch.device(rank))
   print(f'Rank {rank} build graphlearn_torch NeighborLoader Done.')
 
   for batch in tqdm(train_loader):
@@ -40,7 +40,7 @@ def run(rank, glt_ds, raw_text):
 
     # print(batch)
     # print(batch.edge_label_index)
-    message = link_prediction(batch, batch_titles)
+    message = link_prediction(batch, batch_titles, reason=reason)
 
     # print(message)
     response = get_gpt_response(
@@ -52,15 +52,14 @@ def run(rank, glt_ds, raw_text):
 
 if __name__ == '__main__':
   world_size = torch.cuda.device_count()
-  start = time.time()
-  print(f'Load data cost {time.time()-start} s.')
   import pandas as pd
   root = '../data/arxiv_2023/raw/'
   titles = pd.read_csv(root + "titles.csv.gz").to_numpy()
   ids = torch.from_numpy(pd.read_csv(root + "ids.csv.gz").to_numpy())
   edge_index = torch.from_numpy(pd.read_csv(root + "edges.csv.gz").to_numpy())
-  start = time.time()
+
   print('Build graphlearn_torch dataset...')
+  start = time.time()
   glt_dataset = glt.data.Dataset()
   glt_dataset.init_graph(
     edge_index=edge_index.T,
@@ -75,4 +74,4 @@ if __name__ == '__main__':
 
   print(f'Build graphlearn_torch csr_topo and feature cost {time.time() - start} s.')
 
-  run(0, glt_dataset, titles)
+  run(0, glt_dataset, titles, reason=False)
