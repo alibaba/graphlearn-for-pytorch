@@ -62,6 +62,7 @@ class NeighborSampler(BaseSampler):
     self._inducer = None
     self._sampler_lock = threading.Lock()
     self.is_sampler_initialized = False
+    self.is_neg_sampler_initialized = False
     
     if seed is not None:
       pywrap.RandomSeedManager.getInstance().setSeed(seed)
@@ -113,7 +114,7 @@ class NeighborSampler(BaseSampler):
 
 
   def lazy_init_neg_sampler(self):
-    if not self.is_sampler_initialized and self.with_neg:
+    if not self.is_neg_sampler_initialized and self.with_neg:
       with self._sampler_lock:
         if self._neg_sampler is None:
           if self._g_cls == 'homo':
@@ -122,7 +123,7 @@ class NeighborSampler(BaseSampler):
               mode=self.device.type.upper(),
               edge_dir=self.edge_dir
             )
-            self.is_sampler_initialized = True
+            self.is_neg_sampler_initialized = True
           else: # hetero
             self._neg_sampler = {}
             for etype, g in self.graph.items():
@@ -131,7 +132,7 @@ class NeighborSampler(BaseSampler):
                 mode=self.device.type.upper(),
                 edge_dir=self.edge_dir
               )
-            self.is_sampler_initialized = True
+            self.is_neg_sampler_initialized = True
 
   def lazy_init_subgraph_op(self):
     if self._subgraph_op is None:
