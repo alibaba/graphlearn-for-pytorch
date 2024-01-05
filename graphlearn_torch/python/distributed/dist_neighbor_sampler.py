@@ -124,7 +124,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
                collect_features: bool = False,
                channel: Optional[ChannelBase] = None,
                concurrency: int = 1,
-               device: Optional[torch.device] = None):
+               device: Optional[torch.device] = None,
+               seed:int = None):
     self.data = data
     self.num_neighbors = num_neighbors
     self.max_input_size = 0
@@ -136,6 +137,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     self.channel = channel
     self.concurrency = concurrency
     self.device = get_available_device(device)
+    self.seed = seed
 
     if isinstance(data, DistDataset):
       partition2workers = rpc_sync_data_partitions(
@@ -170,7 +172,8 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
     self.sampler = NeighborSampler(
       self.dist_graph.local_graph, self.num_neighbors,
-      self.device, self.with_edge, self.with_neg, self.with_weight, self.edge_dir
+      self.device, self.with_edge, self.with_neg, self.with_weight, 
+      self.edge_dir, seed=self.seed
     )
     self.inducer_pool = queue.Queue(maxsize=self.concurrency)
 

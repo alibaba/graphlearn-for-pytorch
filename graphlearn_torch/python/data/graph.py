@@ -252,7 +252,7 @@ class Graph(object):
                          f"invalid mode {self.mode}")
 
   def export_topology(self):
-    return self.topo.indptr, self.topo.indices
+    return self.topo.indptr, self.topo.indices, self.topo.edge_ids
 
   def share_ipc(self):
     r""" Create ipc handle for multiprocessing.

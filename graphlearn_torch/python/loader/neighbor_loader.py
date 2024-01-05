@@ -70,6 +70,7 @@ class NeighborLoader(NodeLoader):
     strategy: str = 'random',
     device: torch.device = torch.device(0),
     as_pyg_v1: bool = False,
+    seed: int = None,
     **kwargs
   ):
     if neighbor_sampler is None:
@@ -81,6 +82,7 @@ class NeighborLoader(NodeLoader):
         with_weight=with_weight,
         device=device,
         edge_dir=data.edge_dir,
+        seed=seed
       )
     self.as_pyg_v1 = as_pyg_v1
     self.edge_dir = data.edge_dir

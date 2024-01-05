@@ -1,4 +1,7 @@
 import os
+import platform
+import shutil
+import subprocess
 
 from torch.utils.cpp_extension import CppExtension
 
@@ -13,14 +16,24 @@ def glt_v6d_ext_module(
 
   include_dirs.append(root_path)
   # We assume that glt_v6d is built in graphscope environment
-  include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
+
   if 'GRAPHSCOPE_HOME' in os.environ:
     include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard')
     include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include' + '/vineyard/contrib')
     include_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/include')
     library_dirs.append(os.environ['GRAPHSCOPE_HOME'] + '/lib')
- 
-  library_dirs.append('/usr/local/lib')
+
+  if platform.system() == 'Darwin':
+    homebrew_prefix = subprocess.check_output([shutil.which('brew'), '--prefix']) \
+                                .decode('utf-8', errors='ignore').strip()
+    include_dirs.append(os.path.join(homebrew_prefix, 'include'))
+    include_dirs.append(os.path.join(homebrew_prefix, 'include', 'vineyard'))
+    include_dirs.append(os.path.join(homebrew_prefix, 'include', 'vineyard', 'contrib'))
+    library_dirs.append(os.path.join(homebrew_prefix, 'lib'))
+
+  if platform.system() == "Linux":
+    include_dirs.append('/usr/lib/x86_64-linux-gnu/openmpi/include')
+    library_dirs.append('/usr/local/lib')
 
   libraries.append('pthread')
   libraries.append('mpi')
