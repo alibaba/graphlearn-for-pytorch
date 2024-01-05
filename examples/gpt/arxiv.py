@@ -16,72 +16,63 @@
 import time
 import torch
 
-import numpy as np
-import os.path as osp
-
-from numpy import genfromtxt
-
-from ogb.nodeproppred import PygNodePropPredDataset
 from tqdm import tqdm
 
 import graphlearn_torch as glt
-from utils import get_gpt_response
+from utils import get_gpt_response, link_prediction
 
-def run(rank, glt_ds, train_idx):
-  train_loader = glt.loader.NeighborLoader(glt_ds,
-                                           [15, 10, 5],
-                                           train_idx,
-                                           batch_size=1,
+
+def run(rank, glt_ds, raw_text):
+  neg_sampling = glt.sampler.NegativeSampling('binary')
+  train_loader = glt.loader.LinkNeighborLoader(glt_ds,
+                                           [12, 6],
+                                           neg_sampling=neg_sampling,
+                                           batch_size=2,
                                            drop_last=True,
                                            shuffle=True,
                                            device=torch.device(rank))
   print(f'Rank {rank} build graphlearn_torch NeighborLoader Done.')
 
   for batch in tqdm(train_loader):
-    # print(batch)
-    if batch.edge_index.shape[1] < 15:
+    batch_titles = raw_text[batch.node]
+    if batch.edge_index.shape[1] < 5:
       continue
-    message = "This is a directed subgraph of arxiv citation network with " + str(batch.x.shape[0]) + " nodes numbered from 0 to " + str(batch.x.shape[0]-1) + ".\n"
-    message += "The subgraph has " + str(batch.edge_index.shape[1]) + " edges.\n"
-    for i in range(1, batch.x.shape[0]):
-      feature_str = ','.join(f'{it:.3f}' for it in batch.x[i].tolist())
-      message += "The feature of node " + str(i) + " is [" + feature_str + "] "
-      message += "and the node label is " + str(batch.y[i].item()) + ".\n"
-    # message += "The edges of the subgraph are " + str(batch.edge_index.T.tolist()) + ' where the first number indicates source node and the second destination node.\n'
-    message += "Question: predict the label for node 0, whose feature is [" + ','.join(f'{it:.3f}' for it in batch.x[0].tolist()) + "]. Give the label only and don't show any reasoning process.\n\n"
+
+    # print(batch)
+    # print(batch.edge_label_index)
+    message = link_prediction(batch, batch_titles)
+
     # print(message)
     response = get_gpt_response(
-      api_key='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',
       message=message
     )
 
-    print(f"response: {response} label: {batch.y[0]}")
+    print(f"response: {response}")
 
 
 if __name__ == '__main__':
   world_size = torch.cuda.device_count()
   start = time.time()
-  root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'arxiv')
-  dataset = PygNodePropPredDataset('ogbn-arxiv', root)
-  split_idx = dataset.get_idx_split()
-  data = dataset[0]
-  train_idx = split_idx['train']
   print(f'Load data cost {time.time()-start} s.')
-
+  import pandas as pd
+  root = '../data/arxiv_2023/raw/'
+  titles = pd.read_csv(root + "titles.csv.gz").to_numpy()
+  ids = torch.from_numpy(pd.read_csv(root + "ids.csv.gz").to_numpy())
+  edge_index = torch.from_numpy(pd.read_csv(root + "edges.csv.gz").to_numpy())
   start = time.time()
   print('Build graphlearn_torch dataset...')
   glt_dataset = glt.data.Dataset()
   glt_dataset.init_graph(
-    edge_index=data.edge_index,
+    edge_index=edge_index.T,
     graph_mode='CPU',
-    directed=False
+    directed=True
   )
   glt_dataset.init_node_features(
-    node_feature_data=data.x,
+    node_feature_data=ids,
     sort_func=glt.data.sort_by_in_degree,
     split_ratio=0
   )
-  glt_dataset.init_node_labels(node_label_data=data.y)
+
   print(f'Build graphlearn_torch csr_topo and feature cost {time.time() - start} s.')
 
-  run(0, glt_dataset, train_idx)
+  run(0, glt_dataset, titles)
