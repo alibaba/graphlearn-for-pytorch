@@ -42,7 +42,6 @@ def link_prediction(batch, titles):
   message += "Question 3: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[2])+".\n"
   message += "Question 4: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[0])+".\n"
 
-  message += "Question 3: Infer the temporal order of node 2 and node 11.\n"
   message += "Answer yes or no and show reasoning process.\n\n"
 
   return message
