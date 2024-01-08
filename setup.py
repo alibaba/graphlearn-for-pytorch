@@ -30,7 +30,7 @@ WITH_VINEYARD = os.getenv('WITH_VINEYARD', 'OFF')
 WITH_CUDA = os.getenv('WITH_CUDA', 'ON')
 
 sys.path.append(os.path.join(ROOT_PATH, 'graphlearn_torch', 'python', 'utils'))
-from build import glt_ext_module, glt_v6d_ext_module
+from build_glt import glt_ext_module, glt_v6d_ext_module
 
 GLT_V6D_EXT_NAME = "py_graphlearn_torch_vineyard"
 GLT_EXT_NAME = "py_graphlearn_torch"
