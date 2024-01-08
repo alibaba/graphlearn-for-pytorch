@@ -24,6 +24,7 @@ First, we sample a 2-hop ego-subgraph from the original graph. The subgraph is s
 
 Then, the sampled subgraph along with node features (e.g. in this example the title for the paper node) is fed into GPT to infer whether a requested edge is in the original graph or not. 
 
+**Note**: GPT has a limitation on its context size, and thus limits the size of the sampled subgraph, which is determined by the parameter `num_neighbors` in the data loader. If the sampled subgraph is too large, please try to decrease the `num_neighbors` to reduce the size of the subgraph.
 
 ### Appendix:
 1. **Dataset**: You can also use other datasets and modify the preprocessing code, but don't forget to transform the graph format into PyG's `edge_index`.
