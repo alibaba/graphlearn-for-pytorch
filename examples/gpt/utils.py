@@ -49,9 +49,12 @@ def link_prediction(batch, titles, reason=False):
   message += "The titles of each paper:\n"
   for i in range(batch.x.shape[0]):
     message += "node " + str(i) + " is '" + titles[i][0] + "'\n" 
-  message += "The sampled subgraph of the networks are " + str(graph) + ' where the first number indicates source node cites the second destination node.\n'
+  message += "The sampled subgraph of the network is " + str(graph) + ' where the first number indicates source node and the second destination node.\n'
   message += "Hint: the direction of the edge can indicate some information of temporality.\n"
-  message += "\nAccording to principle of the construction of citation networks and the given subgraph structure, answer the following questions:\n"
+  message += "\nAccording to principles of citation network construction and the given subgraph structure, answer the following questions:\n"
+
+  # In batch.edge_label_index.T.tolist(), index 0 and 1 are positive samples,
+  #                                       index 2 and 3 are negative samples.
   message += "Question 1: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[1])+".\n"
   message += "Question 2: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[3])+".\n"
   message += "Question 3: predict whether there tends to form an edge "+str(batch.edge_label_index.T.tolist()[2])+".\n"

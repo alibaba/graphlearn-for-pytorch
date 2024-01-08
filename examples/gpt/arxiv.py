@@ -22,7 +22,7 @@ import graphlearn_torch as glt
 from utils import get_gpt_response, link_prediction
 
 
-def run(rank, glt_ds, raw_text, reason):
+def run(glt_ds, raw_text, reason):
   neg_sampling = glt.sampler.NegativeSampling('binary')
   train_loader = glt.loader.LinkNeighborLoader(glt_ds,
                                               [12, 6],
@@ -30,8 +30,8 @@ def run(rank, glt_ds, raw_text, reason):
                                               batch_size=2,
                                               drop_last=True,
                                               shuffle=True,
-                                              device=torch.device(rank))
-  print(f'Rank {rank} build graphlearn_torch NeighborLoader Done.')
+                                              device=torch.device('cpu'))
+  print(f'Building graphlearn_torch NeighborLoader Done.')
 
   for batch in tqdm(train_loader):
     batch_titles = raw_text[batch.node]
@@ -51,7 +51,6 @@ def run(rank, glt_ds, raw_text, reason):
 
 
 if __name__ == '__main__':
-  world_size = torch.cuda.device_count()
   import pandas as pd
   root = '../data/arxiv_2023/raw/'
   titles = pd.read_csv(root + "titles.csv.gz").to_numpy()
@@ -74,4 +73,5 @@ if __name__ == '__main__':
 
   print(f'Build graphlearn_torch csr_topo and feature cost {time.time() - start} s.')
 
-  run(0, glt_dataset, titles, reason=False)
+  run(glt_dataset, titles, reason=False)
+  
