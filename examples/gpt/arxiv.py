@@ -74,4 +74,3 @@ if __name__ == '__main__':
   print(f'Build graphlearn_torch csr_topo and feature cost {time.time() - start} s.')
 
   run(glt_dataset, titles, reason=False)
-  
