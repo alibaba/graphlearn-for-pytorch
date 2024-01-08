@@ -14,16 +14,21 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal, Tuple
+from typing import Dict, List, Optional, Union, Literal, Tuple, Callable
+from collections.abc import Sequence
 
 import torch
 
 from ..data import Dataset, Graph, Feature, DeviceGroup
-from ..partition import load_partition, cat_feature_cache
-from ..typing import (
-  NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
+from ..partition import (
+  load_partition, cat_feature_cache,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
+from ..typing import (
+  NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
+  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+)
+
 from ..utils import share_memory
 
 
@@ -175,6 +180,7 @@ class DistDataset(Dataset):
     self,
     num_val: Union[float, int],
     num_test: Union[float, int],
+    id_filter: Callable,
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the
@@ -196,10 +202,10 @@ class DistDataset(Dataset):
       test_idx = {}
   
       for node_type, _ in self.node_labels.items():
-        indices = torch.where(self.node_pb[node_type] == self.partition_idx)[0]
+        indices = id_filter(self.node_pb[node_type], self.partition_idx)
         train_idx[node_type], val_idx[node_type], test_idx[node_type] = random_split(indices, num_val, num_test)
     else:
-      indices = torch.where(self.node_pb == self.partition_idx)[0]
+      indices = id_filter(self.node_pb, self.partition_idx)
       train_idx, val_idx, test_idx = random_split(indices, num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
 
@@ -212,43 +218,31 @@ class DistDataset(Dataset):
     node_features: Dict[NodeType, List[str]] = None,
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
+    id2idx: Dict[NodeType, Sequence] = None,
   ):
     # TODO(hongyi): to support more than one partitions
     super().load_vineyard(vineyard_id=vineyard_id, vineyard_socket=vineyard_socket, 
                           edges=edges, edge_weights=edge_weights, node_features=node_features, 
-                          edge_features=edge_features, node_labels=node_labels,)
+                          edge_features=edge_features, node_labels=node_labels, id2idx=id2idx)
     if isinstance(self.graph, dict):
       # hetero
-      self.node_pb = {}
-      self.edge_pb = {}
-      for etype, graph in self.graph.items():
-        self.node_pb[etype[0]] = torch.zeros(graph.row_count)
-        self.edge_pb[etype] = torch.zeros(graph.edge_count)
-
       self._node_feat_pb = {}
       if node_features:
-        for ntype, nfeat in self.node_features.items():
-          self._node_feat_pb[ntype] = torch.zeros(nfeat.shape[0])
-    
-      self._edge_feat_pb = {}
-      if edge_features:
-        for etype, efeat in self.edge_features.items():
-          self._edge_feat_pb[etype] = torch.zeros(efeat.shape[0])
+        for ntype, _ in self.node_features.items():
+          self._node_feat_pb[ntype] = self.node_pb[ntype]
     else:
       # homo
-      self.node_pb = torch.zeros(self.graph.row_count)
-      self.edge_pb = torch.zeros(self.graph.edge_count)
       if node_features:
-        self._node_feat_pb = torch.zeros(self.node_features.shape[0])
-      if edge_features:
-        self._edge_feat_pb = torch.zeros(self.edge_features.shape[0])
+        # print('here;;;;;;;;')
+        self._node_feat_pb = self.node_pb
 
   def share_ipc(self):
     super().share_ipc()
-    self.node_pb = share_memory(self.node_pb)
-    self.edge_pb = share_memory(self.edge_pb)
-    self._node_feat_pb = share_memory(self._node_feat_pb)
-    self._edge_feat_pb = share_memory(self._edge_feat_pb)
+    if isinstance(self.node_pb, torch.Tensor):
+      self.node_pb = share_memory(self.node_pb)
+      self.edge_pb = share_memory(self.edge_pb)
+      self._node_feat_pb = share_memory(self._node_feat_pb)
+      self._edge_feat_pb = share_memory(self._edge_feat_pb)
     ipc_hanlde = (
       self.num_partitions, self.partition_idx,
       self.graph, self.node_features, self.edge_features, self.node_labels,

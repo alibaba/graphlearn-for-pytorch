@@ -15,6 +15,7 @@
 
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
+
 import torch
 import numpy as np
 from enum import Enum
@@ -86,9 +87,9 @@ HeteroFeaturePartitionData = Dict[Union[NodeType, EdgeType], FeaturePartitionDat
 
 # Types for partition book #####################################################
 
-PartitionBook = torch.Tensor
-HeteroNodePartitionDict = Dict[NodeType, PartitionBook]
-HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
+# PartitionBook = torch.Tensor
+# HeteroNodePartitionDict = Dict[NodeType, PartitionBook]
+# HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
 
 # Types for neighbor sampling ##################################################
 

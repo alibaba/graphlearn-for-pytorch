@@ -165,3 +165,9 @@ def load_and_concatenate_tensors(filename, device):
         combined_tensor[start_idx:end_idx] = tensor.to(device)
         start_idx = end_idx
     return combined_tensor
+
+def default_id_select(srcs, p_mask, node_pb=None):
+   return torch.masked_select(srcs, p_mask)
+
+def default_id_filter(node_pb, partition_idx):
+  return torch.where(node_pb == partition_idx)[0]

@@ -26,9 +26,29 @@ from ..typing import (
   NodeType, EdgeType, as_str, TensorDataType,
   GraphPartitionData, HeteroGraphPartitionData,
   FeaturePartitionData, HeteroFeaturePartitionData,
-  PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 from ..utils import convert_to_tensor, ensure_dir, id2idx, append_tensor_to_file, load_and_concatenate_tensors
+
+
+class PartitionBook(object):
+  @abstractmethod
+  def __getitem__(self, indices):
+    pass
+  
+  @property
+  def offset(self):
+    return 0
+
+class GLTPartitionBook(PartitionBook, torch.Tensor):
+  r""" A partition book of graph nodes or edges.
+  """
+  def __getitem__(self, indices) -> torch.Tensor:
+    return torch.Tensor.__getitem__(indices)
+
+
+HeteroNodePartitionDict = Dict[NodeType, PartitionBook]
+HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
 
 
 def save_meta(

@@ -14,9 +14,18 @@
 # ==============================================================================
 
 try:
-    from .. import py_graphlearn_torch_vineyard as pywrap
+  import torch
+  from typing import Dict
+  from collections.abc import Sequence
+
+  from .. import py_graphlearn_torch_vineyard as pywrap
+
+
 except ImportError:
    pass
+
+from ..partition import PartitionBook
+
 
 def vineyard_to_csr(sock, fid, v_label_name, e_label_name, edge_dir, haseid=0):
   '''
@@ -42,3 +51,93 @@ def load_edge_feature_from_vineyard(sock, fid, ecols, e_label_name):
     return edge_feature(torch.Tensor)
   '''
   return pywrap.load_edge_feature_from_vineyard(sock, fid, e_label_name, ecols)
+
+
+def get_fid_from_gid(gid):
+  '''
+    Wrap get_fid_from_gid function to get fid from gid
+  '''
+  return pywrap.get_fid_from_gid(gid)
+
+
+def get_frag_vertex_offset(sock, fid, v_label_name):
+  '''
+    Wrap GetFragVertexOffset function to get vertex offset of a fragment.
+  '''
+  return pywrap.get_frag_vertex_offset(sock, fid, v_label_name)
+
+
+def get_frag_vertex_num(sock, fid, v_label_name):
+  '''
+    Wrap GetFragVertexNum function to get vertex number of a fragment.
+  '''
+  return pywrap.get_frag_vertex_num(sock, fid, v_label_name)
+
+
+class VineyardPartitionBook(PartitionBook):
+  def __init__(self, sock, obj_id, v_label_name, fid2pid: Dict=None):
+    self._sock = sock
+    self._obj_id = obj_id
+    self._v_label_name = v_label_name
+    self._frag = None
+    self._offset = get_frag_vertex_offset(sock, obj_id, v_label_name)
+    # print(f"{obj_id} offset:: {self._offset} >>>{self.gid2fid(torch.tensor([-9223372036854744515,63034,30910, 23673, 1], dtype=torch.int64))}")
+    # TODO: optimise this query process if too slow
+    self._fid2pid = fid2pid
+
+  def __getitem__(self, gids) -> torch.Tensor:
+    fids = self.gid2fid(gids)
+    # ids = fids[:15]
+    # print(f"{gids[:15]} -> {ids} ")
+    if self._fid2pid is not None:
+      pids = torch.tensor([self._fid2pid[fid] for fid in fids])
+      return pids.to(torch.int32)
+    # pids = torch.tensor([self._fid2pid[fid] for fid in fids])
+
+    return fids.to(torch.int32)
+
+  @property
+  def device(self):
+    return torch.device('cpu')
+
+  @property
+  def offset(self):
+    return self._offset
+
+  def gid2fid(self, gids):
+    '''
+      Parse gid to get fid
+    '''
+    if self._frag is None:
+      self._frag = pywrap.VineyardFragHandle(self._sock, self._obj_id)
+    fids = torch.tensor([self._frag.get_fid_from_gid(gid) for gid in gids])
+    return fids
+
+
+class VineyardGid2Lid(Sequence):
+  def __init__(self, sock, fid, v_label_name):
+    self._offset = get_frag_vertex_offset(sock, fid, v_label_name)
+    print(f"{fid} offset: {self._offset} ")
+    self._vnum = get_frag_vertex_num(sock, fid, v_label_name)
+
+  def __getitem__(self, gids):
+    # print(f"{self._offset} gids: {gids} ")
+    return gids - self._offset
+  
+  def __len__(self):
+    return self._vnum
+
+
+def v6d_id_select(srcs, p_mask, node_pb: PartitionBook):
+  gids = torch.masked_select(srcs, p_mask)
+  # print(node_pb.offset)
+  offsets = gids - node_pb.offset
+  return offsets
+
+def v6d_id_filter(node_pb: VineyardPartitionBook, partition_idx):
+  # print(partition_idx, " ", node_pb._fid2pid[node_pb._obj_id])
+  # assert partition_idx == node_pb._fid2pid[node_pb._obj_id]
+  frag = pywrap.VineyardFragHandle(node_pb._sock, node_pb._obj_id)
+  inner_vertices = frag.get_inner_vertices(node_pb._v_label_name)
+  # print(inner_vertices)
+  return inner_vertices

@@ -19,10 +19,13 @@ import torch
 
 from ..data import Graph
 from ..typing import (
-  NodeType, EdgeType, PartitionBook,
-  HeteroNodePartitionDict, HeteroEdgePartitionDict
+  NodeType, EdgeType,
+  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 
+from ..partition import (
+  PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+)
 
 class DistGraph(object):
   r""" Simple wrapper for graph data with distributed context.
@@ -44,7 +47,7 @@ class DistGraph(object):
                partition_idx: int,
                local_graph: Union[Graph, Dict[EdgeType, Graph]],
                node_pb: Union[PartitionBook, HeteroNodePartitionDict],
-               edge_pb: Union[PartitionBook, HeteroEdgePartitionDict]):
+               edge_pb: Union[PartitionBook, HeteroEdgePartitionDict]=None):
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
     self.local_graph = local_graph
@@ -100,9 +103,12 @@ class DistGraph(object):
                           etype: Optional[EdgeType]=None):
     r""" Get the partition ids of edge ids with a specific edge type.
     """
+    
     if self.data_cls == 'hetero':
       assert etype is not None
+      assert isinstance(self.edge_pb[etype], torch.Tensor)
       pb = self.edge_pb[etype]
     else:
+      assert isinstance(self.edge_pb[etype], torch.Tensor)
       pb = self.edge_pb
     return pb[eids.to(pb.device)]

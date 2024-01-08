@@ -14,8 +14,19 @@ limitations under the License.
 ==============================================================================*/
 
 #include <torch/extension.h>
+
+#include <vineyard/graph/fragment/arrow_fragment.h>
+#include <vineyard/graph/loader/arrow_fragment_loader.h>
+#include <vineyard/graph/fragment/graph_schema.h>
+
 namespace graphlearn_torch {
 namespace vineyard_utils {
+  
+using GraphType = vineyard::ArrowFragment<vineyard::property_graph_types::OID_TYPE,
+                                          vineyard::property_graph_types::VID_TYPE>;
+using vertex_t = GraphType::vertex_t;
+using vid_t = vineyard::property_graph_types::VID_TYPE;
+using fid_t = int64_t;
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
   const std::string& ipc_socket, const std::string& object_id_str,
@@ -31,6 +42,27 @@ torch::Tensor LoadEdgeFeatures(
   const std::string& ipc_socket, const std::string& object_id_str,
   const std::string& e_label_name, std::vector<std::string>& ecols
 );
+
+int64_t GetFragVertexOffset(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name
+);
+
+uint32_t GetFragVertexNum(
+  const std::string& ipc_socket, const std::string& object_id_str,
+  const std::string& v_label_name
+);
+
+
+class VineyardFragHandle {
+public:
+  explicit VineyardFragHandle(
+    const std::string& ipc_socket, const std::string& object_id_str);
+  int64_t GetFidFromGid(int64_t gid);
+  torch::Tensor GetInnerVertices(const std::string& v_label_name);
+private:
+  std::shared_ptr<GraphType> frag_;
+};
 
 } // namespace vineyard_utils
 }  // namespace graphlearn_torch

@@ -14,11 +14,11 @@
 # ==============================================================================
 
 import os
-from typing import List, Optional, Union, Literal
+from typing import List, Optional, Union, Literal, Callable
 
 import torch
 
-from ..utils import assign_device
+from ..utils import assign_device, default_id_select
 
 from .dist_context import DistContext, assign_server_by_order
 
@@ -61,7 +61,8 @@ class _BasicDistSamplingWorkerOptions(object):
                master_addr: Optional[str] = None,
                master_port: Optional[Union[str, int]] = None,
                num_rpc_threads: Optional[int] = None,
-               rpc_timeout: float = 180):
+               rpc_timeout: float = 180,
+               id_select: Callable = default_id_select):
     self.num_workers = num_workers
 
     # Not sure yet, will be calculated later.
@@ -102,6 +103,7 @@ class _BasicDistSamplingWorkerOptions(object):
     if self.num_rpc_threads is not None:
       assert self.num_rpc_threads > 0
     self.rpc_timeout = rpc_timeout
+    self.id_select = id_select
 
   def _set_worker_ranks(self, current_ctx: DistContext):
     self.worker_world_size = current_ctx.world_size * self.num_workers
@@ -247,7 +249,8 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                prefetch_size: int = 4,
                worker_key: str = None,
                glt_graph = None,
-               workload_type: Optional[Literal['train', 'validate', 'test']] = None):
+               workload_type: Optional[Literal['train', 'validate', 'test']] = None,
+               id_select: Callable = default_id_select):
     # glt_graph is used in GraphScope side to get parameters
     if glt_graph:
       if not workload_type:
@@ -262,7 +265,8 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       worker_key = str(master_port)
     
     super().__init__(num_workers, worker_devices, worker_concurrency,
-                     master_addr, master_port, num_rpc_threads, rpc_timeout)
+                     master_addr, master_port, num_rpc_threads, rpc_timeout,
+                     id_select)
     if server_rank is not None:
       self.server_rank = server_rank
     else:
