@@ -26,7 +26,6 @@ from ..partition import (
 )
 from ..typing import (
   NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
-  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 
 from ..utils import share_memory

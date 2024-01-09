@@ -85,12 +85,6 @@ class FeaturePartitionData(NamedTuple):
 HeteroGraphPartitionData = Dict[EdgeType, GraphPartitionData]
 HeteroFeaturePartitionData = Dict[Union[NodeType, EdgeType], FeaturePartitionData]
 
-# Types for partition book #####################################################
-
-# PartitionBook = torch.Tensor
-# HeteroNodePartitionDict = Dict[NodeType, PartitionBook]
-# HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
-
 # Types for neighbor sampling ##################################################
 
 Seeds = Union[torch.Tensor, str] 

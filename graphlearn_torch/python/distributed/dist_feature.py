@@ -20,7 +20,6 @@ import torch
 from ..data import Feature
 from ..typing import (
   EdgeType, NodeType,
-  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 from ..partition import (
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict

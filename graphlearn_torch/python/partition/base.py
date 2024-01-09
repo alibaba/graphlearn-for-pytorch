@@ -26,7 +26,6 @@ from ..typing import (
   NodeType, EdgeType, as_str, TensorDataType,
   GraphPartitionData, HeteroGraphPartitionData,
   FeaturePartitionData, HeteroFeaturePartitionData,
-  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 from ..utils import convert_to_tensor, ensure_dir, id2idx, append_tensor_to_file, load_and_concatenate_tensors
 
