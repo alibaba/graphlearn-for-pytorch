@@ -88,16 +88,13 @@ class DistFeature(object):
     ensure_device(self.device)
 
     self.local_feature = local_feature
-    # print("111111")
     if isinstance(self.local_feature, dict):
       self.data_cls = 'hetero'
       for _, feat in self.local_feature.items():
         feat.lazy_init_with_ipc_handle()
     elif isinstance(self.local_feature, Feature):
       self.data_cls = 'homo'
-      # print('222222222')
       self.local_feature.lazy_init_with_ipc_handle()
-      # print('33333333333')
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                        f"feature type '{type(self.local_feature)}'")
@@ -105,7 +102,6 @@ class DistFeature(object):
     if isinstance(self.feature_pb, dict):
       assert self.data_cls == 'hetero'
     elif isinstance(self.feature_pb, PartitionBook):
-      # print('444444444')
       assert self.data_cls == 'homo'
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
@@ -116,11 +112,8 @@ class DistFeature(object):
       if self.rpc_router is None:
         raise ValueError(f"'{self.__class__.__name__}': a rpc router must be "
                          f"provided when `local_only` set to `False`")
-      # print("555555555")
       rpc_callee = RpcFeatureLookupCallee(self)
-      # print('66666666666')
       self.rpc_callee_id = rpc_register(rpc_callee)
-      # print('77777777777777')
     else:
       self.rpc_callee_id = None
 
@@ -199,12 +192,10 @@ class DistFeature(object):
                               dtype=torch.long,
                               device=self.device)
     partition_ids = pb[ids.to(pb.device)].to(self.device)
-    # print(f'befor mask: {self.partition_idx} :: {max(partition_ids)} {min(partition_ids)}')
     ids = ids.to(self.device)
     local_mask = (partition_ids == self.partition_idx)
     local_ids = torch.masked_select(ids, local_mask)
     local_index = torch.masked_select(input_order, local_mask)
-    # print(f"{self.partition_idx}: {ids[-10:]} -> {partition_ids[-10:]}=={local_mask[-10:]}&&{local_ids[-10:]}")
     return feat[local_ids], local_index
 
   def _remote_selecting_get(
@@ -229,18 +220,15 @@ class DistFeature(object):
 
     _, pb = self._get_local_store(input_type)
     ids = ids.to(pb.device)
-    # print(ids)
     input_order= torch.arange(ids.size(0),
                               dtype=torch.long)
     partition_ids = pb[ids].cpu()
-    # print(partition_ids)
     futs, indexes = [], []
     for pidx in range(0, self.num_partitions):
       if pidx == self.partition_idx:
         continue
       remote_mask = (partition_ids == pidx)
       remote_ids = torch.masked_select(ids, remote_mask)
-      # print(remote_ids)
       if remote_ids.shape[0] > 0:
         to_worker = self.rpc_router.get_to_worker(pidx)
         futs.append(rpc_request_async(to_worker,

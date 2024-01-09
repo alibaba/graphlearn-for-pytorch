@@ -353,7 +353,6 @@ class Dataset(object):
         self.node_labels = _build_features(
           self.node_labels, id2idx, 0.0, None, None, with_gpu, None
         )
-    print(f'label ::: {self.node_labels}')
 
   def init_node_split(
     self,

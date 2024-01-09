@@ -357,8 +357,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
       # Sample subgraph.
       for req_num in self.num_neighbors:
         output: NeighborOutput = await self._sample_one_hop(srcs, req_num, None, id_select)
-        # if req_num <= 10:
-        #   print(f"{req_num} {srcs} -------------------- {output.nbr}")
         if output.nbr.numel() == 0:
           break
         nodes, rows, cols = \
@@ -378,7 +376,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         num_sampled_edges=num_sampled_edges,
         metadata={}
       )
-      # print(f"sample_output: {sample_output.node} {sample_output.row} {sample_output.col} {sample_output.edge}")
+
     # Reclaim inducer into pool.
     self.inducer_pool.put(inducer)
 
@@ -627,9 +625,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       src_ntype = etype[0] if etype is not None else None
     elif self.edge_dir == 'in':
       src_ntype = etype[-1] if etype is not None else None
-    # print(f"graph:::: {self.dist_graph.partition_idx}, {self.dist_graph.num_partitions}, {src_ntype}")
     partition_ids = self.dist_graph.get_node_partitions(srcs, src_ntype)
-    # print(f"pids:::: {partition_ids}")
     partition_ids = partition_ids.to(device)
     
     partition_results: List[PartialNeighborOutput] = []
@@ -645,12 +641,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
         p_ids = id_select(srcs, p_mask, self.dist_graph.node_pb[src_ntype])
       else:
         p_ids = id_select(srcs, p_mask, self.dist_graph.node_pb)
-      # print(f"{pidx} p_ids::: {p_ids}")
       if p_ids.shape[0] > 0:
         p_orders = torch.masked_select(orders, p_mask)
         if pidx == self.data.partition_idx:
           p_nbr_out = self.sampler.sample_one_hop(p_ids, num_nbr, etype)
-          # print(f"p_nbr_out::: {p_nbr_out}")
           partition_results.append(PartialNeighborOutput(p_orders, p_nbr_out))
         else:
           remote_orders_list.append(p_orders)
@@ -683,7 +677,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
     r""" Collect labels and features for the sampled subgrarph if necessary,
     and put them into a sample message.
     """
-    # print(f"output: {output}")
     result_map = {}
     is_hetero = (self.dist_graph.data_cls == 'hetero')
     result_map['#IS_HETERO'] = torch.LongTensor([int(is_hetero)])
@@ -755,25 +748,18 @@ class DistNeighborSampler(ConcurrentEventLoop):
           torch.tensor(output.num_sampled_edges, device=self.device)
       if self.with_edge:
         result_map['eids'] = output.edge
-      # print(result_map)
       # Collect node labels.
-      # node_labels = self.data.get_node_label()
-      # print(node_labels[output.node])
       if self.node_labels is not None and isinstance(self.node_labels, torch.Tensor):
         result_map['nlabels'] = self.node_labels[output.node.to(node_labels.device)]
       else:
-        # print("here????????")
         fut = self.dist_node_labels.async_get(output.node)
         nlabels = await wrap_torch_future(fut)
-        # print(f'nlabels : {nlabels}')
         result_map['nlabels'] = nlabels
-      # print(result_map['nlabels'])
       # Collect node features.
       if self.dist_node_feature is not None:
         fut = self.dist_node_feature.async_get(output.node)
         nfeats = await wrap_torch_future(fut)
         result_map['nfeats'] = nfeats
-      # print(nfeats)
       # Collect edge features.
       if self.dist_edge_feature is not None:
         eids = result_map['eids']

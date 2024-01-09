@@ -233,7 +233,6 @@ class DistDataset(Dataset):
     else:
       # homo
       if node_features:
-        # print('here;;;;;;;;')
         self._node_feat_pb = self.node_pb
 
   def share_ipc(self):

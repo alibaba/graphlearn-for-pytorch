@@ -142,7 +142,6 @@ class Feature(object):
     r""" Perform feature lookups with GPU part and CPU part.
     """
     if not self.with_gpu:
-      # print(f'ids: {ids}')
       return self.cpu_get(ids)
     self.lazy_init_with_ipc_handle()
     ids = ids.to(self.device)
@@ -159,13 +158,8 @@ class Feature(object):
     """
     self.lazy_init_with_ipc_handle()
     ids = ids.to('cpu')
-    # print(f'ids:::: {ids}')
     if self.id2index is not None:
       ids = self.id2index[ids]
-      # print(f'ids: {min(ids)}')
-    # if max(ids) > self.feature_tensor.shape[0] or min(ids) < 0:
-    #   print(f'max ids: {max(ids)} feature shape {self.feature_tensor.shape[0]} min {min(ids)}')
-    # print(f"label: {self.feature_tensor[ids]}")
     return self.feature_tensor[ids]
 
   def _check_and_set_device(self):
