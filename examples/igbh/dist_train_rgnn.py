@@ -16,6 +16,7 @@
 import argparse, datetime
 import os.path as osp
 import time, tqdm
+import math
 
 import graphlearn_torch as glt
 import mlperf_logging.mllog.constants as mllog_constants
@@ -92,7 +93,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     val_loader_master_port,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout,
-    validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end):
+    validation_acc, validation_frac_within_epoch,
+    evaluate_on_epoch_end, use_oneCycleLR_scheduler):
   
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
@@ -205,6 +207,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+  if use_oneCycleLR_scheduler:
+    epoch_steps = math.ceil(train_idx.numel()/batch_size)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, steps_per_epoch=epoch_steps, epochs=epochs)
   batch_num = (len(train_idx) + batch_size - 1) // batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
@@ -237,6 +242,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       optimizer.zero_grad()
       loss.backward()
       optimizer.step()
+      if use_oneCycleLR_scheduler:
+        scheduler.step()
       total_loss += loss.item()
       train_acc += sklearn.metrics.accuracy_score(y.cpu().numpy(),
           out.argmax(1).detach().cpu().numpy())*100
@@ -356,6 +363,8 @@ if __name__ == '__main__':
       help="Size of shared memory queue to put sampled results for train dataset")
   parser.add_argument('--val_channel_size', type=str, default='16GB',
       help="Size of shared memory queue to put sampled results for val dataset")
+  parser.add_argument('--onecycle_lr_scheduler', action="store_true",
+      help="Use OneCycleLR cosine scheduler to finetune the optimizer")
   parser.add_argument("--rpc_timeout", type=int, default=180,
       help="rpc timeout in seconds")
   parser.add_argument("--split_training_sampling", action="store_true",
@@ -431,7 +440,8 @@ if __name__ == '__main__':
           args.rpc_timeout,
           args.validation_acc, 
           args.validation_frac_within_epoch,
-          args.evaluate_on_epoch_end),
+          args.evaluate_on_epoch_end,
+          args.onecycle_lr_scheduler),
     nprocs=args.num_training_procs,
     join=True
   )
