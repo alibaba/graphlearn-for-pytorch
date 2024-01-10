@@ -18,20 +18,26 @@ pip install graphlearn-torch
 Please refer to the [documentation](../../README.md#installation) for installation and build details.
 
 ## 1. Dataset Preparation
-If you want download the IGBH-large or IGBH600M, i.e. `dataset_size` is 'large' or 'full',
+If you want download the IGBH-Large of IGBH-Full, i.e., the  `dataset_size` is 'large' or 'full',
 please use the following script:
 ```
-bash download_igbh_large.sh
-# bash download_igbh_full.sh
+bash download_igbh_full.sh
+# bash download_igbh_large.sh
 ```
-
 For the `tiny`, `small` or `medium` dataset, the download procedure is included
 in the training script below. Note that in `dataset.py`, we have converted the graph i
 nto an undirected graph.
 
+Before training, please run `split_seeds.py` to generate the seeds for training and validation:
+```
+python split_seeds.py --dataset_size='full'
+```
+
+The default 
+
 ## 2. Single node training:
 ```
-python train_rgnn.py --model='rgat' --dataset_size='tiny' --num_classes=19
+python train_rgnn.py --model='rgat' --dataset_size='full' --num_classes=19
 ```
 The script uses a single GPU, please add `--cpu_mode` if you want to use CPU only. 
 To save the memory costs while training large datasets, add `--use_fp16` to load
@@ -41,7 +47,7 @@ incur extra memory costs.
 
 To train the model using multiple GPUs and FP16 format wihtout pinning the feature:
 ```
-CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19 --use_fp16
+CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='full' --num_classes=19 --use_fp16
 ```
 
 Note that the original graph is in `COO` format, the above scripts will transform
@@ -50,13 +56,13 @@ This process could be time consuming. We provide a script to convert the graph l
 from `COO` to `CSC/CSR` and persist the feature in FP16 format:
 
 ```
-python compress_graph.py --dataset_size='tiny' --layout='CSC' --use_fp16
+python compress_graph.py --dataset_size='full' --layout='CSC' --use_fp16
 ```
 
 Once the conversion is completed, train the model:
 
 ```
-CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='tiny' --num_classes=19 --use_fp16 --layout='CSC'
+CUDA_VISIBLE_DEVICES=0,1 python train_rgnn_multi_gpu.py --model='rgat' --dataset_size='full' --num_classes=19 --use_fp16 --layout='CSC'
 ```
 
 Note that, when the sampling edge direction is `in`, the layout should be `CSC`. 
@@ -71,7 +77,7 @@ We use 2 nodes as an example.
 
 To partition the dataset (including both the topology and feature):
 ```
-python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19
+python partition.py --dataset_size='full' --num_partitions=2 --num_classes=19
 ```
 
 GLT also supports two-stage partitioning, which splits the process of topology 
@@ -81,7 +87,7 @@ to speedup the partitioning process.
 
 The topology partitioning is conducted by setting  `--with_feature=0`:
 ```
-python partition.py --dataset_size='tiny' --num_partitions=2 --num_classes=19 --with_feature=0
+python partition.py --dataset_size='full' --num_partitions=2 --num_classes=19 --with_feature=0
 ```
 
 By default the layout of partitioned graph is in the `COO` format, `CSC` and `CSR` are also
@@ -91,10 +97,10 @@ supported by setting `--layout` for `partition.py`.
 The feature partitioning in conducted in each training node:
 ```
 # node 0 which holds partition 0:
-python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=0
+python build_partition_feature.py --dataset_size='full' --in_memory=0 --partition_idx=0
 
 # node 1 which holds partition 1:
-python build_partition_feature.py --dataset_size='tiny' --in_memory=0 --partition_idx=1
+python build_partition_feature.py --dataset_size='full' --in_memory=0 --partition_idx=1
 ```
 Building partition feature with `--use_fp16` will convert the data type of feature
 from FP32 into FP16.
@@ -103,10 +109,10 @@ from FP32 into FP16.
 2 nodes each with 2 GPUs
 ```
 # node 0:
-CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
+CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='full' --num_classes=19
 
 # node 1:
-CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19
+CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=2 --master_addr=localhost --model='rgat' --dataset_size='full' --num_classes=19
 ```
 The script uses GPU default, please add `--cpu_mode` if you want to use CPU only.
 
@@ -114,10 +120,10 @@ To seperate the GPU used by sampling and training processes, please add `--split
 
 ```
 # node 0:
-CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19 --split_training_sampling
+CUDA_VISIBLE_DEVICES=0,1 python dist_train_rgnn.py --num_nodes=2 --node_rank=0 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='full' --num_classes=19 --split_training_sampling
 
 # node 1:
-CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='tiny' --num_classes=19 --split_training_sampling
+CUDA_VISIBLE_DEVICES=2,3 python dist_train_rgnn.py --num_nodes=2 --node_rank=1 --num_training_procs=1 --master_addr=localhost --model='rgat' --dataset_size='full' --num_classes=19 --split_training_sampling
 ```
 The script uses one GPU for training and another GPU for sampling in each node. 
 
