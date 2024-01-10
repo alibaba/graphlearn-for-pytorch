@@ -33,8 +33,6 @@ Before training, please run `split_seeds.py` to generate the seeds for training 
 python split_seeds.py --dataset_size='full'
 ```
 
-The default 
-
 ## 2. Single node training:
 ```
 python train_rgnn.py --model='rgat' --dataset_size='full' --num_classes=19
