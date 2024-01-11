@@ -18,6 +18,7 @@ limitations under the License.
 #include <vineyard/client/client.h>
 
 #include "glog/logging.h"
+#include "omp.h"
 
 namespace graphlearn_torch {
 namespace vineyard_utils {
@@ -283,8 +284,18 @@ VineyardFragHandle::VineyardFragHandle(
     frag_ = GetGraphFromVineyard(ipc_socket, object_id_str);
 }
 
-int64_t VineyardFragHandle::GetFidFromGid(int64_t gid) {
-  return frag_->GetFragId(gid);
+torch::Tensor VineyardFragHandle::GetFidFromGid(const std::vector<int64_t>& gids) {
+  int64_t num_gids = gids.size();
+  int64_t* fids_ptr = new int64_t[num_gids];
+
+  #pragma omp parallel for
+    for (int64_t i = 0; i < num_gids; ++i) {
+      fids_ptr[i] = (int64_t)frag_->GetFragId(gids[i]);
+    }
+
+  auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
+  torch::Tensor fids = torch::from_blob(fids_ptr, {num_gids}, options);
+  return fids;
 }
 
 torch::Tensor VineyardFragHandle::GetInnerVertices(const std::string& v_label_name) {

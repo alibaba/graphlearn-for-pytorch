@@ -105,14 +105,15 @@ class VineyardPartitionBook(PartitionBook):
     '''
     if self._frag is None:
       self._frag = pywrap.VineyardFragHandle(self._sock, self._obj_id)
-    fids = torch.tensor([self._frag.get_fid_from_gid(gid) for gid in gids])
+
+    fids = self._frag.get_fid_from_gid(gids.tolist())
+
     return fids
 
 
 class VineyardGid2Lid(Sequence):
   def __init__(self, sock, fid, v_label_name):
     self._offset = get_frag_vertex_offset(sock, fid, v_label_name)
-    print(f"{fid} offset: {self._offset} ")
     self._vnum = get_frag_vertex_num(sock, fid, v_label_name)
 
   def __getitem__(self, gids):

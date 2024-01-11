@@ -58,7 +58,7 @@ class VineyardFragHandle {
 public:
   explicit VineyardFragHandle(
     const std::string& ipc_socket, const std::string& object_id_str);
-  int64_t GetFidFromGid(int64_t gid);
+  torch::Tensor GetFidFromGid(const std::vector<int64_t>& gids);
   torch::Tensor GetInnerVertices(const std::string& v_label_name);
 private:
   std::shared_ptr<GraphType> frag_;
