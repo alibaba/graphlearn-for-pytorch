@@ -16,7 +16,6 @@
 import argparse, datetime
 import os.path as osp
 import time, tqdm
-import math
 
 import graphlearn_torch as glt
 import mlperf_logging.mllog.constants as mllog_constants
@@ -207,10 +206,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-  if use_oneCycleLR_scheduler:
-    epoch_steps = math.ceil(train_idx.numel()/batch_size)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, steps_per_epoch=epoch_steps, epochs=epochs)
   batch_num = (len(train_idx) + batch_size - 1) // batch_size
+  if use_oneCycleLR_scheduler:
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, steps_per_epoch=batch_num, epochs=epochs)
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
   epoch_num = 0
