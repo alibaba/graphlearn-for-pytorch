@@ -258,6 +258,9 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         if validation_acc is not None and global_acc >= validation_acc:
           is_success = True
           break
+        if with_gpu:
+          torch.cuda.synchronize()
+        torch.distributed.barrier()
         model.train()      
     
     train_acc /= idx
