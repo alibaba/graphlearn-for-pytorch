@@ -366,7 +366,7 @@ if __name__ == '__main__':
       help="use trim_to_layer function from pyG")
   parser.add_argument("--use_fp16", action="store_true",
       help="load node/edge feature using fp16 format to reduce memory usage")
-  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.2,
+  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")

@@ -274,7 +274,7 @@ if __name__ == '__main__':
       help="Pin the feature in host memory. Default is False.")
   parser.add_argument("--use_fp16", action="store_true", 
       help="To use FP16 for loading the features. Default is False.")
-  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.2,
+  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
