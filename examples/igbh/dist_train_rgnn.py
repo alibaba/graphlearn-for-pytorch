@@ -81,7 +81,8 @@ def evaluate(model, dataloader, current_device, use_fp16, with_gpu,
 
 def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     split_training_sampling, hidden_channels, num_classes, num_layers, 
-    model_type, num_heads, fan_out, epochs, batch_size, learning_rate,
+    model_type, num_heads, fan_out, epochs, train_batch_size, val_batch_size, 
+    learning_rate,
     random_seed,
     dataset, train_idx, val_idx,
     train_channel_size,
@@ -132,7 +133,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     data=dataset,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
     input_nodes=('paper', train_idx),
-    batch_size=batch_size,
+    batch_size=train_batch_size,
     shuffle=True,
     drop_last=False,
     edge_dir=edge_dir,
@@ -157,7 +158,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     data=dataset,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
     input_nodes=('paper', val_idx),
-    batch_size=batch_size,
+    batch_size=val_batch_size,
     shuffle=False,
     edge_dir=edge_dir,
     collect_features=True,
@@ -205,7 +206,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-  batch_num = (len(train_idx) + batch_size - 1) // batch_size
+  batch_num = (len(train_idx) + train_batch_size - 1) // train_batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
   epoch_num = 0
@@ -324,7 +325,8 @@ if __name__ == '__main__':
                       choices=['rgat', 'rsage'])
   # Model parameters
   parser.add_argument('--fan_out', type=str, default='15,10,5')
-  parser.add_argument('--batch_size', type=int, default=512)
+  parser.add_argument('--train_batch_size', type=int, default=512)
+  parser.add_argument('--val_batch_size', type=int, default=512)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.001)
   parser.add_argument('--epochs', type=int, default=20)
@@ -376,7 +378,7 @@ if __name__ == '__main__':
   if args.node_rank == 0:
     world_size = args.num_nodes * args.num_training_procs
     submission_info(mllogger, 'GNN', 'reference_implementation')
-    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.batch_size)
+    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
     mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
     mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
 
@@ -415,7 +417,7 @@ if __name__ == '__main__':
     args=(args.num_nodes, args.node_rank, args.num_training_procs, 
           args.split_training_sampling, args.hidden_channels, args.num_classes, 
           args.num_layers, args.model, args.num_heads, args.fan_out, 
-          args.epochs, args.batch_size, args.learning_rate,
+          args.epochs, args.train_batch_size, args.val_batch_size, args.learning_rate,
           args.random_seed,
           dataset, train_idx, val_idx,
           args.train_channel_size,
