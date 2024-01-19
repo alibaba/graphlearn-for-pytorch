@@ -49,7 +49,7 @@ def evaluate(model, dataloader):
     return acc
 
 
-def train(model, device, train_dataloader, val_dataloader, test_dataloader, args):
+def train(model, device, train_dataloader, val_dataloader, args):
   param_size = 0
   for param in model.parameters():
     param_size += param.nelement() * param.element_size()
@@ -112,9 +112,6 @@ def train(model, device, train_dataloader, val_dataloader, test_dataloader, args
           )
       )
 
-  model.eval()
-  test_acc = evaluate(model, test_dataloader).item()*100
-  print("Test Acc {:.2f}%".format(test_acc))
   print("Total time taken " + str(datetime.timedelta(seconds = int(time.time() - training_start))))
 
 
@@ -182,13 +179,6 @@ if __name__ == '__main__':
                                          shuffle=True,
                                          drop_last=False,
                                          device=device)
-  test_loader = glt.loader.NeighborLoader(glt_dataset,
-                                          [int(fanout) for fanout in args.fan_out.split(',')],
-                                          ('paper', igbh_dataset.test_idx),
-                                          batch_size=args.batch_size,
-                                          shuffle=True,
-                                          drop_last=False,
-                                          device=device)
   # model
   model = RGNN(igbh_dataset.etypes,
                igbh_dataset.feat_dict['paper'].shape[1],
@@ -200,4 +190,4 @@ if __name__ == '__main__':
                heads=args.num_heads,
                node_type='paper',
                with_trim=args.with_trim).to(device)
-  train(model, device, train_loader, val_loader, test_loader, args)
+  train(model, device, train_loader, val_loader, args)

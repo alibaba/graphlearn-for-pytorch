@@ -58,14 +58,6 @@ def partition_dataset(src_path: str,
   for pidx in range(num_partitions):
     torch.save(val_idx[pidx], osp.join(val_idx_partitions_dir, f'partition{pidx}.pt'))
 
-  print('-- Partitioning test idx ...')
-  test_idx = data.test_idx
-  test_idx = test_idx.split(test_idx.size(0) // num_partitions)
-  test_idx_partitions_dir = osp.join(dst_path, f'{dataset_size}-test-partitions')
-  glt.utils.ensure_dir(test_idx_partitions_dir)
-  for pidx in range(num_partitions):
-    torch.save(test_idx[pidx], osp.join(test_idx_partitions_dir, f'partition{pidx}.pt'))
-
   print('-- Partitioning graph and features ...')
   partitions_dir = osp.join(dst_path, f'{dataset_size}-partitions')
   partitioner = glt.partition.RandomPartitioner(
