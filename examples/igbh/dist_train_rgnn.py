@@ -94,9 +94,12 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout,
     validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end):
-  
+
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
+  if rank == 0:
+    mllogger.start(key=mllog_constants.RUN_START)
+  
   glt.utils.common.seed_everything(random_seed)
 
   # Initialize graphlearn_torch distributed worker group context.
