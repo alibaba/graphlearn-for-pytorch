@@ -119,6 +119,7 @@ class DistLinkNeighborLoader(DistLoader):
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
+               random_seed: Optional[int] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
     # Get edge type (or `None` for homogeneous graphs):
     input_type, edge_label_index = get_edge_label_index(
@@ -150,7 +151,8 @@ class DistLinkNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.LINK, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg, with_weight, edge_dir
+      drop_last, with_edge, collect_features, with_neg, with_weight,
+      edge_dir, random_seed
     )
 
     super().__init__(

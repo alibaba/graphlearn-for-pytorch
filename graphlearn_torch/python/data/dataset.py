@@ -424,11 +424,20 @@ class Dataset(object):
     return None
 
   def get_node_label(self, ntype: Optional[NodeType] = None):
-    if isinstance(self.node_labels, torch.Tensor | Feature):
-      return self.node_labels
-    if isinstance(self.node_labels, dict):
-      assert ntype is not None
+    if isinstance(self.node_labels, dict) and ntype is not None:
+      if isinstance(self.node_labels[ntype], torch.Tensor):
+        self.node_labels[ntype] = Feature(self.node_labels[ntype].reshape(-1,1),
+                                          dtype=self.node_labels[ntype].dtype)
       return self.node_labels.get(ntype, None)
+    if isinstance(self.node_labels, Feature):
+      return self.node_labels
+    if isinstance(self.node_labels, torch.Tensor):
+      return Feature(self.node_labels.reshape(-1,1), dtype=self.node_labels.dtype)
+    if isinstance(self.node_labels, dict):
+      for ntype, labels in self.node_labels.items():
+        if isinstance(labels, torch.Tensor):
+          self.node_labels[ntype] = Feature(labels.reshape(-1,1), dtype=labels.dtype)
+      return self.node_labels
     return None
 
   def __getitem__(self, key):

@@ -169,11 +169,12 @@ class DistNeighborSampler(ConcurrentEventLoop):
           )
 
       self.node_labels = self.data.get_node_label()
-      self.dist_node_labels = DistFeature(
-        self.data.num_partitions, self.data.partition_idx,
-        self.node_labels, self.data.node_feat_pb,
-        local_only=False, rpc_router=self.rpc_router, device=self.device
-      )
+      if self.node_labels is not None:
+        self.dist_node_labels = DistFeature(
+          self.data.num_partitions, self.data.partition_idx,
+          self.node_labels, self.data.node_feat_pb,
+          local_only=False, rpc_router=self.rpc_router, device=self.device
+        )
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                        f"data type '{type(data)}'")
@@ -217,7 +218,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         sampling from.
     """
     inputs = NodeSamplerInput.cast(inputs)
-    id_select = kwargs.get('id_select', torch.masked_select)
+    id_select = kwargs.get('id_select', default_id_select)
 
     if self.channel is None:
       return self.run_task(coro=self._send_adapter(self._sample_from_nodes,
@@ -246,7 +247,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         indices, the (3) optional edge labels and the (4) input edge type.
     """
 
-    id_select = kwargs.get('id_select', torch.masked_select)
+    id_select = kwargs.get('id_select', default_id_select)
     if self.channel is None:
       return self.run_task(coro=self._send_adapter(self._sample_from_edges,
                                                    inputs, id_select))
@@ -709,7 +710,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         node_labels = self.data.get_node_label(input_type)
         if node_labels is not None:
           result_map[f'{as_str(input_type)}.nlabels'] = \
-            node_labels[output.node[input_type].to(node_labels.device)]
+            node_labels[output.node[input_type].to(node_labels.device)].T[0]
       # Collect node features.
       if self.dist_node_feature is not None:
         nfeat_fut_dict = {}
@@ -749,12 +750,13 @@ class DistNeighborSampler(ConcurrentEventLoop):
       if self.with_edge:
         result_map['eids'] = output.edge
       # Collect node labels.
-      if self.node_labels is not None and isinstance(self.node_labels, torch.Tensor):
-        result_map['nlabels'] = self.node_labels[output.node.to(node_labels.device)]
-      else:
-        fut = self.dist_node_labels.async_get(output.node)
-        nlabels = await wrap_torch_future(fut)
-        result_map['nlabels'] = nlabels
+      if self.node_labels is not None:
+        if isinstance(self.node_labels, torch.Tensor):
+          result_map['nlabels'] = self.node_labels[output.node.to(node_labels.device)].T[0]
+        else:
+          fut = self.dist_node_labels.async_get(output.node)
+          nlabels = await wrap_torch_future(fut)
+          result_map['nlabels'] = nlabels.T[0]
       # Collect node features.
       if self.dist_node_feature is not None:
         fut = self.dist_node_feature.async_get(output.node)

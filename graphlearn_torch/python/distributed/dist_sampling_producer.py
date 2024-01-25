@@ -28,7 +28,7 @@ from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput, SamplingType, SamplingConfig
 )
 from ..utils import ensure_device
-from ..utils import seed_everything
+from ..utils import seed_everything, default_id_select
 
 from ..distributed.dist_context import get_context
 from .dist_context import init_worker_group
@@ -61,7 +61,7 @@ def _sampling_worker_loop(rank,
                           task_queue: mp.Queue,
                           sampling_completed_worker_count: mp.Value,
                           mp_barrier,
-                          id_select: Callable=torch.masked_select):
+                          id_select: Callable=default_id_select):
   r""" Subprocess work loop for sampling worker.
   """
   # print(f"sampler input::: {sampler_input}")

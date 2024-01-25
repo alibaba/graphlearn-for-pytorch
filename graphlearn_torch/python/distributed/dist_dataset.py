@@ -28,7 +28,7 @@ from ..typing import (
   NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
 )
 
-from ..utils import share_memory
+from ..utils import share_memory, default_id_filter
 
 
 class DistDataset(Dataset):
@@ -179,7 +179,7 @@ class DistDataset(Dataset):
     self,
     num_val: Union[float, int],
     num_test: Union[float, int],
-    id_filter: Callable,
+    id_filter: Callable = default_id_filter,
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the

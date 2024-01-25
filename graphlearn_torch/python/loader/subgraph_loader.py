@@ -63,6 +63,7 @@ class SubGraphLoader(NodeLoader):
     with_edge: bool = False,
     strategy: str = 'random',
     device: torch.device = torch.device(0),
+    seed: Optional[int] = None,
     **kwargs
   ):
     if neighbor_sampler is None:
@@ -72,6 +73,7 @@ class SubGraphLoader(NodeLoader):
         strategy=strategy,
         with_edge=with_edge,
         device=device,
+        seed=seed
       )
 
     super().__init__(

@@ -70,7 +70,7 @@ class NeighborLoader(NodeLoader):
     strategy: str = 'random',
     device: torch.device = torch.device(0),
     as_pyg_v1: bool = False,
-    seed: int = None,
+    seed: Optional[int] = None,
     **kwargs
   ):
     if neighbor_sampler is None:

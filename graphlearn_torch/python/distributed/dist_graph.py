@@ -24,7 +24,7 @@ from ..typing import (
 )
 
 from ..partition import (
-  PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+  PartitionBook, GLTPartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 
 class DistGraph(object):
@@ -65,7 +65,13 @@ class DistGraph(object):
     if self.node_pb is not None:
       if isinstance(self.node_pb, dict):
         assert self.data_cls == 'hetero'
+        for key, feat in self.node_pb.items():
+          if not isinstance(feat, PartitionBook):
+            self.node_pb[key] = GLTPartitionBook(feat)
       elif isinstance(self.node_pb, PartitionBook):
+        assert self.data_cls == 'homo'
+      elif isinstance(self.node_pb, torch.Tensor):
+        self.node_pb = GLTPartitionBook(self.node_pb)
         assert self.data_cls == 'homo'
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
@@ -74,7 +80,13 @@ class DistGraph(object):
     if self.edge_pb is not None:
       if isinstance(self.edge_pb, dict):
         assert self.data_cls == 'hetero'
+        for key, feat in self.edge_pb.items():
+          if not isinstance(feat, PartitionBook):
+            self.edge_pb[key] = GLTPartitionBook(feat)
       elif isinstance(self.edge_pb, PartitionBook):
+        assert self.data_cls == 'homo'
+      elif isinstance(self.edge_pb, torch.Tensor):
+        self.edge_pb = GLTPartitionBook(self.edge_pb)
         assert self.data_cls == 'homo'
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
