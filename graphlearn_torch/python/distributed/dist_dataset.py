@@ -228,7 +228,10 @@ class DistDataset(Dataset):
       self._node_feat_pb = {}
       if node_features:
         for ntype, _ in self.node_features.items():
-          self._node_feat_pb[ntype] = self.node_pb[ntype]
+          if self.node_pb is not None:
+            self._node_feat_pb[ntype] = self.node_pb[ntype]
+          else:
+            self._node_feat_pb[ntype] = None
     else:
       # homo
       if node_features:

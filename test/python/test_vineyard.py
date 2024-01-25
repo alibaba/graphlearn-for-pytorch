@@ -220,7 +220,7 @@ class VineyardDatasetTest(unittest.TestCase):
       edge_features=self.homo_edge_features,
       node_labels=self.node_labels,
     )
-    print(ds.node_labels["person"])
+    print(ds.node_labels)
 
   def test_hetero_dist_dataset(self):
     ds = DistDataset()
