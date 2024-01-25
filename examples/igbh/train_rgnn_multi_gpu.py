@@ -78,7 +78,7 @@ def evaluate(model, dataloader, current_device, rank, world_size, epoch_num):
 
 def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
-    epochs, batch_size, learning_rate, random_seed, dataset, 
+    epochs, train_batch_size, val_batch_size, learning_rate, random_seed, dataset, 
     train_idx, val_idx, with_gpu, validation_acc, validation_frac_within_epoch,
     evaluate_on_epoch_end):
   if rank == 0:
@@ -97,7 +97,7 @@ def run_training_proc(rank, world_size,
     data=dataset,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
     input_nodes=('paper', train_idx),
-    batch_size=batch_size,
+    batch_size=train_batch_size,
     shuffle=True,
     drop_last=False,
     device=current_device,
@@ -110,7 +110,7 @@ def run_training_proc(rank, world_size,
     data=dataset,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
     input_nodes=('paper', val_idx),
-    batch_size=batch_size,
+    batch_size=val_batch_size,
     shuffle=True,
     drop_last=False,
     device=current_device,
@@ -143,7 +143,7 @@ def run_training_proc(rank, world_size,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-  batch_num = (len(train_idx) + batch_size - 1) // batch_size
+  batch_num = (len(train_idx) + train_batch_size - 1) // train_batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
   epoch_num = 0
@@ -257,7 +257,8 @@ if __name__ == '__main__':
                       choices=['rgat', 'rsage'])
   # Model parameters
   parser.add_argument('--fan_out', type=str, default='15,10,5')
-  parser.add_argument('--batch_size', type=int, default=1024)
+  parser.add_argument('--train_batch_size', type=int, default=1024)
+  parser.add_argument('--val_batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.01)
   parser.add_argument('--epochs', type=int, default=3)
@@ -273,7 +274,7 @@ if __name__ == '__main__':
       help="Pin the feature in host memory. Default is False.")
   parser.add_argument("--use_fp16", action="store_true", 
       help="To use FP16 for loading the features. Default is False.")
-  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.2,
+  parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
@@ -285,7 +286,7 @@ if __name__ == '__main__':
 
   world_size = torch.cuda.device_count()
   submission_info(mllogger, 'GNN', 'reference_implementation')
-  mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.batch_size)
+  mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
   mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
   mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
 
@@ -318,7 +319,8 @@ if __name__ == '__main__':
   torch.multiprocessing.spawn(
     run_training_proc,
     args=(world_size, args.hidden_channels, args.num_classes, args.num_layers, 
-          args.model, args.num_heads, args.fan_out, args.epochs, args.batch_size,
+          args.model, args.num_heads, args.fan_out, args.epochs, 
+          args.train_batch_size, args.val_batch_size,
           args.learning_rate, args.random_seed,
           glt_dataset, train_idx, val_idx, args.with_gpu,
           args.validation_acc, args.validation_frac_within_epoch, 
