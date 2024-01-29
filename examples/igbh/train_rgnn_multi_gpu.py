@@ -124,7 +124,8 @@ def run_training_proc(rank, world_size,
   if ckpt_path is not None:
     try:
       ckpt = torch.load(ckpt_path)
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+      print(f"Checkpoint file not found: {e}")
       return -1
     
   # Define model and optimizer.
