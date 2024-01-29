@@ -28,6 +28,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 from dataset import IGBHeteroDataset
 from mlperf_logging_utils import get_mlperf_logger, submission_info
+from utilities import create_ckpt_folder
 from rgnn import RGNN
 
 warnings.filterwarnings("ignore")
@@ -80,9 +81,11 @@ def run_training_proc(rank, world_size,
     hidden_channels, num_classes, num_layers, model_type, num_heads, fan_out,
     epochs, train_batch_size, val_batch_size, learning_rate, random_seed, dataset, 
     train_idx, val_idx, with_gpu, validation_acc, validation_frac_within_epoch,
-    evaluate_on_epoch_end):
+    evaluate_on_epoch_end, checkpoint_on_epoch_end, ckpt_steps, ckpt_path):
   if rank == 0:
     mllogger.start(key=mllog_constants.RUN_START)
+    if ckpt_steps > 0:
+      ckpt_dir = create_ckpt_folder(base_dir=osp.dirname(osp.abspath(__file__)))
   os.environ['MASTER_ADDR'] = 'localhost'
   os.environ['MASTER_PORT'] = '12355'
   dist.init_process_group('nccl', rank=rank, world_size=world_size)
@@ -116,7 +119,15 @@ def run_training_proc(rank, world_size,
     device=current_device,
     seed=random_seed
   )
-
+  # Load checkpoint
+  ckpt = None
+  if ckpt_path is not None:
+    try:
+      ckpt = torch.load(ckpt_path)
+    except FileNotFoundError as e:
+      print(f"Checkpoint file not found: {e}")
+      return -1
+    
   # Define model and optimizer.
   model = RGNN(dataset.get_edge_types(),
                dataset.node_features['paper'].shape[1],
@@ -127,6 +138,8 @@ def run_training_proc(rank, world_size,
                model=model_type,
                heads=num_heads,
                node_type='paper').to(current_device)
+  if ckpt is not None:
+    model.load_state_dict(ckpt['model_state_dict'])
   model = DistributedDataParallel(model,
                                   device_ids=[current_device.index] if with_gpu else None,
                                   find_unused_parameters=True)
@@ -143,6 +156,9 @@ def run_training_proc(rank, world_size,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+  if ckpt is not None:
+    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+
   batch_num = (len(train_idx) + train_batch_size - 1) // train_batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
@@ -179,6 +195,16 @@ def run_training_proc(rank, world_size,
           if with_gpu
           else 0
       )
+      #checkpoint
+      if ckpt_steps > 0 and idx % ckpt_steps == 0:
+        if with_gpu:
+          torch.cuda.synchronize()
+        dist.barrier()
+        if rank == 0:
+          epoch_num = epoch + idx / batch_num
+          glt.utils.common.save_ckpt(idx + epoch * batch_num, 
+                                    ckpt_dir, model.module, optimizer, epoch_num)
+        dist.barrier()
       # evaluate
       if idx % validation_freq == 0:
         if with_gpu:
@@ -196,6 +222,14 @@ def run_training_proc(rank, world_size,
     if with_gpu:
       torch.cuda.synchronize()
     dist.barrier()
+
+    #checkpoint at the end of epoch
+    if checkpoint_on_epoch_end:
+      if rank == 0:
+        epoch_num = epoch + 1
+        glt.utils.common.save_ckpt(idx + epoch * batch_num, 
+                                   ckpt_dir, model.module, optimizer, epoch_num)
+      dist.barrier()
 
     # evaluate at the end of epoch
     if  evaluate_on_epoch_end and not is_success:
@@ -260,9 +294,9 @@ if __name__ == '__main__':
   parser.add_argument('--train_batch_size', type=int, default=1024)
   parser.add_argument('--val_batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
-  parser.add_argument('--learning_rate', type=float, default=0.01)
-  parser.add_argument('--epochs', type=int, default=3)
-  parser.add_argument('--num_layers', type=int, default=2)
+  parser.add_argument('--learning_rate', type=float, default=0.001)
+  parser.add_argument('--epochs', type=int, default=2)
+  parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--random_seed', type=int, default=42)
   parser.add_argument("--cpu_mode", action="store_true",
@@ -280,6 +314,12 @@ if __name__ == '__main__':
       help="Validation accuracy threshold to stop training once reached.")
   parser.add_argument("--evaluate_on_epoch_end", action="store_true",
         help="Evaluate using validation set on each epoch end.")
+  parser.add_argument("--checkpoint_on_epoch_end", action="store_true",
+      help="Save checkpoint on each epoch end.")
+  parser.add_argument('--ckpt_steps', type=int, default=-1, 
+        help="Save checkpoint every n steps. Default is -1, which means no checkpoint is saved.")
+  parser.add_argument('--ckpt_path', type=str, default=None, 
+        help="Path to load checkpoint from. Default is None.")
   args = parser.parse_args()
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   assert args.layout in ['COO', 'CSC', 'CSR']
@@ -324,7 +364,8 @@ if __name__ == '__main__':
           args.learning_rate, args.random_seed,
           glt_dataset, train_idx, val_idx, args.with_gpu,
           args.validation_acc, args.validation_frac_within_epoch, 
-          args.evaluate_on_epoch_end),
+          args.evaluate_on_epoch_end, args.checkpoint_on_epoch_end, 
+          args.ckpt_steps, args.ckpt_path),
     nprocs=world_size,
     join=True
   )
