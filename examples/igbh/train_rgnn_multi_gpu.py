@@ -291,8 +291,8 @@ if __name__ == '__main__':
                       choices=['rgat', 'rsage'])
   # Model parameters
   parser.add_argument('--fan_out', type=str, default='15,10,5')
-  parser.add_argument('--train_batch_size', type=int, default=512)
-  parser.add_argument('--val_batch_size', type=int, default=512)
+  parser.add_argument('--train_batch_size', type=int, default=1024)
+  parser.add_argument('--val_batch_size', type=int, default=1024)
   parser.add_argument('--hidden_channels', type=int, default=128)
   parser.add_argument('--learning_rate', type=float, default=0.001)
   parser.add_argument('--epochs', type=int, default=2)

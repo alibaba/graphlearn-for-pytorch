@@ -267,7 +267,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
           else 0
       )
       #checkpoint
-      if ckpt_steps> 0 and idx % ckpt_steps == 0:
+      if ckpt_steps > 0 and idx % ckpt_steps == 0:
         if with_gpu:
           torch.cuda.synchronize()
         torch.distributed.barrier()
@@ -406,7 +406,7 @@ if __name__ == '__main__':
       help="load node/edge feature using fp16 format to reduce memory usage")
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
-  parser.add_argument("--validation_acc", type=float, default=1,
+  parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
   parser.add_argument("--evaluate_on_epoch_end", action="store_true",
       help="Evaluate using validation set on each epoch end."),
