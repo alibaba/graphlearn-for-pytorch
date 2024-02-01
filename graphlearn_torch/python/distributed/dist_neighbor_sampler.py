@@ -752,6 +752,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         efeats = await wrap_torch_future(fut)
         result_map['efeats'] = efeats
       # Collect batch info
-      result_map['batch'] = output.batch
+      if output.batch is not None:
+        result_map['batch'] = output.batch
 
     return result_map
