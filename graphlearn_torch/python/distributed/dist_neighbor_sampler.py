@@ -282,6 +282,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     if is_hetero:
       assert input_type is not None
       src_dict = inducer.init_node({input_type: input_seeds})
+      batch = src_dict
       out_nodes, out_rows, out_cols, out_edges = {}, {}, {}, {}
       num_sampled_nodes, num_sampled_edges = {}, {}
       merge_dict(src_dict, out_nodes)
@@ -329,6 +330,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
           {etype: torch.cat(eids) for etype, eids in out_edges.items()}
           if self.with_edge else None
         ),
+        batch=batch,
         num_sampled_nodes=num_sampled_nodes,
         num_sampled_edges=num_sampled_edges,
         input_type=input_type,
@@ -337,6 +339,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
 
     else:
       srcs = inducer.init_node(input_seeds)
+      batch = srcs
       out_nodes, out_edges = [], []
       num_sampled_nodes, num_sampled_edges = [], []
       out_nodes.append(srcs)
@@ -359,6 +362,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         row=torch.cat([e[0] for e in out_edges]),
         col=torch.cat([e[1] for e in out_edges]),
         edge=(torch.cat([e[2] for e in out_edges]) if self.with_edge else None),
+        batch=batch,
         num_sampled_nodes=num_sampled_nodes,
         num_sampled_edges=num_sampled_edges,
         metadata={}
@@ -717,6 +721,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
             result_map[f'{as_str(etype)}.efeats'] = efeats
           elif self.edge_dir == 'in':
             result_map[f'{as_str(reverse_edge_type(etype))}.efeats'] = efeats
+      # Collect batch info
+      if output.batch is not None:
+        for ntype, batch in output.batch.items():
+          result_map[f'{as_str(ntype)}.batch'] = batch
     else:
       result_map['ids'] = output.node
       result_map['rows'] = output.row
@@ -743,5 +751,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         fut = self.dist_edge_feature.async_get(eids)
         efeats = await wrap_torch_future(fut)
         result_map['efeats'] = efeats
+      # Collect batch info
+      result_map['batch'] = output.batch
 
     return result_map
