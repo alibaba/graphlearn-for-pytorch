@@ -116,7 +116,7 @@ if __name__ == '__main__':
   glt.utils.ensure_dir(root)
   parser.add_argument('--path', type=str, default=root,
       help='path containing the datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument("--layout", type=str, default='CSC')

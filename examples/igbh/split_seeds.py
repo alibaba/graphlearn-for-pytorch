@@ -43,13 +43,13 @@ if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')
   parser.add_argument('--path', type=str, default=root,
       help='path containing the datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument("--random_seed", type=int, default='42')
   parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
-  parser.add_argument("--validation_frac", type=float, default=0.01,
+  parser.add_argument("--validation_frac", type=float, default=0.025,
       help="Fraction of labeled vertices to be used for validation.")
   
   args = parser.parse_args()
