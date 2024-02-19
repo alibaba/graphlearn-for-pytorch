@@ -279,7 +279,7 @@ if __name__ == '__main__':
   glt.utils.ensure_dir(root)
   parser.add_argument('--path', type=str, default=root,
       help='path containing the datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument('--num_classes', type=int, default=2983,
@@ -293,7 +293,7 @@ if __name__ == '__main__':
   parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--train_batch_size', type=int, default=1024)
   parser.add_argument('--val_batch_size', type=int, default=1024)
-  parser.add_argument('--hidden_channels', type=int, default=128)
+  parser.add_argument('--hidden_channels', type=int, default=512)
   parser.add_argument('--learning_rate', type=float, default=0.001)
   parser.add_argument('--epochs', type=int, default=2)
   parser.add_argument('--num_layers', type=int, default=3)
