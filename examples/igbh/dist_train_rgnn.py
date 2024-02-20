@@ -100,7 +100,6 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
   if rank == 0:
-    mllogger.start(key=mllog_constants.RUN_START)
     if ckpt_steps > 0:
       ckpt_dir = create_ckpt_folder(base_dir=osp.dirname(osp.abspath(__file__)))
   
@@ -420,20 +419,23 @@ if __name__ == '__main__':
   args = parser.parse_args()
   assert args.layout in ['COO', 'CSC', 'CSR']
 
-  if args.node_rank == 0:
-    world_size = args.num_nodes * args.num_training_procs
-    submission_info(mllogger, 'GNN', 'reference_implementation')
-    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
-    mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
-    mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
-
   glt.utils.common.seed_everything(args.random_seed)
+
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
     assert(not args.num_training_procs > torch.cuda.device_count())
     if args.split_training_sampling:
       assert(not args.num_training_procs > torch.cuda.device_count() // 2)
+
+  if args.node_rank == 0:
+    world_size = args.num_nodes * args.num_training_procs
+    submission_info(mllogger, 'GNN', 'reference_implementation')
+    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
+    mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
+    mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
+    mllogger.end(key=mllog_constants.INIT_STOP)
+    mllogger.start(key=mllog_constants.RUN_START)
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
@@ -455,7 +457,6 @@ if __name__ == '__main__':
   train_idx.share_memory_()
   val_idx.share_memory_()
   
-  mllogger.end(key=mllog_constants.INIT_STOP)
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,

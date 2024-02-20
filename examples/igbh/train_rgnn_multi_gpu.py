@@ -83,7 +83,6 @@ def run_training_proc(rank, world_size,
     train_idx, val_idx, with_gpu, validation_acc, validation_frac_within_epoch,
     evaluate_on_epoch_end, checkpoint_on_epoch_end, ckpt_steps, ckpt_path):
   if rank == 0:
-    mllogger.start(key=mllog_constants.RUN_START)
     if ckpt_steps > 0:
       ckpt_dir = create_ckpt_folder(base_dir=osp.dirname(osp.abspath(__file__)))
   os.environ['MASTER_ADDR'] = 'localhost'
@@ -329,8 +328,11 @@ if __name__ == '__main__':
   mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
   mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
   mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
-
   glt.utils.common.seed_everything(args.random_seed)
+  
+  mllogger.end(key=mllog_constants.INIT_STOP)
+  mllogger.start(key=mllog_constants.RUN_START)
+
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983, True, args.layout, 
                                   args.use_fp16)
@@ -354,7 +356,6 @@ if __name__ == '__main__':
   train_idx = igbh_dataset.train_idx.clone().share_memory_()
   val_idx = igbh_dataset.val_idx.clone().share_memory_()
 
-  mllogger.end(key=mllog_constants.INIT_STOP)
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,
