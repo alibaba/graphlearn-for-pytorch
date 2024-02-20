@@ -335,7 +335,6 @@ if __name__ == '__main__':
   igbh_dataset = IGBHeteroDataset(args.path, args.dataset_size, args.in_memory,
                                   args.num_classes==2983, True, args.layout, 
                                   args.use_fp16)
-  
   # init graphlearn_torch Dataset.
   glt_dataset = glt.data.Dataset(edge_dir=args.edge_dir)
 
