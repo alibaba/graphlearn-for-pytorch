@@ -24,6 +24,11 @@ namespace vineyard_utils {
 
 vineyard::Client vyclient;
 
+template<typename T>
+void customDeleter(T* ptr) {
+    delete[] ptr;
+}
+
 std::shared_ptr<GraphType> GetGraphFromVineyard(
   const std::string& ipc_socket, const std::string& object_id_str) {
   // Get the graph via vineyard fragment id from vineyard server.
@@ -134,8 +139,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
 
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
   torch::Tensor indptr = torch::from_blob(offsets, offset_len, options);
-  torch::Tensor indices = torch::from_blob(cols, indice_len, options);
-  torch::Tensor edge_ids = torch::from_blob(eids, indice_len, options);
+  torch::Tensor indices = torch::from_blob(cols, indice_len, customDeleter<int64_t>, options);
+  torch::Tensor edge_ids = torch::from_blob(eids, indice_len, customDeleter<int64_t>, options);
   return {indptr, indices, edge_ids};
 }
 
@@ -294,7 +299,7 @@ torch::Tensor VineyardFragHandle::GetFidFromGid(const std::vector<int64_t>& gids
   });
 
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
-  torch::Tensor fids = torch::from_blob(fids_ptr, {num_gids}, options);
+  torch::Tensor fids = torch::from_blob(fids_ptr, {num_gids}, customDeleter<int64_t>, options);
   return fids;
 }
 
@@ -307,7 +312,7 @@ torch::Tensor VineyardFragHandle::GetInnerVertices(const std::string& v_label_na
     iv_[i++] = frag_->Vertex2Gid(v);
   }
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
-  torch::Tensor vertices = torch::from_blob(iv_, {iv.size()}, options);
+  torch::Tensor vertices = torch::from_blob(iv_, {iv.size()}, customDeleter<int64_t>, options);
   return vertices;
 }
 

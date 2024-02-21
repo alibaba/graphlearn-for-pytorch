@@ -18,13 +18,11 @@ from typing import Dict, Optional, Union
 import torch
 
 from ..data import Graph
-from ..typing import (
-  NodeType, EdgeType,
-  # PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
-)
+from ..typing import (NodeType, EdgeType)
 
 from ..partition import (
-  PartitionBook, GLTPartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+  PartitionBook, GLTPartitionBook,
+  HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 
 class DistGraph(object):
@@ -71,8 +69,8 @@ class DistGraph(object):
       elif isinstance(self.node_pb, PartitionBook):
         assert self.data_cls == 'homo'
       elif isinstance(self.node_pb, torch.Tensor):
-        self.node_pb = GLTPartitionBook(self.node_pb)
         assert self.data_cls == 'homo'
+        self.node_pb = GLTPartitionBook(self.node_pb)
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                         f"node patition book type '{type(self.node_pb)}'")
@@ -86,8 +84,8 @@ class DistGraph(object):
       elif isinstance(self.edge_pb, PartitionBook):
         assert self.data_cls == 'homo'
       elif isinstance(self.edge_pb, torch.Tensor):
-        self.edge_pb = GLTPartitionBook(self.edge_pb)
         assert self.data_cls == 'homo'
+        self.edge_pb = GLTPartitionBook(self.edge_pb)
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                         f"edge patition book type '{type(self.edge_pb)}'")
@@ -114,13 +112,13 @@ class DistGraph(object):
   def get_edge_partitions(self, eids: torch.Tensor,
                           etype: Optional[EdgeType]=None):
     r""" Get the partition ids of edge ids with a specific edge type.
+         PS: tehre is no edge pb implementation when loading graph from v6d
     """
-    
     if self.data_cls == 'hetero':
       assert etype is not None
-      assert isinstance(self.edge_pb[etype], torch.Tensor)
+      assert isinstance(self.edge_pb[etype], GLTPartitionBook)
       pb = self.edge_pb[etype]
     else:
-      assert isinstance(self.edge_pb[etype], torch.Tensor)
+      assert isinstance(self.edge_pb[etype], GLTPartitionBook)
       pb = self.edge_pb
     return pb[eids.to(pb.device)]

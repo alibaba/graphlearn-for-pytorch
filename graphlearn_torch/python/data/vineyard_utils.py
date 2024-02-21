@@ -122,13 +122,19 @@ class VineyardGid2Lid(Sequence):
   def __len__(self):
     return self._vnum
 
-
 def v6d_id_select(srcs, p_mask, node_pb: PartitionBook):
+  '''
+    Select the inner vertices in `srcs` that belong to a specific partition,
+    and return their local offsets in the partition.
+  '''
   gids = torch.masked_select(srcs, p_mask)
   offsets = gids - node_pb.offset
   return offsets
 
 def v6d_id_filter(node_pb: VineyardPartitionBook, partition_idx):
+  '''
+    Select the inner vertices that belong to a specific partition
+  '''
   frag = pywrap.VineyardFragHandle(node_pb._sock, node_pb._obj_id)
   inner_vertices = frag.get_inner_vertices(node_pb._v_label_name)
   return inner_vertices

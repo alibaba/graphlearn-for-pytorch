@@ -26,7 +26,7 @@ from ..partition import (
 )
 from ..typing import (
   NodeType, EdgeType, TensorDataType,
-  GraphPartitionData, FeaturePartitionData#, PartitionBook
+  GraphPartitionData, FeaturePartitionData
 )
 from ..utils import convert_to_tensor, ensure_dir, index_select
 

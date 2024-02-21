@@ -19,7 +19,7 @@ from collections.abc import Sequence
 
 import torch
 
-from ..data import Dataset, Graph, Feature, DeviceGroup
+from ..data import Dataset, Graph, Feature, DeviceGroup, vineyard_utils
 from ..partition import (
   load_partition, cat_feature_cache,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
@@ -28,7 +28,7 @@ from ..typing import (
   NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
 )
 
-from ..utils import share_memory, default_id_filter
+from ..utils import share_memory, default_id_filter, default_id_select
 
 
 class DistDataset(Dataset):
@@ -49,6 +49,8 @@ class DistDataset(Dataset):
     edge_feat_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     edge_dir: Literal['in', 'out'] = 'out',
     node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
+    id_filter: Callable = default_id_filter,
+    id_select: Callable = default_id_select
   ):
     super().__init__(
       graph_partition,
@@ -58,7 +60,8 @@ class DistDataset(Dataset):
       edge_dir,
       node_split,
     )
-
+    self.id_filter = id_filter
+    self.id_select = id_select
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
 
@@ -178,8 +181,7 @@ class DistDataset(Dataset):
   def random_node_split(
     self,
     num_val: Union[float, int],
-    num_test: Union[float, int],
-    id_filter: Callable = default_id_filter,
+    num_test: Union[float, int]
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the
@@ -201,10 +203,10 @@ class DistDataset(Dataset):
       test_idx = {}
   
       for node_type, _ in self.node_labels.items():
-        indices = id_filter(self.node_pb[node_type], self.partition_idx)
+        indices = self.id_filter(self.node_pb[node_type], self.partition_idx)
         train_idx[node_type], val_idx[node_type], test_idx[node_type] = random_split(indices, num_val, num_test)
     else:
-      indices = id_filter(self.node_pb, self.partition_idx)
+      indices = self.id_filter(self.node_pb, self.partition_idx)
       train_idx, val_idx, test_idx = random_split(indices, num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
 
@@ -219,7 +221,6 @@ class DistDataset(Dataset):
     node_labels: Dict[NodeType, str] = None,
     id2idx: Dict[NodeType, Sequence] = None,
   ):
-    # TODO(hongyi): to support more than one partitions
     super().load_vineyard(vineyard_id=vineyard_id, vineyard_socket=vineyard_socket, 
                           edges=edges, edge_weights=edge_weights, node_features=node_features, 
                           edge_features=edge_features, node_labels=node_labels, id2idx=id2idx)
@@ -236,6 +237,9 @@ class DistDataset(Dataset):
       # homo
       if node_features:
         self._node_feat_pb = self.node_pb
+    
+    self.id_select = vineyard_utils.v6d_id_select
+    self.id_filter = vineyard_utils.v6d_id_filter
 
   def share_ipc(self):
     super().share_ipc()

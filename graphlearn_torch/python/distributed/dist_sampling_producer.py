@@ -16,7 +16,7 @@
 import queue
 import time
 from enum import Enum
-from typing import Optional, Union, Callable
+from typing import Optional, Union
 
 import torch
 import torch.multiprocessing as mp
@@ -28,7 +28,7 @@ from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput, SamplingType, SamplingConfig
 )
 from ..utils import ensure_device
-from ..utils import seed_everything, default_id_select
+from ..utils import seed_everything
 
 from ..distributed.dist_context import get_context
 from .dist_context import init_worker_group
@@ -60,11 +60,9 @@ def _sampling_worker_loop(rank,
                           channel: ChannelBase,
                           task_queue: mp.Queue,
                           sampling_completed_worker_count: mp.Value,
-                          mp_barrier,
-                          id_select: Callable=default_id_select):
+                          mp_barrier):
   r""" Subprocess work loop for sampling worker.
   """
-  # print(f"sampler input::: {sampler_input}")
   dist_sampler = None
   try:
     init_worker_group(
@@ -130,10 +128,10 @@ def _sampling_worker_loop(rank,
 
         if sampling_config.sampling_type == SamplingType.NODE:
           for index in loader:
-            dist_sampler.sample_from_nodes(sampler_input[index], id_select=id_select)
+            dist_sampler.sample_from_nodes(sampler_input[index])
         elif sampling_config.sampling_type == SamplingType.LINK:
           for index in loader:
-            dist_sampler.sample_from_edges(sampler_input[index], id_select=id_select)
+            dist_sampler.sample_from_edges(sampler_input[index])
         elif sampling_config.sampling_type == SamplingType.SUBGRAPH:
           for index in loader:
             dist_sampler.subgraph(sampler_input[index])
@@ -206,8 +204,7 @@ class DistMpSamplingProducer(object):
         target=_sampling_worker_loop,
         args=(rank, self.data, self.sampler_input, unshuffled_indexes[rank],
               self.sampling_config, self.worker_options, self.output_channel,
-              task_queue, self.sampling_completed_worker_count, barrier,
-              self.worker_options.id_select)
+              task_queue, self.sampling_completed_worker_count, barrier)
       )
       w.daemon = True
       w.start()

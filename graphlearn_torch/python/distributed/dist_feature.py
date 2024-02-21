@@ -107,8 +107,8 @@ class DistFeature(object):
     elif isinstance(self.feature_pb, PartitionBook):
       assert self.data_cls == 'homo'
     elif isinstance(self.feature_pb, torch.Tensor):
-      self.feature_pb = GLTPartitionBook(self.feature_pb)
       assert self.data_cls == 'homo'
+      self.feature_pb = GLTPartitionBook(self.feature_pb)
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                        f"patition book type '{type(self.feature_pb)}'")

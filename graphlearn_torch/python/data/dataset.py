@@ -125,7 +125,6 @@ class Dataset(object):
     self,
     num_val: Union[float, int],
     num_test: Union[float, int],
-    id_filter: Callable = None
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the

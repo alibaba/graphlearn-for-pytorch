@@ -29,9 +29,8 @@ from ..sampler import (
 )
 from ..typing import EdgeType, as_str, NumNeighbors, reverse_edge_type
 from ..utils import (
-  get_available_device, ensure_device, merge_dict, id2idx,
-  merge_hetero_sampler_output, format_hetero_sampler_output, count_dict,
-  default_id_select
+    get_available_device, ensure_device, merge_dict, id2idx,
+    merge_hetero_sampler_output, format_hetero_sampler_output, count_dict
 )
 
 from .dist_dataset import DistDataset
@@ -218,13 +217,11 @@ class DistNeighborSampler(ConcurrentEventLoop):
         sampling from.
     """
     inputs = NodeSamplerInput.cast(inputs)
-    id_select = kwargs.get('id_select', default_id_select)
-
     if self.channel is None:
       return self.run_task(coro=self._send_adapter(self._sample_from_nodes,
-                                                   inputs, id_select))
+                                                   inputs))
     cb = kwargs.get('callback', None)
-    self.add_task(coro=self._send_adapter(self._sample_from_nodes, inputs, id_select),
+    self.add_task(coro=self._send_adapter(self._sample_from_nodes, inputs),
                   callback=cb)
     return None
 
@@ -246,13 +243,11 @@ class DistNeighborSampler(ConcurrentEventLoop):
         including the (1) source node indices, the (2) destination node
         indices, the (3) optional edge labels and the (4) input edge type.
     """
-
-    id_select = kwargs.get('id_select', default_id_select)
     if self.channel is None:
       return self.run_task(coro=self._send_adapter(self._sample_from_edges,
-                                                   inputs, id_select))
+                                                   inputs))
     cb = kwargs.get('callback', None)
-    self.add_task(coro=self._send_adapter(self._sample_from_edges, inputs, id_select),
+    self.add_task(coro=self._send_adapter(self._sample_from_edges, inputs),
                   callback=cb)
     return None
 
@@ -286,7 +281,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
   async def _sample_from_nodes(
     self,
     inputs: NodeSamplerInput,
-    id_select: Callable = default_id_select
   ) -> Optional[SampleMessage]:
     input_seeds = inputs.node.to(self.device)
     input_type = inputs.input_type
@@ -309,7 +303,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
             srcs = src_dict.get(etype[-1], None)
             if srcs is not None and srcs.numel() > 0:
               task_dict[reverse_edge_type(etype)] = self._loop.create_task(
-                self._sample_one_hop(srcs, req_num, etype, id_select))
+                self._sample_one_hop(srcs, req_num, etype))
           elif self.edge_dir == 'out':
             srcs = src_dict.get(etype[0], None)
             if srcs is not None and srcs.numel() > 0:
@@ -357,7 +351,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       num_sampled_nodes.append(srcs.size(0))
       # Sample subgraph.
       for req_num in self.num_neighbors:
-        output: NeighborOutput = await self._sample_one_hop(srcs, req_num, None, id_select)
+        output: NeighborOutput = await self._sample_one_hop(srcs, req_num, None)
         if output.nbr.numel() == 0:
           break
         nodes, rows, cols = \
@@ -377,7 +371,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
         num_sampled_edges=num_sampled_edges,
         metadata={}
       )
-
     # Reclaim inducer into pool.
     self.inducer_pool.put(inducer)
 
@@ -387,7 +380,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
   async def _sample_from_edges(
     self,
     inputs: EdgeSamplerInput,
-    id_select: Callable = default_id_select
   ) -> Optional[SampleMessage]:
     r"""Performs sampling from an edge sampler input, leveraging a sampling
     function of the same signature as `node_sample`.
@@ -454,7 +446,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       temp_out = []
       for it, node in seed_dict.items():
         seeds = NodeSamplerInput(node=node, input_type=it)
-        temp_out.append(await self._sample_from_nodes(seeds, id_select))
+        temp_out.append(await self._sample_from_nodes(seeds))
       if len(temp_out) == 2:
         out = merge_hetero_sampler_output(temp_out[0],
                                           temp_out[1],
@@ -495,7 +487,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     else: #homo
       seed = torch.cat([src, dst], dim=0)
       seed, inverse_seed = seed.unique(return_inverse=True)
-      out = await self._sample_from_nodes(NodeSamplerInput.cast(seed), id_select)
+      out = await self._sample_from_nodes(NodeSamplerInput.cast(seed))
 
       # edge_label
       if neg_sampling is None or neg_sampling.is_binary():
@@ -605,8 +597,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
     self,
     srcs: torch.Tensor,
     num_nbr: int,
-    etype: Optional[EdgeType],
-    id_select: Callable = default_id_select
+    etype: Optional[EdgeType]
   ) -> NeighborOutput:
     r""" Sample one-hop neighbors and induce the coo format subgraph.
 
@@ -614,7 +605,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
       srcs: input ids, 1D tensor.
       num_nbr: request(max) number of neighbors for one hop.
       etype: edge type to sample from input ids.
-      id_select: function to select global ids from srcs.
 
     Returns:
       Tuple[torch.Tensor, torch.Tensor]: unique node ids and edge_index.
@@ -628,7 +618,6 @@ class DistNeighborSampler(ConcurrentEventLoop):
       src_ntype = etype[-1] if etype is not None else None
     partition_ids = self.dist_graph.get_node_partitions(srcs, src_ntype)
     partition_ids = partition_ids.to(device)
-    
     partition_results: List[PartialNeighborOutput] = []
     remote_orders_list: List[torch.Tensor] = []
     futs: List[torch.futures.Future] = []
@@ -639,9 +628,9 @@ class DistNeighborSampler(ConcurrentEventLoop):
       )
       p_mask = (partition_ids == pidx)
       if isinstance(self.dist_graph.node_pb, Dict):
-        p_ids = id_select(srcs, p_mask, self.dist_graph.node_pb[src_ntype])
+        p_ids = self.data.id_select(srcs, p_mask, self.dist_graph.node_pb[src_ntype])
       else:
-        p_ids = id_select(srcs, p_mask, self.dist_graph.node_pb)
+        p_ids = self.data.id_select(srcs, p_mask, self.dist_graph.node_pb)
       if p_ids.shape[0] > 0:
         p_orders = torch.masked_select(orders, p_mask)
         if pidx == self.data.partition_idx:
