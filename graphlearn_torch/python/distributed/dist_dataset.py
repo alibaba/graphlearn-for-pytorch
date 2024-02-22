@@ -219,11 +219,10 @@ class DistDataset(Dataset):
     node_features: Dict[NodeType, List[str]] = None,
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
-    id2idx: Dict[NodeType, Sequence] = None,
   ):
     super().load_vineyard(vineyard_id=vineyard_id, vineyard_socket=vineyard_socket, 
                           edges=edges, edge_weights=edge_weights, node_features=node_features, 
-                          edge_features=edge_features, node_labels=node_labels, id2idx=id2idx)
+                          edge_features=edge_features, node_labels=node_labels)
     if isinstance(self.graph, dict):
       # hetero
       self._node_feat_pb = {}

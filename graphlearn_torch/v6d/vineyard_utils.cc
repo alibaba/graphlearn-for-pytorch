@@ -115,7 +115,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
     if (edge_dir == "out") {
       auto oe = vineyard_graph->GetOutgoingAdjList(v, e_label_id);
       for (auto& e : oe) {
-        // cols[i] = vineyard_graph->(e.get_neighbor());
         cols[i] = vineyard_graph->Vertex2Gid(e.get_neighbor());
         if (has_eid) {
           eids[i++] = e.edge_id();
@@ -126,7 +125,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> ToCSR(
     } else {
       auto oe = vineyard_graph->GetIncomingAdjList(v, e_label_id);
       for (auto& e : oe) {
-        // cols[i] = vineyard_graph->vertex_offset(e.get_neighbor());
         cols[i] = vineyard_graph->Vertex2Gid(e.get_neighbor());
         if (has_eid) {
           eids[i++] = e.edge_id();

@@ -16,7 +16,7 @@
 import math
 import queue
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union, Tuple, Callable, Dict
+from typing import List, Literal, Optional, Union, Tuple, Dict
 
 import torch
 
@@ -167,11 +167,12 @@ class DistNeighborSampler(ConcurrentEventLoop):
             local_only=False, rpc_router=self.rpc_router, device=self.device
           )
 
-      self.node_labels = self.data.get_node_label()
-      if self.node_labels is not None:
+      self.dist_node_labels = None
+      node_labels = self.data.get_node_label()
+      if node_labels is not None:
         self.dist_node_labels = DistFeature(
           self.data.num_partitions, self.data.partition_idx,
-          self.node_labels, self.data.node_feat_pb,
+          node_labels, self.data.node_feat_pb,
           local_only=False, rpc_router=self.rpc_router, device=self.device
         )
     else:
@@ -739,13 +740,10 @@ class DistNeighborSampler(ConcurrentEventLoop):
       if self.with_edge:
         result_map['eids'] = output.edge
       # Collect node labels.
-      if self.node_labels is not None:
-        if isinstance(self.node_labels, torch.Tensor):
-          result_map['nlabels'] = self.node_labels[output.node.to(node_labels.device)].T[0]
-        else:
-          fut = self.dist_node_labels.async_get(output.node)
-          nlabels = await wrap_torch_future(fut)
-          result_map['nlabels'] = nlabels.T[0]
+      if self.dist_node_labels is not None:
+        fut = self.dist_node_labels.async_get(output.node)
+        nlabels = await wrap_torch_future(fut)
+        result_map['nlabels'] = nlabels.T[0]
       # Collect node features.
       if self.dist_node_feature is not None:
         fut = self.dist_node_feature.async_get(output.node)

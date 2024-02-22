@@ -161,12 +161,11 @@ class Dataset(object):
     node_features: Dict[NodeType, List[str]] = None,
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
-    id2idx: Dict[NodeType, Sequence] = None,
   ):
     # TODO(hongyi): GPU support
     is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
     from .vineyard_utils import \
-      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
+      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard, VineyardGid2Lid
 
     _edge_index = {}
     _edge_ids = {}
@@ -194,11 +193,14 @@ class Dataset(object):
     # load node features
     if node_features:
       node_feature_data = {}
+      id2idx = {}
       for ntype, property_names in node_features.items():
         node_feature_data[ntype] = \
           load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, ntype)
+        id2idx[ntype] = VineyardGid2Lid(vineyard_socket, vineyard_id, ntype)
       if is_homo:
         node_feature_data = node_feature_data[edges[0][0]]
+        id2idx = VineyardGid2Lid(vineyard_socket, vineyard_id, edges[0][0])
       self.init_node_features(node_feature_data=node_feature_data, id2idx=id2idx, with_gpu=False)
     
     # load edge features
@@ -216,13 +218,15 @@ class Dataset(object):
     # load node labels
     if node_labels:
       node_label_data = {}
+      id2idx = {}
       for ntype, label_property_name in node_labels.items():
         node_label_data[ntype] = \
           load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, [label_property_name], ntype)
-
+        id2idx[ntype] = VineyardGid2Lid(vineyard_socket, vineyard_id, ntype)
       if is_homo:
         node_label_data = node_label_data[edges[0][0]]
-      self.init_node_labels(node_label_data=node_label_data, id2idx=id2idx, with_gpu=False)
+        id2idx = VineyardGid2Lid(vineyard_socket, vineyard_id, edges[0][0])
+      self.init_node_labels(node_label_data=node_label_data, id2idx=id2idx)
 
   def init_node_features(
     self,
@@ -335,8 +339,7 @@ class Dataset(object):
     self,
     node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
     id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType],
-                  Sequence, Dict[NodeType, Sequence]] = None,
-    with_gpu: bool = False,
+                  Sequence, Dict[NodeType, Sequence]] = None
   ):
     r""" Initialize the node label storage.
 
@@ -344,13 +347,17 @@ class Dataset(object):
       node_label_data (torch.Tensor or numpy.ndarray): A tensor of the raw
         node label data, should be a dict for heterogenous graph nodes.
         (default: ``None``)
+      id2idx (torch.Tensor or numpy.ndarray): A tensor that maps global node id
+        to local index, and should be None for GLT(none-v6d) graph. (default: ``None``) 
     """
     if node_label_data is not None:
       self.node_labels = convert_to_tensor(node_label_data, dtype=torch.int64)
-      id2idx = convert_to_tensor(id2idx)
+      # For v6d graph, label data are partitioned into different fragments, and are
+      # handled in the same approach as distributed feature.
       if id2idx is not None:
+        id2idx = convert_to_tensor(id2idx)
         self.node_labels = _build_features(
-          self.node_labels, id2idx, 0.0, None, None, with_gpu, None
+          self.node_labels, id2idx, 0.0, None, None, False, None
         )
 
   def init_node_split(
