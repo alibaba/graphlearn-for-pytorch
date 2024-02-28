@@ -26,6 +26,7 @@ import torch.distributed
 
 from mlperf_logging_utils import get_mlperf_logger, submission_info
 from torch.nn.parallel import DistributedDataParallel
+from utilities import create_ckpt_folder
 from rgnn import RGNN
 
 mllogger = get_mlperf_logger(path=osp.dirname(osp.abspath(__file__)))
@@ -93,10 +94,15 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     val_loader_master_port,
     with_gpu, trim_to_layer, use_fp16,
     edge_dir, rpc_timeout,
-    validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end):
-  
+    validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end, 
+    checkpoint_on_epoch_end, ckpt_steps, ckpt_path):
+
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
+  if rank == 0:
+    if ckpt_steps > 0:
+      ckpt_dir = create_ckpt_folder(base_dir=osp.dirname(osp.abspath(__file__)))
+  
   glt.utils.common.seed_everything(random_seed)
 
   # Initialize graphlearn_torch distributed worker group context.
@@ -159,7 +165,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     num_neighbors=[int(fanout) for fanout in fan_out.split(',')],
     input_nodes=('paper', val_idx),
     batch_size=val_batch_size,
-    shuffle=False,
+    shuffle=True,
+    drop_last=False,
     edge_dir=edge_dir,
     collect_features=True,
     to_device=current_device,
@@ -177,6 +184,15 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     )
   )
 
+  # Load checkpoint
+  ckpt = None
+  if ckpt_path is not None:
+    try:
+      ckpt = torch.load(ckpt_path)
+    except FileNotFoundError as e:
+      print(f"Checkpoint file not found: {e}")
+      return -1
+    
   # Define model and optimizer.
   if with_gpu:
     torch.cuda.set_device(current_device)
@@ -190,6 +206,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                heads=num_heads,
                node_type='paper',
                with_trim=trim_to_layer).to(current_device)
+  if ckpt is not None:
+    model.load_state_dict(ckpt['model_state_dict'])
   model = DistributedDataParallel(model,
                                   device_ids=[current_device.index] if with_gpu else None,
                                   find_unused_parameters=True)
@@ -206,6 +224,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
 
   loss_fcn = torch.nn.CrossEntropyLoss().to(current_device)
   optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+  if ckpt is not None:
+    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
   batch_num = (len(train_idx) + train_batch_size - 1) // train_batch_size
   validation_freq = int(batch_num * validation_frac_within_epoch)
   is_success = False
@@ -246,6 +266,16 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
           if with_gpu
           else 0
       )
+      #checkpoint
+      if ckpt_steps > 0 and idx % ckpt_steps == 0:
+        if with_gpu:
+          torch.cuda.synchronize()
+        torch.distributed.barrier()
+        if rank == 0:
+          epoch_num = epoch + idx / batch_num
+          glt.utils.common.save_ckpt(idx + epoch * batch_num, 
+                                     ckpt_dir, model.module, optimizer, epoch_num)
+        torch.distributed.barrier()
       # evaluate
       if idx % validation_freq == 0:
         if with_gpu:
@@ -268,6 +298,14 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       torch.cuda.synchronize()
     torch.distributed.barrier()
     
+    #checkpoint at the end of epoch
+    if checkpoint_on_epoch_end:
+      if rank == 0:
+        epoch_num = epoch + 1
+        glt.utils.common.save_ckpt(idx + epoch * batch_num, 
+                                   ckpt_dir, model.module, optimizer, epoch_num)
+      torch.distributed.barrier()
+
     # evaluate at the end of epoch
     if evaluate_on_epoch_end and not is_success:
       epoch_num = epoch + 1
@@ -313,7 +351,7 @@ if __name__ == '__main__':
   glt.utils.ensure_dir(root)
   parser.add_argument('--path', type=str, default=root,
       help='path containing the datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument('--num_classes', type=int, default=2983,
@@ -327,9 +365,9 @@ if __name__ == '__main__':
   parser.add_argument('--fan_out', type=str, default='15,10,5')
   parser.add_argument('--train_batch_size', type=int, default=512)
   parser.add_argument('--val_batch_size', type=int, default=512)
-  parser.add_argument('--hidden_channels', type=int, default=128)
+  parser.add_argument('--hidden_channels', type=int, default=512)
   parser.add_argument('--learning_rate', type=float, default=0.001)
-  parser.add_argument('--epochs', type=int, default=20)
+  parser.add_argument('--epochs', type=int, default=2)
   parser.add_argument('--num_layers', type=int, default=3)
   parser.add_argument('--num_heads', type=int, default=4)
   parser.add_argument('--random_seed', type=int, default=42)
@@ -363,7 +401,7 @@ if __name__ == '__main__':
   parser.add_argument("--split_training_sampling", action="store_true",
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
-      help="use trim_to_layer function from pyG")
+      help="use trim_to_layer function from PyG")
   parser.add_argument("--use_fp16", action="store_true",
       help="load node/edge feature using fp16 format to reduce memory usage")
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
@@ -371,24 +409,32 @@ if __name__ == '__main__':
   parser.add_argument("--validation_acc", type=float, default=0.72,
       help="Validation accuracy threshold to stop training once reached.")
   parser.add_argument("--evaluate_on_epoch_end", action="store_true",
-      help="Evaluate using validation set on each epoch end.")
+      help="Evaluate using validation set on each epoch end."),
+  parser.add_argument("--checkpoint_on_epoch_end", action="store_true",
+    help="Save checkpoint on each epoch end."),
+  parser.add_argument('--ckpt_steps', type=int, default=-1, 
+      help="Save checkpoint every n steps. Default is -1, which means no checkpoint is saved.")
+  parser.add_argument('--ckpt_path', type=str, default=None, 
+      help="Path to load checkpoint from. Default is None.")
   args = parser.parse_args()
   assert args.layout in ['COO', 'CSC', 'CSR']
 
-  if args.node_rank == 0:
-    world_size = args.num_nodes * args.num_training_procs
-    submission_info(mllogger, 'GNN', 'reference_implementation')
-    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
-    mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
-    mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
-
-  glt.utils.common.seed_everything(args.random_seed)
+  glt.utils.common.seed_everything(args.random_seed)  
   # when set --cpu_mode or GPU is not available, use cpu only mode.
   args.with_gpu = (not args.cpu_mode) and torch.cuda.is_available()
   if args.with_gpu:
     assert(not args.num_training_procs > torch.cuda.device_count())
     if args.split_training_sampling:
       assert(not args.num_training_procs > torch.cuda.device_count() // 2)
+  
+  if args.node_rank == 0:
+    world_size = args.num_nodes * args.num_training_procs
+    submission_info(mllogger, 'GNN', 'reference_implementation')
+    mllogger.event(key=mllog_constants.GLOBAL_BATCH_SIZE, value=world_size*args.train_batch_size)
+    mllogger.event(key=mllog_constants.OPT_BASE_LR, value=args.learning_rate)
+    mllogger.event(key=mllog_constants.SEED,value=args.random_seed)
+    mllogger.end(key=mllog_constants.INIT_STOP)
+    mllogger.start(key=mllog_constants.RUN_START)
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
@@ -410,7 +456,6 @@ if __name__ == '__main__':
   train_idx.share_memory_()
   val_idx.share_memory_()
   
-  mllogger.end(key=mllog_constants.INIT_STOP)
   print('--- Launching training processes ...\n')
   torch.multiprocessing.spawn(
     run_training_proc,
@@ -433,7 +478,10 @@ if __name__ == '__main__':
           args.rpc_timeout,
           args.validation_acc, 
           args.validation_frac_within_epoch,
-          args.evaluate_on_epoch_end),
+          args.evaluate_on_epoch_end,
+          args.checkpoint_on_epoch_end,
+          args.ckpt_steps,
+          args.ckpt_path),
     nprocs=args.num_training_procs,
     join=True
   )

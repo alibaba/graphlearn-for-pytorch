@@ -173,3 +173,62 @@ def default_id_select(srcs, p_mask, node_pb=None):
 ## Default function to filter src ids in a specific partition from the partition book
 def default_id_filter(node_pb, partition_idx):
   return torch.where(node_pb == partition_idx)[0]
+
+def save_ckpt(
+  ckpt_seq: int,
+  ckpt_dir: str,
+  model: torch.nn.Module,
+  optimizer: Optional[torch.optim.Optimizer] = None,
+  epoch: float = 0,
+):
+  """
+  Saves a checkpoint of the model's state.
+
+  Parameters:
+  ckpt_seq (int): The sequence number of the checkpoint.
+  ckpt_dir (str): The directory where the checkpoint will be saved.
+  model (torch.nn.Module): The model to be saved.
+  optimizer (Optional[torch.optim.Optimizer]): The optimizer, if any.
+  epoch (float): The current epoch. Default is 0.
+  """
+  if not os.path.isdir(ckpt_dir):
+      os.makedirs(ckpt_dir)
+  ckpt_path = os.path.join(ckpt_dir, f"model_seq_{ckpt_seq}.ckpt")
+
+  ckpt = {
+      'seq': ckpt_seq,
+      'epoch': epoch,
+      'model_state_dict': model.state_dict()
+  }
+  if optimizer:
+    ckpt['optimizer_state_dict'] = optimizer.state_dict()
+  
+  torch.save(ckpt, ckpt_path)
+
+def load_ckpt(
+  ckpt_seq: int,
+  ckpt_dir: str,
+  model: torch.nn.Module,
+  optimizer: Optional[torch.optim.Optimizer] = None,
+) -> float:
+  """
+  Loads a checkpoint of the model's state, returns the epoch of the checkpoint.
+
+  Parameters:
+  ckpt_seq (int): The sequence number of the checkpoint.
+  ckpt_dir (str): The directory where the checkpoint will be saved.
+  model (torch.nn.Module): The model to be saved.
+  optimizer (Optional[torch.optim.Optimizer]): The optimizer, if any.
+  """
+
+  ckpt_path = os.path.join(ckpt_dir, f"model_seq_{ckpt_seq}.ckpt")
+  try:
+    ckpt = torch.load(ckpt_path)
+  except FileNotFoundError:
+    return -1
+
+  model.load_state_dict(ckpt['model_state_dict'])
+  epoch = ckpt.get('epoch')
+  if optimizer:
+    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+  return epoch

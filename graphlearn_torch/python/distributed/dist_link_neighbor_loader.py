@@ -151,8 +151,8 @@ class DistLinkNeighborLoader(DistLoader):
 
     sampling_config = SamplingConfig(
       SamplingType.LINK, num_neighbors, batch_size, shuffle,
-      drop_last, with_edge, collect_features, with_neg, with_weight,
-      edge_dir, random_seed
+      drop_last, with_edge, collect_features, with_neg, 
+      with_weight=with_weight, edge_dir=edge_dir, seed=random_seed
     )
 
     super().__init__(

@@ -125,10 +125,10 @@ if __name__ == '__main__':
       help='path containing the datasets')
   parser.add_argument('--dst_path', type=str, default=root,
       help='path containing the partitioned datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
-  parser.add_argument('--num_classes', type=int, default=19,
+  parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
   parser.add_argument('--in_memory', type=int, default=0,
       choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')

@@ -387,9 +387,15 @@ class DistLoader(object):
 
       if self.sampling_config.sampling_type in [SamplingType.NODE,
                                                 SamplingType.SUBGRAPH]:
-        batch_dict = {
-          self._input_type: node_dict[self._input_type][:self.batch_size]
-        }
+        batch_key = f'{self._input_type}.batch'
+        if msg.get(batch_key) is not None:
+          batch_dict = {
+            self._input_type: msg[f'{self._input_type}.batch'].to(self.to_device)
+          }
+        else:
+          batch_dict = {
+            self._input_type: node_dict[self._input_type][:self.batch_size]
+          }
         batch_labels_key = f'{self._input_type}.nlabels'
         if batch_labels_key in msg:
           batch_labels = msg[batch_labels_key].to(self.to_device)
@@ -426,7 +432,10 @@ class DistLoader(object):
 
       if self.sampling_config.sampling_type in [SamplingType.NODE,
                                                 SamplingType.SUBGRAPH]:
-        batch = ids[:self.batch_size]
+        if msg.get('batch') is not None:
+          batch = msg['batch'].to(self.to_device)
+        else:
+          batch = ids[:self.batch_size]
         batch_labels = msg['nlabels'].to(self.to_device) if 'nlabels' in msg else None
       else:
         batch = None

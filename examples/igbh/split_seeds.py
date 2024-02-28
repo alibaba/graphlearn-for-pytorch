@@ -9,7 +9,7 @@ class SeedSplitter(object):
                dataset_size='tiny',
                use_label_2K=True,
                random_seed=42,
-               validation_frac=0.05):
+               validation_frac=0.01):
     self.path = path
     self.dataset_size = dataset_size
     self.use_label_2K = use_label_2K
@@ -43,13 +43,13 @@ if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')
   parser.add_argument('--path', type=str, default=root,
       help='path containing the datasets')
-  parser.add_argument('--dataset_size', type=str, default='tiny',
+  parser.add_argument('--dataset_size', type=str, default='full',
       choices=['tiny', 'small', 'medium', 'large', 'full'],
       help='size of the datasets')
   parser.add_argument("--random_seed", type=int, default='42')
   parser.add_argument('--num_classes', type=int, default=2983,
       choices=[19, 2983], help='number of classes')
-  parser.add_argument("--validation_frac", type=float, default=0.05,
+  parser.add_argument("--validation_frac", type=float, default=0.025,
       help="Fraction of labeled vertices to be used for validation.")
   
   args = parser.parse_args()
