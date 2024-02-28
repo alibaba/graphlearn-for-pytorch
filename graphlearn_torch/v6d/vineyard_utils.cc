@@ -25,8 +25,8 @@ namespace vineyard_utils {
 vineyard::Client vyclient;
 
 template<typename T>
-void customDeleter(T* ptr) {
-    delete[] ptr;
+void customDeleter(void* ptr) {
+  delete[] static_cast<T*>(ptr);
 }
 
 std::shared_ptr<GraphType> GetGraphFromVineyard(
