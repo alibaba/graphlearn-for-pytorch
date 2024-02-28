@@ -718,7 +718,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
             nlabels = await wrap_torch_future(fut)
             result_map[f'{as_str(input_type)}.nlabels'] = nlabels.T[0]
           else:
-            node_labels = self.dist_node_labels.get(ntype, None)
+            node_labels = self.dist_node_labels.get(input_type, None)
             if node_labels is not None:
               result_map[f'{as_str(input_type)}.nlabels'] = \
                 node_labels[output.node[input_type].to(node_labels.device)]
