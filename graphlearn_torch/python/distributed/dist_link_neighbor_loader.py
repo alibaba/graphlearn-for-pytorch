@@ -119,7 +119,7 @@ class DistLinkNeighborLoader(DistLoader):
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
-               random_seed: int = None,
+               random_seed: Optional[int] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
     # Get edge type (or `None` for homogeneous graphs):
     input_type, edge_label_index = get_edge_label_index(

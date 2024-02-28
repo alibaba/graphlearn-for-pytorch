@@ -18,9 +18,9 @@ from typing import List, Dict, Optional, Tuple, Union
 
 import torch
 
-from ..typing import NodeType, EdgeType, TensorDataType, PartitionBook
+from ..typing import NodeType, EdgeType, TensorDataType
 
-from .base import PartitionerBase
+from .base import PartitionerBase, PartitionBook
 
 
 # Implementation of a random partitioner.

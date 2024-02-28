@@ -15,7 +15,8 @@
 
 import threading
 from multiprocessing.reduction import ForkingPickler
-from typing import List, Optional
+from typing import List, Optional, Union
+from collections.abc import Sequence
 
 import torch
 
@@ -100,7 +101,7 @@ class Feature(object):
   """
   def __init__(self,
                feature_tensor: TensorDataType,
-               id2index: Optional[torch.Tensor] = None,
+               id2index: Optional[Union[torch.Tensor, Sequence]] = None,
                split_ratio: float = 0.0,
                device_group_list: Optional[List[DeviceGroup]] = None,
                device: Optional[int] = None,
@@ -210,7 +211,7 @@ class Feature(object):
     if self._ipc_handle is not None:
       return self._ipc_handle
 
-    if self.id2index is not None:
+    if self.id2index is not None and isinstance(self.id2index, torch.Tensor):
       self.id2index = self.id2index.cpu()
       self.id2index.share_memory_()
 

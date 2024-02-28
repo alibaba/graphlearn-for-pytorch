@@ -31,4 +31,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("vineyard_to_csr", &ToCSR);
   m.def("load_vertex_feature_from_vineyard", &LoadVertexFeatures);
   m.def("load_edge_feature_from_vineyard", &LoadEdgeFeatures);
+  m.def("get_frag_vertex_offset", &GetFragVertexOffset);
+  m.def("get_frag_vertex_num", &GetFragVertexNum);
+
+  py::class_<VineyardFragHandle>(m, "VineyardFragHandle")
+    .def(py::init<const std::string&, const std::string&>())
+    .def("get_fid_from_gid", &VineyardFragHandle::GetFidFromGid, py::arg("gid"))
+    .def("get_inner_vertices", &VineyardFragHandle::GetInnerVertices,
+          py::arg("v_label_name"));
 }

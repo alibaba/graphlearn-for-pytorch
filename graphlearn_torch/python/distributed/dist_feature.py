@@ -20,7 +20,9 @@ import torch
 from ..data import Feature
 from ..typing import (
   EdgeType, NodeType,
-  PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
+)
+from ..partition import (
+  PartitionBook, GLTPartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
 from ..utils import get_available_device, ensure_device
 
@@ -87,7 +89,8 @@ class DistFeature(object):
     if isinstance(self.local_feature, dict):
       self.data_cls = 'hetero'
       for _, feat in self.local_feature.items():
-        feat.lazy_init_with_ipc_handle()
+        if isinstance(feat, Feature):
+          feat.lazy_init_with_ipc_handle()
     elif isinstance(self.local_feature, Feature):
       self.data_cls = 'homo'
       self.local_feature.lazy_init_with_ipc_handle()
@@ -97,8 +100,14 @@ class DistFeature(object):
     self.feature_pb = feature_pb
     if isinstance(self.feature_pb, dict):
       assert self.data_cls == 'hetero'
+      for key, feat in self.feature_pb.items():
+        if not isinstance(feat, PartitionBook):
+          self.feature_pb[key] = GLTPartitionBook(feat)
     elif isinstance(self.feature_pb, PartitionBook):
       assert self.data_cls == 'homo'
+    elif isinstance(self.feature_pb, torch.Tensor):
+      assert self.data_cls == 'homo'
+      self.feature_pb = GLTPartitionBook(self.feature_pb)
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                        f"patition book type '{type(self.feature_pb)}'")

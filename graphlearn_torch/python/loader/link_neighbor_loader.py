@@ -123,6 +123,7 @@ class LinkNeighborLoader(LinkLoader):
     drop_last: bool = False,
     strategy: str = "random",
     device: torch.device = torch.device(0),
+    seed: Optional[int] = None,
     **kwargs,
   ):
     with_neg = True if neg_sampling is not None else False
@@ -135,7 +136,8 @@ class LinkNeighborLoader(LinkLoader):
         with_neg=with_neg,
         with_weight=with_weight,
         device=device,
-        edge_dir=data.edge_dir
+        edge_dir=data.edge_dir,
+        seed=seed
       )
 
     super().__init__(

@@ -166,6 +166,14 @@ def load_and_concatenate_tensors(filename, device):
         start_idx = end_idx
     return combined_tensor
 
+## Default function to select ids in `srcs` that belong to a specific partition
+def default_id_select(srcs, p_mask, node_pb=None):
+   return torch.masked_select(srcs, p_mask)
+
+## Default function to filter src ids in a specific partition from the partition book
+def default_id_filter(node_pb, partition_idx):
+  return torch.where(node_pb == partition_idx)[0]
+
 def save_ckpt(
   ckpt_seq: int,
   ckpt_dir: str,

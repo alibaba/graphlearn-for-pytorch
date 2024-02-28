@@ -83,7 +83,7 @@ class DistNeighborLoader(DistLoader):
                edge_dir: Literal['in', 'out'] = 'out',
                collect_features: bool = False,
                to_device: Optional[torch.device] = None,
-               random_seed: int = None,
+               random_seed: Optional[int] = None,
                worker_options: Optional[AllDistSamplingWorkerOptions] = None):
 
     if isinstance(input_nodes, tuple):

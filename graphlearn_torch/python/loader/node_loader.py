@@ -71,7 +71,9 @@ class NodeLoader(object):
     self._input_type = input_type
 
     label = self.data.get_node_label(self._input_type)
-    self.input_t_label = label.to(self.device) if label is not None else None
+    if label is not None:
+      assert(isinstance(label, torch.Tensor))
+      self.input_t_label = label.to(self.device)
 
     self._seed_loader = torch.utils.data.DataLoader(input_seeds, **kwargs)
 

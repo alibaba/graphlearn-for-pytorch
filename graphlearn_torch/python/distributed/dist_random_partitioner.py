@@ -21,11 +21,12 @@ import torch
 
 from ..partition import (
   save_meta, save_node_pb, save_edge_pb,
-  save_graph_partition, save_feature_partition
+  save_graph_partition, save_feature_partition,
+  PartitionBook
 )
 from ..typing import (
   NodeType, EdgeType, TensorDataType,
-  GraphPartitionData, FeaturePartitionData, PartitionBook
+  GraphPartitionData, FeaturePartitionData
 )
 from ..utils import convert_to_tensor, ensure_dir, index_select
 

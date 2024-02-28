@@ -18,11 +18,12 @@ from typing import Dict, Optional, Union
 import torch
 
 from ..data import Graph
-from ..typing import (
-  NodeType, EdgeType, PartitionBook,
+from ..typing import (NodeType, EdgeType)
+
+from ..partition import (
+  PartitionBook, GLTPartitionBook,
   HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
-
 
 class DistGraph(object):
   r""" Simple wrapper for graph data with distributed context.
@@ -44,7 +45,7 @@ class DistGraph(object):
                partition_idx: int,
                local_graph: Union[Graph, Dict[EdgeType, Graph]],
                node_pb: Union[PartitionBook, HeteroNodePartitionDict],
-               edge_pb: Union[PartitionBook, HeteroEdgePartitionDict]):
+               edge_pb: Union[PartitionBook, HeteroEdgePartitionDict]=None):
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
     self.local_graph = local_graph
@@ -62,8 +63,14 @@ class DistGraph(object):
     if self.node_pb is not None:
       if isinstance(self.node_pb, dict):
         assert self.data_cls == 'hetero'
+        for key, feat in self.node_pb.items():
+          if not isinstance(feat, PartitionBook):
+            self.node_pb[key] = GLTPartitionBook(feat)
       elif isinstance(self.node_pb, PartitionBook):
         assert self.data_cls == 'homo'
+      elif isinstance(self.node_pb, torch.Tensor):
+        assert self.data_cls == 'homo'
+        self.node_pb = GLTPartitionBook(self.node_pb)
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                         f"node patition book type '{type(self.node_pb)}'")
@@ -71,8 +78,14 @@ class DistGraph(object):
     if self.edge_pb is not None:
       if isinstance(self.edge_pb, dict):
         assert self.data_cls == 'hetero'
+        for key, feat in self.edge_pb.items():
+          if not isinstance(feat, PartitionBook):
+            self.edge_pb[key] = GLTPartitionBook(feat)
       elif isinstance(self.edge_pb, PartitionBook):
         assert self.data_cls == 'homo'
+      elif isinstance(self.edge_pb, torch.Tensor):
+        assert self.data_cls == 'homo'
+        self.edge_pb = GLTPartitionBook(self.edge_pb)
       else:
         raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                         f"edge patition book type '{type(self.edge_pb)}'")
@@ -99,10 +112,13 @@ class DistGraph(object):
   def get_edge_partitions(self, eids: torch.Tensor,
                           etype: Optional[EdgeType]=None):
     r""" Get the partition ids of edge ids with a specific edge type.
+         PS: tehre is no edge pb implementation when loading graph from v6d
     """
     if self.data_cls == 'hetero':
       assert etype is not None
+      assert isinstance(self.edge_pb[etype], GLTPartitionBook)
       pb = self.edge_pb[etype]
     else:
+      assert isinstance(self.edge_pb[etype], GLTPartitionBook)
       pb = self.edge_pb
     return pb[eids.to(pb.device)]

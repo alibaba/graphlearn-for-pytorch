@@ -14,17 +14,17 @@
 # ==============================================================================
 
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal, Tuple
+from typing import Dict, List, Optional, Union, Literal, Tuple, Callable
 
 import torch
 
-from ..data import Dataset, Graph, Feature, DeviceGroup
-from ..partition import load_partition, cat_feature_cache
-from ..typing import (
-  NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
+from ..data import Dataset, Graph, Feature, DeviceGroup, vineyard_utils
+from ..partition import (
+  load_partition, cat_feature_cache,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
-from ..utils import share_memory
+from ..typing import (NodeType, EdgeType, NodeLabel, NodeIndex)
+from ..utils import share_memory, default_id_filter, default_id_select
 
 
 class DistDataset(Dataset):
@@ -45,6 +45,8 @@ class DistDataset(Dataset):
     edge_feat_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     edge_dir: Literal['in', 'out'] = 'out',
     node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
+    id_filter: Callable = default_id_filter,
+    id_select: Callable = default_id_select
   ):
     super().__init__(
       graph_partition,
@@ -54,7 +56,8 @@ class DistDataset(Dataset):
       edge_dir,
       node_split,
     )
-
+    self.id_filter = id_filter
+    self.id_select = id_select
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
 
@@ -196,10 +199,10 @@ class DistDataset(Dataset):
       test_idx = {}
   
       for node_type, _ in self.node_labels.items():
-        indices = torch.where(self.node_pb[node_type] == self.partition_idx)[0]
+        indices = self.id_filter(self.node_pb[node_type], self.partition_idx)
         train_idx[node_type], val_idx[node_type], test_idx[node_type] = random_split(indices, num_val, num_test)
     else:
-      indices = torch.where(self.node_pb == self.partition_idx)[0]
+      indices = self.id_filter(self.node_pb, self.partition_idx)
       train_idx, val_idx, test_idx = random_split(indices, num_val, num_test)
     self.init_node_split((train_idx, val_idx, test_idx))
 
@@ -213,42 +216,33 @@ class DistDataset(Dataset):
     edge_features: Dict[EdgeType, List[str]] = None,
     node_labels: Dict[NodeType, str] = None,
   ):
-    # TODO(hongyi): to support more than one partitions
     super().load_vineyard(vineyard_id=vineyard_id, vineyard_socket=vineyard_socket, 
                           edges=edges, edge_weights=edge_weights, node_features=node_features, 
-                          edge_features=edge_features, node_labels=node_labels,)
+                          edge_features=edge_features, node_labels=node_labels)
     if isinstance(self.graph, dict):
       # hetero
-      self.node_pb = {}
-      self.edge_pb = {}
-      for etype, graph in self.graph.items():
-        self.node_pb[etype[0]] = torch.zeros(graph.row_count)
-        self.edge_pb[etype] = torch.zeros(graph.edge_count)
-
       self._node_feat_pb = {}
       if node_features:
-        for ntype, nfeat in self.node_features.items():
-          self._node_feat_pb[ntype] = torch.zeros(nfeat.shape[0])
-    
-      self._edge_feat_pb = {}
-      if edge_features:
-        for etype, efeat in self.edge_features.items():
-          self._edge_feat_pb[etype] = torch.zeros(efeat.shape[0])
+        for ntype, _ in self.node_features.items():
+          if self.node_pb is not None:
+            self._node_feat_pb[ntype] = self.node_pb[ntype]
+          else:
+            self._node_feat_pb[ntype] = None
     else:
       # homo
-      self.node_pb = torch.zeros(self.graph.row_count)
-      self.edge_pb = torch.zeros(self.graph.edge_count)
       if node_features:
-        self._node_feat_pb = torch.zeros(self.node_features.shape[0])
-      if edge_features:
-        self._edge_feat_pb = torch.zeros(self.edge_features.shape[0])
+        self._node_feat_pb = self.node_pb
+    
+    self.id_select = vineyard_utils.v6d_id_select
+    self.id_filter = vineyard_utils.v6d_id_filter
 
   def share_ipc(self):
     super().share_ipc()
-    self.node_pb = share_memory(self.node_pb)
-    self.edge_pb = share_memory(self.edge_pb)
-    self._node_feat_pb = share_memory(self._node_feat_pb)
-    self._edge_feat_pb = share_memory(self._edge_feat_pb)
+    if isinstance(self.node_pb, torch.Tensor):
+      self.node_pb = share_memory(self.node_pb)
+      self.edge_pb = share_memory(self.edge_pb)
+      self._node_feat_pb = share_memory(self._node_feat_pb)
+      self._edge_feat_pb = share_memory(self._edge_feat_pb)
     ipc_hanlde = (
       self.num_partitions, self.partition_idx,
       self.graph, self.node_features, self.edge_features, self.node_labels,

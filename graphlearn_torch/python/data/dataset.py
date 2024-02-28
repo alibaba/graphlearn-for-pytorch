@@ -16,7 +16,7 @@
 import logging
 from multiprocessing.reduction import ForkingPickler
 from typing import Dict, List, Optional, Union, Literal, Tuple
-from enum import Enum
+from collections.abc import Sequence
 
 import torch
 
@@ -165,7 +165,8 @@ class Dataset(object):
     # TODO(hongyi): GPU support
     is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
     from .vineyard_utils import \
-      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard
+      vineyard_to_csr, load_vertex_feature_from_vineyard, \
+      load_edge_feature_from_vineyard, VineyardGid2Lid
 
     _edge_index = {}
     _edge_ids = {}
@@ -173,32 +174,39 @@ class Dataset(object):
     layout = {}
     for etype in edges:
       src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
-      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
-      _edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
+      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, \
+        vineyard_id, src_ntype, etype[1], self.edge_dir, True)
+      _edge_index[etype] = (indptr, indices) if self.edge_dir == \
+        "out" else (indices, indptr)
       _edge_ids[etype] = edge_id
       layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
       if edge_weights:
         etype_edge_weights_label_name = edge_weights.get(etype)
         if etype_edge_weights_label_name: 
           _edge_weights[etype] = torch.squeeze(
-            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
+            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, \
+              [etype_edge_weights_label_name], etype[1]))
     if is_homo:
       ntype = edges[0]
       _edge_index = _edge_index[ntype]
       _edge_ids = _edge_ids[ntype]
       _edge_weights =  _edge_weights.get(ntype)
       layout = "CSR" if self.edge_dir == "out" else "CSC"
-    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
+    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, \
+                    layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
 
     # load node features
     if node_features:
       node_feature_data = {}
+      id2idx = {}
       for ntype, property_names in node_features.items():
         node_feature_data[ntype] = \
           load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, property_names, ntype)
+        id2idx[ntype] = VineyardGid2Lid(vineyard_socket, vineyard_id, ntype)
       if is_homo:
         node_feature_data = node_feature_data[edges[0][0]]
-      self.init_node_features(node_feature_data=node_feature_data, with_gpu=False)
+        id2idx = VineyardGid2Lid(vineyard_socket, vineyard_id, edges[0][0])
+      self.init_node_features(node_feature_data=node_feature_data, id2idx=id2idx, with_gpu=False)
     
     # load edge features
     if edge_features:
@@ -215,18 +223,21 @@ class Dataset(object):
     # load node labels
     if node_labels:
       node_label_data = {}
+      id2idx = {}
       for ntype, label_property_name in node_labels.items():
         node_label_data[ntype] = \
           load_vertex_feature_from_vineyard(vineyard_socket, vineyard_id, [label_property_name], ntype)
-
+        id2idx[ntype] = VineyardGid2Lid(vineyard_socket, vineyard_id, ntype)
       if is_homo:
         node_label_data = node_label_data[edges[0][0]]
-      self.init_node_labels(node_label_data=node_label_data)
+        id2idx = VineyardGid2Lid(vineyard_socket, vineyard_id, edges[0][0])
+      self.init_node_labels(node_label_data=node_label_data, id2idx=id2idx)
 
   def init_node_features(
     self,
     node_feature_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
-    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType],
+                  Sequence, Dict[NodeType, Sequence]] = None,
     sort_func = None,
     split_ratio: Union[float, Dict[NodeType, float]] = 0.0,
     device_group_list: Optional[List[DeviceGroup]] = None,
@@ -331,7 +342,9 @@ class Dataset(object):
 
   def init_node_labels(
     self,
-    node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None
+    node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
+    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType], \
+                  Sequence, Dict[NodeType, Sequence]] = None
   ):
     r""" Initialize the node label storage.
 
@@ -339,9 +352,19 @@ class Dataset(object):
       node_label_data (torch.Tensor or numpy.ndarray): A tensor of the raw
         node label data, should be a dict for heterogenous graph nodes.
         (default: ``None``)
+      id2idx (torch.Tensor or numpy.ndarray): A tensor that maps global node id
+        to local index, and should be None for GLT(none-v6d) graph. (default: ``None``) 
     """
     if node_label_data is not None:
-      self.node_labels = squeeze(convert_to_tensor(node_label_data))
+      # For v6d graph, label data are partitioned into different fragments, and are
+      # handled in the same approach as distributed feature.
+      if id2idx is not None:
+        node_label_data = convert_to_tensor(node_label_data, dtype=torch.int64)
+        id2idx = convert_to_tensor(id2idx)
+        self.node_labels = _build_features(node_label_data, id2idx, 0.0, \
+                                           None, None, False, None)
+      else:
+        self.node_labels = squeeze(convert_to_tensor(node_label_data))
 
   def init_node_split(
     self,
@@ -413,7 +436,7 @@ class Dataset(object):
     return None
 
   def get_node_label(self, ntype: Optional[NodeType] = None):
-    if isinstance(self.node_labels, torch.Tensor):
+    if isinstance(self.node_labels, Feature) or isinstance(self.node_labels, torch.Tensor):
       return self.node_labels
     if isinstance(self.node_labels, dict):
       assert ntype is not None

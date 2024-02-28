@@ -20,7 +20,7 @@ import graphlearn_torch as glt
 
 
 def run_dist_feature_test(world_size: int, rank: int, feature: glt.data.Feature,
-                          partition_book: glt.PartitionBook, master_port: int):
+                          partition_book: glt.data.PartitionBook, master_port: int):
   glt.distributed.init_worker_group(world_size, rank, 'dist-feature-test')
   glt.distributed.init_rpc(master_addr='localhost', master_port=master_port)
 
