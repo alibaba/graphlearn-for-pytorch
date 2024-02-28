@@ -15,7 +15,6 @@
 
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
-
 import torch
 import numpy as np
 from enum import Enum

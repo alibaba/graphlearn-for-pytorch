@@ -24,7 +24,6 @@ from ..typing import (
 from ..partition import (
   PartitionBook, GLTPartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
-
 from ..utils import get_available_device, ensure_device
 
 from .rpc import (

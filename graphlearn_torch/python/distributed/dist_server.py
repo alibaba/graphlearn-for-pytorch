@@ -16,7 +16,7 @@
 import logging
 import time
 import threading
-from typing import Dict, Optional, Union, Callable
+from typing import Dict, Optional, Union
 import warnings
 
 from ..channel import ShmChannel, QueueTimeoutError

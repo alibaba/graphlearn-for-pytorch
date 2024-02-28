@@ -22,12 +22,13 @@ import torch
 
 from .. import py_graphlearn_torch as pywrap
 from ..channel import ChannelBase, SampleMessage
+from ..data import Feature
 from ..sampler import (
   NodeSamplerInput, EdgeSamplerInput,
   NeighborOutput, SamplerOutput, HeteroSamplerOutput,
   NeighborSampler
 )
-from ..typing import EdgeType, as_str, NumNeighbors, reverse_edge_type
+from ..typing import EdgeType, as_str, NumNeighbors, reverse_edge_type, TensorDataType
 from ..utils import (
     get_available_device, ensure_device, merge_dict, id2idx,
     merge_hetero_sampler_output, format_hetero_sampler_output, count_dict
@@ -166,15 +167,25 @@ class DistNeighborSampler(ConcurrentEventLoop):
             data.edge_features, data.edge_feat_pb,
             local_only=False, rpc_router=self.rpc_router, device=self.device
           )
-
-      self.dist_node_labels = None
-      node_labels = self.data.get_node_label()
-      if node_labels is not None:
-        self.dist_node_labels = DistFeature(
-          self.data.num_partitions, self.data.partition_idx,
-          node_labels, self.data.node_feat_pb,
-          local_only=False, rpc_router=self.rpc_router, device=self.device
-        )
+      # dist_node_labels should is initialized as a DistFeature object in the v6d case
+      self.dist_node_labels = self.data.node_labels
+      if self.dist_graph.data_cls == 'homo':
+        if self.dist_node_labels is not None and \
+            not isinstance(self.dist_node_labels, TensorDataType):
+          self.dist_node_labels = DistFeature(
+            self.data.num_partitions, self.data.partition_idx,
+            self.dist_node_labels, self.data.node_feat_pb,
+            local_only=False, rpc_router=self.rpc_router, device=self.device
+          )
+      else:
+        assert isinstance(self.dist_node_labels, Dict)
+        if self.dist_node_labels is not None and \
+            all(isinstance(value, Feature) for value in self.dist_node_labels.values()):
+          self.dist_node_labels = DistFeature(
+            self.data.num_partitions, self.data.partition_idx,
+            self.data.node_labels, self.data.node_feat_pb,
+            local_only=False, rpc_router=self.rpc_router, device=self.device
+          )
     else:
       raise ValueError(f"'{self.__class__.__name__}': found invalid input "
                        f"data type '{type(data)}'")
@@ -697,10 +708,16 @@ class DistNeighborSampler(ConcurrentEventLoop):
       input_type = output.input_type
       assert input_type is not None
       if not isinstance(input_type, Tuple):
-        node_labels = self.data.get_node_label(input_type)
-        if node_labels is not None:
-          result_map[f'{as_str(input_type)}.nlabels'] = \
-            node_labels[output.node[input_type].to(node_labels.device)].T[0]
+        if self.dist_node_labels is not None:
+          if isinstance(self.dist_node_labels, DistFeature):
+            fut = self.dist_node_labels.async_get(output.node[input_type], input_type)
+            nlabels = await wrap_torch_future(fut)
+            result_map[f'{as_str(input_type)}.nlabels'] = nlabels.T[0]
+          else:
+            node_labels = self.dist_node_labels.get(ntype, None)
+            if node_labels is not None:
+              result_map[f'{as_str(input_type)}.nlabels'] = \
+                node_labels[output.node[input_type].to(node_labels.device)]
       # Collect node features.
       if self.dist_node_feature is not None:
         nfeat_fut_dict = {}
@@ -741,9 +758,13 @@ class DistNeighborSampler(ConcurrentEventLoop):
         result_map['eids'] = output.edge
       # Collect node labels.
       if self.dist_node_labels is not None:
-        fut = self.dist_node_labels.async_get(output.node)
-        nlabels = await wrap_torch_future(fut)
-        result_map['nlabels'] = nlabels.T[0]
+        if isinstance(self.dist_node_labels, DistFeature):
+          fut = self.dist_node_labels.async_get(output.node)
+          nlabels = await wrap_torch_future(fut)
+          result_map['nlabels'] = nlabels.T[0]
+        else:
+          result_map['nlabels'] = \
+            self.dist_node_labels[output.node.to(self.dist_node_labels.device)]
       # Collect node features.
       if self.dist_node_feature is not None:
         fut = self.dist_node_feature.async_get(output.node)

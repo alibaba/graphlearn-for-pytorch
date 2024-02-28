@@ -15,7 +15,6 @@
 
 from multiprocessing.reduction import ForkingPickler
 from typing import Dict, List, Optional, Union, Literal, Tuple, Callable
-from collections.abc import Sequence
 
 import torch
 
@@ -24,10 +23,7 @@ from ..partition import (
   load_partition, cat_feature_cache,
   PartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
-from ..typing import (
-  NodeType, EdgeType, TensorDataType, NodeLabel, NodeIndex,
-)
-
+from ..typing import (NodeType, EdgeType, NodeLabel, NodeIndex)
 from ..utils import share_memory, default_id_filter, default_id_select
 
 
@@ -181,7 +177,7 @@ class DistDataset(Dataset):
   def random_node_split(
     self,
     num_val: Union[float, int],
-    num_test: Union[float, int]
+    num_test: Union[float, int],
   ):
     r"""Performs a node-level random split by adding :obj:`train_idx`,
     :obj:`val_idx` and :obj:`test_idx` attributes to the

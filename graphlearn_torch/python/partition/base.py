@@ -16,8 +16,6 @@
 import os
 import pickle
 from abc import ABC, abstractmethod
-from threading import Thread
-from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch

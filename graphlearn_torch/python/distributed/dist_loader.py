@@ -289,6 +289,7 @@ class DistLoader(object):
       msg = self._channel.recv()
     else:
       msg = self._collocated_producer.sample()
+
     result = self._collate_fn(msg)
     self._num_recv += 1
     return result

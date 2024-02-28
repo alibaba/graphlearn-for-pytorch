@@ -15,7 +15,7 @@
 
 import logging
 from multiprocessing.reduction import ForkingPickler
-from typing import Dict, List, Optional, Union, Literal, Tuple, Callable
+from typing import Dict, List, Optional, Union, Literal, Tuple
 from collections.abc import Sequence
 
 import torch
@@ -165,7 +165,8 @@ class Dataset(object):
     # TODO(hongyi): GPU support
     is_homo = len(edges) == 1 and edges[0][0] == edges[0][2] 
     from .vineyard_utils import \
-      vineyard_to_csr, load_vertex_feature_from_vineyard, load_edge_feature_from_vineyard, VineyardGid2Lid
+      vineyard_to_csr, load_vertex_feature_from_vineyard, \
+      load_edge_feature_from_vineyard, VineyardGid2Lid
 
     _edge_index = {}
     _edge_ids = {}
@@ -173,22 +174,26 @@ class Dataset(object):
     layout = {}
     for etype in edges:
       src_ntype = etype[0] if self.edge_dir == "out" else etype[2]
-      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, vineyard_id, src_ntype, etype[1], self.edge_dir, True)
-      _edge_index[etype] = (indptr, indices) if self.edge_dir == "out" else (indices, indptr)
+      indptr, indices, edge_id = vineyard_to_csr(vineyard_socket, \
+        vineyard_id, src_ntype, etype[1], self.edge_dir, True)
+      _edge_index[etype] = (indptr, indices) if self.edge_dir == \
+        "out" else (indices, indptr)
       _edge_ids[etype] = edge_id
       layout[etype] = "CSR" if self.edge_dir == "out" else "CSC"
       if edge_weights:
         etype_edge_weights_label_name = edge_weights.get(etype)
         if etype_edge_weights_label_name: 
           _edge_weights[etype] = torch.squeeze(
-            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, [etype_edge_weights_label_name], etype[1]))
+            load_edge_feature_from_vineyard(vineyard_socket, vineyard_id, \
+              [etype_edge_weights_label_name], etype[1]))
     if is_homo:
       ntype = edges[0]
       _edge_index = _edge_index[ntype]
       _edge_ids = _edge_ids[ntype]
       _edge_weights =  _edge_weights.get(ntype)
       layout = "CSR" if self.edge_dir == "out" else "CSC"
-    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
+    self.init_graph(edge_index=_edge_index, edge_ids=_edge_ids, \
+                    layout=layout, graph_mode='CPU', edge_weights=_edge_weights)
 
     # load node features
     if node_features:
@@ -338,7 +343,7 @@ class Dataset(object):
   def init_node_labels(
     self,
     node_label_data: Union[TensorDataType, Dict[NodeType, TensorDataType]] = None,
-    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType],
+    id2idx: Union[TensorDataType, Dict[NodeType, TensorDataType], \
                   Sequence, Dict[NodeType, Sequence]] = None
   ):
     r""" Initialize the node label storage.
@@ -351,14 +356,15 @@ class Dataset(object):
         to local index, and should be None for GLT(none-v6d) graph. (default: ``None``) 
     """
     if node_label_data is not None:
-      self.node_labels = convert_to_tensor(node_label_data, dtype=torch.int64)
       # For v6d graph, label data are partitioned into different fragments, and are
       # handled in the same approach as distributed feature.
       if id2idx is not None:
+        node_label_data = convert_to_tensor(node_label_data, dtype=torch.int64)
         id2idx = convert_to_tensor(id2idx)
-        self.node_labels = _build_features(
-          self.node_labels, id2idx, 0.0, None, None, False, None
-        )
+        self.node_labels = _build_features(node_label_data, id2idx, 0.0, \
+                                           None, None, False, None)
+      else:
+        self.node_labels = squeeze(convert_to_tensor(node_label_data))
 
   def init_node_split(
     self,
@@ -430,20 +436,11 @@ class Dataset(object):
     return None
 
   def get_node_label(self, ntype: Optional[NodeType] = None):
-    if isinstance(self.node_labels, dict) and ntype is not None:
-      if isinstance(self.node_labels[ntype], torch.Tensor):
-        self.node_labels[ntype] = Feature(self.node_labels[ntype].reshape(-1,1),
-                                          dtype=self.node_labels[ntype].dtype)
-      return self.node_labels.get(ntype, None)
-    if isinstance(self.node_labels, Feature):
+    if isinstance(self.node_labels, Feature) or isinstance(self.node_labels, torch.Tensor):
       return self.node_labels
-    if isinstance(self.node_labels, torch.Tensor):
-      return Feature(self.node_labels.reshape(-1,1), dtype=self.node_labels.dtype)
     if isinstance(self.node_labels, dict):
-      for ntype, labels in self.node_labels.items():
-        if isinstance(labels, torch.Tensor):
-          self.node_labels[ntype] = Feature(labels.reshape(-1,1), dtype=labels.dtype)
-      return self.node_labels
+      assert ntype is not None
+      return self.node_labels.get(ntype, None)
     return None
 
   def __getitem__(self, key):

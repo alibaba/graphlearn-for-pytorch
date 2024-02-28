@@ -14,7 +14,7 @@
 # ==============================================================================
 
 import os
-from typing import List, Optional, Union, Literal, Callable
+from typing import List, Optional, Union, Literal
 
 import torch
 
