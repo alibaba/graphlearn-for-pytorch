@@ -171,7 +171,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
       self.dist_node_labels = self.data.node_labels
       if self.dist_graph.data_cls == 'homo':
         if self.dist_node_labels is not None and \
-            not isinstance(self.dist_node_labels, TensorDataType):
+            not isinstance(self.dist_node_labels, torch.Tensor):
           self.dist_node_labels = DistFeature(
             self.data.num_partitions, self.data.partition_idx,
             self.dist_node_labels, self.data.node_feat_pb,
