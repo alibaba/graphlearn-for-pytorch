@@ -627,6 +627,11 @@ class DistNeighborSampler(ConcurrentEventLoop):
     """
     device = self.device
     srcs = srcs.to(device)
+    if self.data.graph_caching:
+      nbr_out = None
+      if srcs is not None and srcs.numel() > 0:
+        nbr_out = self.sampler.sample_one_hop(srcs, num_nbr, etype)
+      return nbr_out
     orders = torch.arange(srcs.size(0), dtype=torch.long, device=device)
     if self.edge_dir == 'out':
       src_ntype = etype[0] if etype is not None else None

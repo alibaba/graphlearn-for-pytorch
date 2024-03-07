@@ -60,6 +60,7 @@ class DistDataset(Dataset):
     self.id_select = id_select
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
+    self.graph_caching = False
 
     self.node_pb = node_pb
     self.edge_pb = edge_pb
@@ -87,6 +88,7 @@ class DistDataset(Dataset):
     graph_mode: str = 'ZERO_COPY',
     input_layout: Literal['COO', 'CSR', 'CSC'] = 'COO',
     feature_with_gpu: bool = True,
+    graph_caching: bool = False,
     device_group_list: Optional[List[DeviceGroup]] = None,
     whole_node_label_file: Union[str, Dict[NodeType, str]] = None,
     device: Optional[int] = None
@@ -107,6 +109,8 @@ class DistDataset(Dataset):
         If True, it means ``Feature`` consists of ``UnifiedTensor``, otherwise
         ``Feature`` is a PyTorch CPU Tensor, the ``device_group_list`` and
         ``device`` will be invliad. (default: ``True``)
+      graph_caching (bool): A Boolean value indicating whether to load the full
+        graph totoploy instead of partitioned one.
       device_group_list (List[DeviceGroup], optional): A list of device groups
         used for feature lookups, the GPU part of feature data will be
         replicated on each device group in this list during the initialization.
@@ -126,7 +130,7 @@ class DistDataset(Dataset):
       edge_feat_data,
       self.node_pb,
       self.edge_pb
-    ) = load_partition(root_dir, partition_idx)
+    ) = load_partition(root_dir, partition_idx, graph_caching)
 
     # init graph partition
     if isinstance(graph_data, dict):
@@ -143,6 +147,7 @@ class DistDataset(Dataset):
       edge_weights = graph_data.weights
     self.init_graph(edge_index, edge_ids, edge_weights, layout=input_layout,
                     graph_mode=graph_mode, device=device)
+    self.graph_caching = graph_caching
 
     # load node feature partition
     if node_feat_data is not None:

@@ -31,6 +31,7 @@ def partition_dataset(src_path: str,
                       edge_assign_strategy: str='by_src',
                       use_label_2K: bool=False,
                       with_feature: bool=True,
+                      use_graph_caching: bool=False,
                       use_fp16: bool=False,
                       layout: Literal['CSC', 'CSR', 'COO'] = 'COO'):
   print(f'-- Loading igbh_{dataset_size} ...')
@@ -70,7 +71,7 @@ def partition_dataset(src_path: str,
     edge_assign_strategy=edge_assign_strategy,
     chunk_size=chunk_size,
   )
-  partitioner.partition(with_feature)
+  partitioner.partition(with_feature, graph_caching=use_graph_caching)
 
   if layout in ['CSC', 'CSR']:
     compress_edge_dict = {}
@@ -140,6 +141,8 @@ if __name__ == '__main__':
       help="edge assign strategy can be either 'by_src' or 'by_dst'")
   parser.add_argument('--with_feature', type=int, default=1,
       choices=[0, 1], help='0:do not partition feature, 1:partition feature')
+  parser.add_argument('--graph_caching', type=int, default=0,
+      choices=[0, 1], help='0:do not save full graph topology, 1:save full graph topology')
   parser.add_argument('--use_fp16', action="store_true",
       help="save partitioned node/edge feature into fp16 format")
   parser.add_argument("--layout", type=str, default='COO', 
@@ -157,6 +160,7 @@ if __name__ == '__main__':
     edge_assign_strategy=args.edge_assign_strategy,
     use_label_2K=args.num_classes==2983,
     with_feature=args.with_feature==1,
+    use_graph_caching=args.graph_caching,
     use_fp16=args.use_fp16,
     layout = args.layout
   )
