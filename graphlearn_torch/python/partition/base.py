@@ -111,13 +111,11 @@ def save_graph_cache(
   ensure_dir(subdir)
   rows = torch.cat([graph_partition.edge_index[0] for graph_partition in graph_partition_list])
   cols = torch.cat([graph_partition.edge_index[1] for graph_partition in graph_partition_list])
-  edge_ids = torch.cat([graph_partition.eids for graph_partition in graph_partition_list])
   weights = None
   if graph_partition_list[0].weights is not None:
     weights = torch.cat([graph_partition.weights for graph_partition in graph_partition_list])
   torch.save(rows, os.path.join(subdir, 'rows.pt'))
   torch.save(cols, os.path.join(subdir, 'cols.pt'))
-  torch.save(edge_ids, os.path.join(subdir, 'eids.pt'))
   if weights is not None:
     torch.save(weights, os.path.join(subdir, 'weights.pt'))
 
@@ -547,10 +545,10 @@ class PartitionerBase(ABC):
 
       for etype in self.edge_types:
         graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
-        save_edge_pb(self.output_dir, edge_pb, etype)
         if graph_caching:
           save_graph_cache(self.output_dir, graph_list, etype)
         else:
+          save_edge_pb(self.output_dir, edge_pb, etype)
           for pidx in range(self.num_parts):
             save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
           if with_feature:
@@ -709,8 +707,10 @@ def load_graph_partition_data(
                     map_location=device)
   cols = torch.load(os.path.join(graph_data_dir, 'cols.pt'),
                     map_location=device)
-  eids = torch.load(os.path.join(graph_data_dir, 'eids.pt'),
-                    map_location=device)
+  eids = None
+  eids_dir = os.path.join(graph_data_dir, 'eids.pt')
+  if os.path.exists(eids_dir):
+    eids = torch.load(eids_dir, eids_dir)
 
   if os.path.exists(os.path.join(graph_data_dir, 'weights.pt')):
     weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
