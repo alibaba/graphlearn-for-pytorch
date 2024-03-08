@@ -710,7 +710,7 @@ def load_graph_partition_data(
   eids = None
   eids_dir = os.path.join(graph_data_dir, 'eids.pt')
   if os.path.exists(eids_dir):
-    eids = torch.load(eids_dir, eids_dir)
+    eids = torch.load(eids_dir, map_location=device)
 
   if os.path.exists(os.path.join(graph_data_dir, 'weights.pt')):
     weights = torch.load(os.path.join(graph_data_dir, 'weights.pt'),
