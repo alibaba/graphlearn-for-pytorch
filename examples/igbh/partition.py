@@ -120,12 +120,12 @@ def partition_dataset(src_path: str,
 
     if use_graph_caching:
       base_path = osp.join(dst_path, f'{dataset_size}-partitions', 'graph')
-      convert_graph_layout(base_path, compress_edge_dict, layout, use_graph_caching)
+      convert_graph_layout(base_path, compress_edge_dict, layout)
 
     else:
       for pidx in range(num_partitions):
         base_path = osp.join(dst_path, f'{dataset_size}-partitions', f'part{pidx}', 'graph')
-        convert_graph_layout(base_path, compress_edge_dict, layout, use_graph_caching)
+        convert_graph_layout(base_path, compress_edge_dict, layout)
 
 if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')

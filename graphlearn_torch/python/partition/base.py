@@ -99,7 +99,8 @@ def save_edge_pb(
 def save_graph_cache(
   output_dir: str,
   graph_partition_list: List[GraphPartitionData],
-  etype: Optional[EdgeType] = None
+  etype: Optional[EdgeType] = None,
+  with_edge_feat: bool = False
 ):
   r""" Save full graph topology into the output directory.
   """
@@ -116,6 +117,9 @@ def save_graph_cache(
     weights = torch.cat([graph_partition.weights for graph_partition in graph_partition_list])
   torch.save(rows, os.path.join(subdir, 'rows.pt'))
   torch.save(cols, os.path.join(subdir, 'cols.pt'))
+  if with_edge_feat:
+    edge_ids = torch.cat([graph_partition.eids for graph_partition in graph_partition_list])
+    torch.save(edge_ids, os.path.join(subdir, 'eids.pt'))
   if weights is not None:
     torch.save(weights, os.path.join(subdir, 'weights.pt'))
 
@@ -545,14 +549,18 @@ class PartitionerBase(ABC):
 
       for etype in self.edge_types:
         graph_list, edge_pb = self._partition_graph(node_pb_dict, etype)
+        edge_feat = self.get_edge_feat(etype)
+        with_edge_feat = (edge_feat != None)
         if graph_caching:
-          save_graph_cache(self.output_dir, graph_list, etype)
+          if with_edge_feat:
+            save_edge_pb(self.output_dir, edge_pb, etype)
+          save_graph_cache(self.output_dir, graph_list, etype, with_edge_feat)
         else:
           save_edge_pb(self.output_dir, edge_pb, etype)
           for pidx in range(self.num_parts):
             save_graph_partition(self.output_dir, pidx, graph_list[pidx], etype)
-          if with_feature:
-            self._partition_and_save_edge_feat(graph_list, etype)
+        if with_feature:
+          self._partition_and_save_edge_feat(graph_list, etype)
 
     else:
       node_ids_list, node_pb = self._partition_node()
@@ -561,14 +569,19 @@ class PartitionerBase(ABC):
         self._partition_and_save_node_feat(node_ids_list)
 
       graph_list, edge_pb = self._partition_graph(node_pb)
-      save_edge_pb(self.output_dir, edge_pb)
+      edge_feat = self.get_edge_feat()
+      with_edge_feat = (edge_feat != None)
+
       if graph_caching:
-        save_graph_cache(self.output_dir, graph_list)
+        if with_edge_feat:
+          save_edge_pb(self.output_dir, edge_pb)
+        save_graph_cache(self.output_dir, graph_list, with_edge_feat)
       else:
+        save_edge_pb(self.output_dir, edge_pb)
         for pidx in range(self.num_parts):
           save_graph_partition(self.output_dir, pidx, graph_list[pidx])
-        if with_feature:
-          self._partition_and_save_edge_feat(graph_list)
+      if with_feature:
+        self._partition_and_save_edge_feat(graph_list)
 
     # save meta.
     save_meta(self.output_dir, self.num_parts, self.data_cls,
@@ -843,13 +856,12 @@ def load_partition(
       os.path.join(node_pb_dir, f'{as_str(ntype)}.pt'), map_location=device)
 
   edge_pb_dict = {}
-  if not graph_caching:
-    edge_pb_dir = os.path.join(root_dir, 'edge_pb')
-    for etype in meta['edge_types']:
-      edge_pb_file = os.path.join(edge_pb_dir, f'{as_str(etype)}.pt')
-      if os.path.exists(edge_pb_file):
-        edge_pb_dict[etype] = torch.load(
-          edge_pb_file, map_location=device)
+  edge_pb_dir = os.path.join(root_dir, 'edge_pb')
+  for etype in meta['edge_types']:
+    edge_pb_file = os.path.join(edge_pb_dir, f'{as_str(etype)}.pt')
+    if os.path.exists(edge_pb_file):
+      edge_pb_dict[etype] = torch.load(
+        edge_pb_file, map_location=device)
 
   return (
     num_partitions, partition_idx,
