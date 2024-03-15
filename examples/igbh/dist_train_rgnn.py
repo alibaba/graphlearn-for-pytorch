@@ -404,6 +404,8 @@ if __name__ == '__main__':
       help="use trim_to_layer function from PyG")
   parser.add_argument("--use_fp16", action="store_true",
       help="load node/edge feature using fp16 format to reduce memory usage")
+  parser.add_argument("--graph_caching", action="store_true",
+      help="load the full graph topology for each partition"),
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
@@ -445,6 +447,7 @@ if __name__ == '__main__':
     graph_mode='ZERO_COPY' if args.with_gpu else 'CPU',
     input_layout = args.layout,
     feature_with_gpu=args.with_gpu,
+    graph_caching = args.graph_caching,
     whole_node_label_file={'paper': osp.join(args.path, f'{args.dataset_size}-label', 'label.pt')}
   )
   train_idx = torch.load(
