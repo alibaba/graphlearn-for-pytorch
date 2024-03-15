@@ -843,12 +843,13 @@ def load_partition(
       os.path.join(node_pb_dir, f'{as_str(ntype)}.pt'), map_location=device)
 
   edge_pb_dict = {}
-  edge_pb_dir = os.path.join(root_dir, 'edge_pb')
-  for etype in meta['edge_types']:
-    edge_pb_file = os.path.join(edge_pb_dir, f'{as_str(etype)}.pt')
-    if os.path.exists(edge_pb_file):
-      edge_pb_dict[etype] = torch.load(
-        edge_pb_file, map_location=device)
+  if not graph_caching:
+    edge_pb_dir = os.path.join(root_dir, 'edge_pb')
+    for etype in meta['edge_types']:
+      edge_pb_file = os.path.join(edge_pb_dir, f'{as_str(etype)}.pt')
+      if os.path.exists(edge_pb_file):
+        edge_pb_dict[etype] = torch.load(
+          edge_pb_file, map_location=device)
 
   return (
     num_partitions, partition_idx,

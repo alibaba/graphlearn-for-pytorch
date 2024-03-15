@@ -22,6 +22,37 @@ import torch
 from dataset import IGBHeteroDataset
 from typing import Literal
 
+def convert_graph_layout(base_path: str,
+                         edge_dict: dict,
+                         layout: str):
+  device = torch.device('cpu')
+  graph_dict = {}
+  for etype, e_path in edge_dict.items():
+    graph = glt.partition.base.load_graph_partition_data(osp.join(base_path, e_path), device)
+    if graph != None:
+      graph_dict[etype] = graph
+
+    edge_dir = 'out' if layout == 'CSR' else 'in'
+    dataset = glt.distributed.DistDataset(edge_dir=edge_dir)
+    edge_index, edge_ids, edge_weights = {}, {}, {}
+    for k, v in graph_dict.items():
+      edge_index[k] = v.edge_index
+      edge_weights[k] = v.weights
+      edge_ids[k] = v.eids
+    # COO is the original layout of raw igbh graph
+    dataset.init_graph(edge_index, edge_ids, edge_weights, layout='COO',
+      graph_mode='CPU', device=device)
+    for etype in graph_dict:
+      graph = dataset.get_graph(etype)
+      indptr, indices, _ = graph.export_topology()
+      path = osp.join(base_path, edge_dict[etype])
+      if layout == 'CSR':
+        torch.save(indptr, osp.join(path, 'rows.pt'))
+        torch.save(indices, osp.join(path, 'cols.pt'))
+      else:
+        torch.save(indptr, osp.join(path, 'cols.pt'))
+        torch.save(indices, osp.join(path, 'rows.pt'))
+
 def partition_dataset(src_path: str,
                       dst_path: str,
                       num_partitions: int,
@@ -87,36 +118,14 @@ def partition_dataset(src_path: str,
     compress_edge_dict[('journal', 'rev_published', 'paper')] = 'journal__rev_published__paper'
     compress_edge_dict[('conference', 'rev_venue', 'paper')] = 'conference__rev_venue__paper'
 
-    for pidx in range(num_partitions):
-      base_path = osp.join(dst_path, f'{dataset_size}-partitions', f'part{pidx}', 'graph')
-      device = torch.device('cpu')
-      graph_dict = {}
-      for etype, e_path in compress_edge_dict.items():
-        graph = glt.partition.base.load_graph_partition_data(osp.join(base_path, e_path), device)
-        if graph != None:
-          graph_dict[etype] = graph
-      
-      edge_dir = 'out' if layout == 'CSR' else 'in'
-      dataset = glt.distributed.DistDataset(edge_dir=edge_dir)
-      edge_index, edge_ids, edge_weights = {}, {}, {}
-      for k, v in graph_dict.items():
-        edge_index[k] = v.edge_index
-        edge_ids[k] = v.eids
-        edge_weights[k] = v.weights 
-      # COO is the oroginal layout of raw igbh graph
-      dataset.init_graph(edge_index, edge_ids, edge_weights, layout='COO',
-        graph_mode='CPU', device=device)
+    if use_graph_caching:
+      base_path = osp.join(dst_path, f'{dataset_size}-partitions', 'graph')
+      convert_graph_layout(base_path, compress_edge_dict, layout, use_graph_caching)
 
-      for etype in graph_dict:
-        graph = dataset.get_graph(etype)
-        indptr, indices, _ = graph.export_topology()
-        path = osp.join(base_path, compress_edge_dict[etype])
-        if layout == 'CSR':
-          torch.save(indptr, osp.join(path, 'rows.pt'))
-          torch.save(indices, osp.join(path, 'cols.pt'))
-        else:
-          torch.save(indptr, osp.join(path, 'cols.pt'))
-          torch.save(indices, osp.join(path, 'rows.pt'))
+    else:
+      for pidx in range(num_partitions):
+        base_path = osp.join(dst_path, f'{dataset_size}-partitions', f'part{pidx}', 'graph')
+        convert_graph_layout(base_path, compress_edge_dict, layout, use_graph_caching)
 
 if __name__ == '__main__':
   root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.realpath(__file__)))), 'data', 'igbh')
