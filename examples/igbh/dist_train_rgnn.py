@@ -31,7 +31,7 @@ from rgnn import RGNN
 
 mllogger = get_mlperf_logger(path=osp.dirname(osp.abspath(__file__)))
 
-def evaluate(model, dataloader, current_device, dtype, with_gpu,
+def evaluate(model, dataloader, current_device, with_gpu,
              rank, world_size, epoch_num):
   if rank == 0:
     mllogger.start(
@@ -47,7 +47,7 @@ def evaluate(model, dataloader, current_device, dtype, with_gpu,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
-      out = out.to(dtype)
+      out = out.to(torch.float32)
       batch_size = min(out.shape[0], batch_size)
       labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
       predictions.append(out.argmax(1).cpu().clone().numpy())
@@ -282,7 +282,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         epoch_num = epoch + idx / batch_num
         model.eval()
         rank_val_acc, global_acc = evaluate(model, val_loader, current_device,
-                                            dtype, with_gpu, rank, 
+                                            with_gpu, rank,
                                             world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
           is_success = True
@@ -309,8 +309,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       epoch_num = epoch + 1
       model.eval()
       rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
-                                          dtype, with_gpu, rank, world_size,
-                                          epoch_num)
+                                          with_gpu, rank, world_size, epoch_num)
       if validation_acc is not None and global_acc >= validation_acc:
         is_success = True
     
@@ -400,7 +399,7 @@ if __name__ == '__main__':
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
       help="use trim_to_layer function from PyG")
-  parser.add_argument("--precision", type=str, default="fp32",
+  parser.add_argument("--precision", type=str, default='fp32',
       choices=['fp32', 'fp16', 'bf16'], help="Precision to train the model")
   parser.add_argument("--graph_caching", action="store_true",
       help="load the full graph topology for each partition"),
