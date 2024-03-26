@@ -31,7 +31,7 @@ from rgnn import RGNN
 
 mllogger = get_mlperf_logger(path=osp.dirname(osp.abspath(__file__)))
 
-def evaluate(model, dataloader, current_device, use_fp16, with_gpu, 
+def evaluate(model, dataloader, current_device, with_gpu,
              rank, world_size, epoch_num):
   if rank == 0:
     mllogger.start(
@@ -43,16 +43,11 @@ def evaluate(model, dataloader, current_device, use_fp16, with_gpu,
   with torch.no_grad():
     for batch in tqdm.tqdm(dataloader):
       batch_size = batch['paper'].batch_size
-      if use_fp16:
-        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
-                  for node_name, node_feat in batch.x_dict.items()}
-      else:
-        x_dict = {node_name: node_feat.to(current_device)
-                  for node_name, node_feat in batch.x_dict.items()}
-      out = model(x_dict,
+      out = model(batch.x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      out = out.to(torch.float32)
       batch_size = min(out.shape[0], batch_size)
       labels.append(batch['paper'].y[:batch_size].cpu().clone().numpy())
       predictions.append(out.argmax(1).cpu().clone().numpy())
@@ -92,13 +87,19 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     training_pg_master_port,
     train_loader_master_port,
     val_loader_master_port,
-    with_gpu, trim_to_layer, use_fp16,
+    with_gpu, trim_to_layer, precision,
     edge_dir, rpc_timeout,
     validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end, 
     checkpoint_on_epoch_end, ckpt_steps, ckpt_path):
 
   world_size=num_nodes*num_training_procs
   rank=node_rank*num_training_procs+local_proc_rank
+  dtype = torch.float32
+  if precision == "bf16":
+    dtype = torch.bfloat16
+  elif precision == "fp16":
+    dtype = torch.float16
+
   if rank == 0:
     if ckpt_steps > 0:
       ckpt_dir = create_ckpt_folder(base_dir=osp.dirname(osp.abspath(__file__)))
@@ -208,6 +209,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
                with_trim=trim_to_layer).to(current_device)
   if ckpt is not None:
     model.load_state_dict(ckpt['model_state_dict'])
+  model = model.to(current_device, dtype=dtype)
   model = DistributedDataParallel(model,
                                   device_ids=[current_device.index] if with_gpu else None,
                                   find_unused_parameters=True)
@@ -242,19 +244,15 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     for batch in tqdm.tqdm(train_loader):
       idx += 1
       batch_size = batch['paper'].batch_size
-      if use_fp16:
-        x_dict = {node_name: node_feat.to(current_device).to(torch.float32)
-                  for node_name,node_feat in batch.x_dict.items()}
-      else:
-        x_dict = {node_name: node_feat.to(current_device)
-                  for node_name,node_feat in batch.x_dict.items()}
-      out = model(x_dict,
+      out = model(batch.x_dict,
                   batch.edge_index_dict,
                   num_sampled_nodes_dict=batch.num_sampled_nodes,
                   num_sampled_edges_dict=batch.num_sampled_edges)[:batch_size]
+      out = out.to(torch.float32)
       batch_size = min(batch_size, out.shape[0])
       y = batch['paper'].y[:batch_size]
       loss = loss_fcn(out, y)
+      loss = loss.to(dtype)
       optimizer.zero_grad()
       loss.backward()
       optimizer.step()
@@ -283,8 +281,8 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
         torch.distributed.barrier()
         epoch_num = epoch + idx / batch_num
         model.eval()
-        rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
-                                            use_fp16, with_gpu, rank, 
+        rank_val_acc, global_acc = evaluate(model, val_loader, current_device,
+                                            with_gpu, rank,
                                             world_size, epoch_num)
         if validation_acc is not None and global_acc >= validation_acc:
           is_success = True
@@ -311,8 +309,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       epoch_num = epoch + 1
       model.eval()
       rank_val_acc, global_acc = evaluate(model, val_loader, current_device, 
-                                          use_fp16, with_gpu, rank, world_size, 
-                                          epoch_num)
+                                          with_gpu, rank, world_size, epoch_num)
       if validation_acc is not None and global_acc >= validation_acc:
         is_success = True
     
@@ -402,8 +399,8 @@ if __name__ == '__main__':
       help="Use seperate GPUs for training and sampling processes.")
   parser.add_argument("--with_trim", action="store_true",
       help="use trim_to_layer function from PyG")
-  parser.add_argument("--use_fp16", action="store_true",
-      help="load node/edge feature using fp16 format to reduce memory usage")
+  parser.add_argument("--precision", type=str, default='fp32',
+      choices=['fp32', 'fp16', 'bf16'], help="Precision to train the model")
   parser.add_argument("--graph_caching", action="store_true",
       help="load the full graph topology for each partition"),
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
@@ -476,7 +473,7 @@ if __name__ == '__main__':
           args.val_loader_master_port,
           args.with_gpu,
           args.with_trim,
-          args.use_fp16,
+          args.precision,
           args.edge_dir,
           args.rpc_timeout,
           args.validation_acc, 

@@ -63,9 +63,12 @@ def partition_dataset(src_path: str,
                       use_label_2K: bool=False,
                       with_feature: bool=True,
                       use_graph_caching: bool=False,
-                      use_fp16: bool=False,
+                      data_type: str="fp32",
                       layout: Literal['CSC', 'CSR', 'COO'] = 'COO'):
   print(f'-- Loading igbh_{dataset_size} ...')
+  use_fp16 = False
+  if data_type == "fp16":
+    use_fp16 = True
   data = IGBHeteroDataset(src_path, dataset_size, in_memory, use_label_2K, use_fp16=use_fp16)
   node_num = {k : v.shape[0] for k, v in data.feat_dict.items()}
 
@@ -91,6 +94,11 @@ def partition_dataset(src_path: str,
     torch.save(val_idx[pidx], osp.join(val_idx_partitions_dir, f'partition{pidx}.pt'))
 
   print('-- Partitioning graph and features ...')
+  feat_precision = torch.float32
+  if data_type == 'fp16':
+    feat_precision = torch.float16
+  elif data_type == 'bf16':
+    feat_precision = torch.bfloat16
   partitions_dir = osp.join(dst_path, f'{dataset_size}-partitions')
   partitioner = glt.partition.RandomPartitioner(
     output_dir=partitions_dir,
@@ -98,7 +106,7 @@ def partition_dataset(src_path: str,
     num_nodes=node_num,
     edge_index=data.edge_dict,
     node_feat=data.feat_dict,
-    node_feat_dtype = torch.float16 if use_fp16 else torch.float32,
+    node_feat_dtype = feat_precision,
     edge_assign_strategy=edge_assign_strategy,
     chunk_size=chunk_size,
   )
@@ -152,8 +160,8 @@ if __name__ == '__main__':
       choices=[0, 1], help='0:do not partition feature, 1:partition feature')
   parser.add_argument('--graph_caching', type=int, default=0,
       choices=[0, 1], help='0:do not save full graph topology, 1:save full graph topology')
-  parser.add_argument('--use_fp16', action="store_true",
-      help="save partitioned node/edge feature into fp16 format")
+  parser.add_argument("--data_precision", type=str, default='fp32',
+      choices=['fp32', 'fp16', 'bf16'], help="data precision for node feature")
   parser.add_argument("--layout", type=str, default='COO', 
       help="layout of the partitioned graph: CSC, CSR, COO")
 
@@ -170,6 +178,6 @@ if __name__ == '__main__':
     use_label_2K=args.num_classes==2983,
     with_feature=args.with_feature==1,
     use_graph_caching=args.graph_caching,
-    use_fp16=args.use_fp16,
+    data_type=args.data_precision,
     layout = args.layout
   )
