@@ -340,7 +340,8 @@ class DistCollocatedSamplingProducer(object):
       self.sampling_config.with_edge, self.sampling_config.with_neg,
       self.sampling_config.with_weight,
       self.sampling_config.edge_dir, self.sampling_config.collect_features,
-      channel=None, concurrency=1, device=self.device, 
+      channel=None, use_all2all=self.worker_options.use_all2all,
+      concurrency=1, device=self.device,
       seed=self.sampling_config.seed
     )
     self._collocated_sampler.start_loop()
