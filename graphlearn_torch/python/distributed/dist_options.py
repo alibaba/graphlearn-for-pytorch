@@ -129,6 +129,8 @@ class CollocatedDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       each sampling worker. (default: ``None``).
     rpc_timeout (float): The timeout in seconds for rpc requests.
       (default: ``180``).
+    use_all2all (bool): Whether use all2all to collect distributed node/edge 
+      feature instead of through p2p rpc. (deafult: ``False``).
 
   Please ref to ``_BasicDistSamplingWorkerOptions`` for more detailed comments
   of related input arguments.
@@ -137,9 +139,11 @@ class CollocatedDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                master_addr: Optional[str] = None,
                master_port: Optional[Union[str, int]] = None,
                num_rpc_threads: Optional[int] = None,
-               rpc_timeout: float = 180):
+               rpc_timeout: float = 180,
+               use_all2all: bool = False):
     super().__init__(1, None, 1, master_addr, master_port,
                      num_rpc_threads, rpc_timeout)
+    self.use_all2all = use_all2all
 
 
 class MpDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
@@ -172,6 +176,8 @@ class MpDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
     pin_memory (bool): Set to ``True`` to register the underlying shared memory
       for cuda, which will achieve better performance if you want to copy
       loaded data from channel to cuda device. (default: ``False``).
+    use_all2all (bool): Whether use all2all to collect distributed node/edge 
+      feature instead of through p2p rpc. (deafult: ``False``).
 
   Please ref to ``_BasicDistSamplingWorkerOptions`` for more detailed comments
   of related input arguments.
@@ -185,7 +191,8 @@ class MpDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                num_rpc_threads: Optional[int] = None,
                rpc_timeout: float = 180,
                channel_size: Optional[Union[int, str]] = None,
-               pin_memory: bool = False):
+               pin_memory: bool = False,
+               use_all2all: bool = False):
     super().__init__(num_workers, worker_devices, worker_concurrency,
                      master_addr, master_port, num_rpc_threads, rpc_timeout)
 
@@ -197,6 +204,7 @@ class MpDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
       self.channel_size = channel_size
 
     self.pin_memory = pin_memory
+    self.use_all2all = use_all2all
 
 
 class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):

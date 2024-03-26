@@ -16,7 +16,7 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
-
+import torch.distributed as dist
 from ..data import Feature
 from ..typing import (
   EdgeType, NodeType,
@@ -37,6 +37,19 @@ from .rpc import (
 # node ids.
 PartialFeature = Tuple[torch.Tensor, torch.Tensor]
 
+
+def communicate_node_num(send_tensor):
+    if not torch.is_tensor(send_tensor):
+        send_tensor = torch.tensor(send_tensor, dtype=torch.int64)
+        recv_tensor = torch.zeros(send_tensor.shape[0], dtype=torch.int64)
+    else:
+        recv_tensor = torch.zeros(send_tensor.shape[0], dtype=send_tensor.dtype)
+    scount = [1 for i in range(send_tensor.shape[0])]
+    rcount = [1 for i in range(send_tensor.shape[0])]
+    sync_req = dist.all_to_all_single(recv_tensor, send_tensor, rcount, scount, async_op=True)
+    sync_req.wait()
+    dist.barrier()
+    return send_tensor, recv_tensor
 
 class RpcFeatureLookupCallee(RpcCalleeBase):
   r""" A wrapper for rpc callee that will perform feature lookup from
@@ -140,6 +153,18 @@ class DistFeature(object):
     # TODO: check performance with `return feat[ids].cpu()`
     return feat.cpu_get(ids)
 
+  def get_all2all (
+    self,
+    ids: torch.Tensor,
+    input_type: Optional[Union[NodeType, EdgeType]] = None
+  ) -> torch.tensor:
+    r""" Lookup features synchronously using torch.distributed.all_to_all.
+    """
+    local_feature = self._local_selecting_get(ids, input_type)
+    remote_fut_list = self.remote_selecting_get_all2all(ids, input_type)
+    result = self._stitch(ids, local_feature, remote_fut_list)
+    return result
+
   def async_get(
     self,
     ids: torch.Tensor,
@@ -202,6 +227,68 @@ class DistFeature(object):
     local_ids = torch.masked_select(ids, local_mask)
     local_index = torch.masked_select(input_order, local_mask)
     return feat[local_ids], local_index
+
+  def remote_selecting_get_all2all(
+    self,
+    ids: torch.Tensor,
+    input_type: Optional[Union[NodeType, EdgeType]] = None
+  ) -> torch.Tensor:
+    feat, pb = self._get_local_store(input_type)
+    input_order= torch.arange(ids.size(0),
+                              dtype=torch.long,
+                              device=self.device)
+    partition_ids = pb[ids.to(pb.device)].to(self.device)
+    ids = ids.to(self.device)
+    send_remote_count = []
+    send_ids = []
+    offset = 0
+    indexes = {}
+    for pidx in range(0, self.num_partitions):
+      if pidx == self.partition_idx:
+        send_remote_count.append(0)
+      else:
+        remote_mask = (partition_ids == pidx)
+        remote_ids = torch.masked_select(ids, remote_mask)
+        indexes[pidx] = torch.masked_select(input_order, remote_mask)
+        ssize = remote_ids.numel()
+        send_ids[offset: offset + ssize] = remote_ids.tolist()
+        send_remote_count.append(remote_ids.numel())
+        offset = offset + ssize
+    assert len(send_ids) == sum(send_remote_count)
+    send_sr, recv_sr = communicate_node_num(send_remote_count)
+    tsend, trecv = sum(send_sr), sum(recv_sr)
+    self.recv_rn_count = []
+    for pidx in range(self.num_partitions):
+      self.recv_rn_count.append(int(recv_sr[pidx]))
+    self.recv_rn_gnid = torch.zeros(trecv, dtype=ids.dtype)
+    req = dist.all_to_all_single(self.recv_rn_gnid, torch.tensor(send_ids),
+                                 self.recv_rn_count, send_remote_count,
+                                 async_op=True)
+    req.wait()
+    dist.barrier()
+    r_feats = feat[self.recv_rn_gnid]
+    feat_size = r_feats.shape[1]
+    send_count = []
+    recv_count = []
+    for np in range(self.num_partitions):
+      ele = self.recv_rn_count[np]
+      send_count.append(ele)
+      recv_count.append(send_remote_count[np])
+
+    recv_feats = torch.zeros((sum(recv_count), feat_size), dtype=r_feats.dtype)
+    req = dist.all_to_all_single(recv_feats, r_feats,
+                                 recv_count, send_count,
+                                 async_op=True)
+    req.wait()
+    dist.barrier()
+    recv_feat_list = torch.split(recv_feats, recv_count, dim = 0)
+    remote_feat_list = []
+    for np in range(self.num_partitions):
+      if np == self.partition_idx:
+        continue
+      else:
+        remote_feat_list.append((recv_feat_list[np], indexes[np]))
+    return remote_feat_list
 
   def _remote_selecting_get(
     self,

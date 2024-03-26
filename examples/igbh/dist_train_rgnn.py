@@ -92,7 +92,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
     training_pg_master_port,
     train_loader_master_port,
     val_loader_master_port,
-    with_gpu, trim_to_layer, use_fp16,
+    with_gpu, trim_to_layer, use_fp16, use_all2all,
     edge_dir, rpc_timeout,
     validation_acc, validation_frac_within_epoch, evaluate_on_epoch_end, 
     checkpoint_on_epoch_end, ckpt_steps, ckpt_path):
@@ -154,6 +154,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       master_port=train_loader_master_port,
       channel_size=train_channel_size,
       pin_memory=True,
+      use_all2all=use_all2all,
       rpc_timeout=rpc_timeout,
       num_rpc_threads=2
     )
@@ -179,6 +180,7 @@ def run_training_proc(local_proc_rank, num_nodes, node_rank, num_training_procs,
       master_port=val_loader_master_port,
       channel_size=val_channel_size,
       pin_memory=True,
+      use_all2all=use_all2all,
       rpc_timeout=rpc_timeout,
       num_rpc_threads=2
     )
@@ -406,6 +408,8 @@ if __name__ == '__main__':
       help="load node/edge feature using fp16 format to reduce memory usage")
   parser.add_argument("--graph_caching", action="store_true",
       help="load the full graph topology for each partition"),
+  parser.add_argument("--use_all2all", action="store_true",
+      help="using all2all for cross node feature collection instead of p2p rpc"),
   parser.add_argument("--validation_frac_within_epoch", type=float, default=0.05,
       help="Fraction of the epoch after which validation should be performed.")
   parser.add_argument("--validation_acc", type=float, default=0.72,
@@ -440,7 +444,7 @@ if __name__ == '__main__':
 
   print('--- Loading data partition ...\n')
   data_pidx = args.node_rank % args.num_nodes
-  dataset = glt.distributed.DistDataset(edge_dir=args.edge_dir)
+  dataset = glt.distributed.DistDataset(edge_dir=args.edge_dir, graph_caching=args.graph_caching)
   dataset.load(
     root_dir=osp.join(args.path, f'{args.dataset_size}-partitions'),
     partition_idx=data_pidx,
@@ -477,6 +481,7 @@ if __name__ == '__main__':
           args.with_gpu,
           args.with_trim,
           args.use_fp16,
+          args.use_all2all,
           args.edge_dir,
           args.rpc_timeout,
           args.validation_acc, 

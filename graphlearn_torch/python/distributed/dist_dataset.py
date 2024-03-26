@@ -44,6 +44,7 @@ class DistDataset(Dataset):
     node_feat_pb: Union[PartitionBook, HeteroNodePartitionDict] = None,
     edge_feat_pb: Union[PartitionBook, HeteroEdgePartitionDict] = None,
     edge_dir: Literal['in', 'out'] = 'out',
+    graph_caching: bool = False,
     node_split: Tuple[NodeIndex, NodeIndex, NodeIndex] = None,
     id_filter: Callable = default_id_filter,
     id_select: Callable = default_id_select
@@ -60,7 +61,7 @@ class DistDataset(Dataset):
     self.id_select = id_select
     self.num_partitions = num_partitions
     self.partition_idx = partition_idx
-    self.graph_caching = False
+    self.graph_caching = graph_caching
 
     self.node_pb = node_pb
     self.edge_pb = edge_pb
