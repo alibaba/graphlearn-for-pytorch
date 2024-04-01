@@ -735,9 +735,12 @@ class DistNeighborSampler(ConcurrentEventLoop):
       # Collect node features.
       if self.dist_node_feature is not None:
         nfeat_fut_dict = {}
-        sorted_ntype = sorted(output.node.keys())
+        sorted_ntype = sorted(self.dist_node_feature.feature_pb.keys())
         for ntype in sorted_ntype:
-          nodes = output.node[ntype].to(torch.long)
+          nodes = output.node.get(ntype)
+          if nodes is None:
+            continue
+          nodes = nodes.to(torch.long)
           if self.use_all2all:
             nfeat_fut_dict[ntype] = self.dist_node_feature.get_all2all(nodes, ntype)
           else:
