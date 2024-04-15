@@ -734,21 +734,17 @@ class DistNeighborSampler(ConcurrentEventLoop):
                 node_labels[output.node[input_type].to(node_labels.device)]
       # Collect node features.
       if self.dist_node_feature is not None:
-        nfeat_fut_dict = {}
-        sorted_ntype = sorted(self.dist_node_feature.feature_pb.keys())
-        for ntype in sorted_ntype:
-          nodes = output.node.get(ntype)
-          if nodes is None:
-            continue
-          nodes = nodes.to(torch.long)
-          if self.use_all2all:
-            nfeat_fut_dict[ntype] = self.dist_node_feature.get_all2all(nodes, ntype)
-          else:
+        if self.use_all2all:
+          sorted_ntype = sorted(self.dist_node_feature.feature_pb.keys())
+          nfeat_dict = self.dist_node_feature.get_all2all(output, sorted_ntype)
+          for ntype, nfeats in nfeat_dict.items():
+            result_map[f'{as_str(ntype)}.nfeats'] = nfeats
+        else:
+          nfeat_fut_dict = {}
+          for ntype, nodes in output.node.items():
+            nodes = nodes.to(torch.long)
             nfeat_fut_dict[ntype] = self.dist_node_feature.async_get(nodes, ntype)
-        for ntype, fut in nfeat_fut_dict.items():
-          if self.use_all2all:
-            result_map[f'{as_str(ntype)}.nfeats'] = nfeat_fut_dict[ntype]
-          else:
+          for ntype, fut in nfeat_fut_dict.items():
             nfeats = await wrap_torch_future(fut)
             result_map[f'{as_str(ntype)}.nfeats'] = nfeats
       # Collect edge features

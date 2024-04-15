@@ -21,6 +21,9 @@ from ..data import Feature
 from ..typing import (
   EdgeType, NodeType,
 )
+from ..sampler import (
+  SamplerOutput, HeteroSamplerOutput,
+)
 from ..partition import (
   PartitionBook, GLTPartitionBook, HeteroNodePartitionDict, HeteroEdgePartitionDict
 )
@@ -155,15 +158,20 @@ class DistFeature(object):
 
   def get_all2all (
     self,
-    ids: torch.Tensor,
-    input_type: Optional[Union[NodeType, EdgeType]] = None
-  ) -> torch.tensor:
+    sampler_result: Union[SamplerOutput, HeteroSamplerOutput],
+    ntype_list: List[NodeType]
+  ) -> Dict[NodeType, torch.tensor]:
     r""" Lookup features synchronously using torch.distributed.all_to_all.
     """
-    local_feature = self._local_selecting_get(ids, input_type)
-    remote_fut_list = self.remote_selecting_get_all2all(ids, input_type)
-    result = self._stitch(ids, local_feature, remote_fut_list)
-    return result
+    remote_feats_dict = self.remote_selecting_get_all2all(sampler_result, ntype_list)
+    feat_dict = {}
+    for ntype, nodes in sampler_result.node.items():
+      nodes = nodes.to(torch.long)
+      local_feat = self._local_selecting_get(nodes, ntype)
+      remote_feats = remote_feats_dict.get(ntype, None)
+      feat_dict[ntype] = self._stitch(nodes, local_feat, remote_feats)
+
+    return feat_dict
 
   def async_get(
     self,
@@ -228,67 +236,141 @@ class DistFeature(object):
     local_index = torch.masked_select(input_order, local_mask)
     return feat[local_ids], local_index
 
-  def remote_selecting_get_all2all(
+  def remote_selecting_prepare(
     self,
-    ids: torch.Tensor,
-    input_type: Optional[Union[NodeType, EdgeType]] = None
-  ) -> torch.Tensor:
-    feat, pb = self._get_local_store(input_type)
-    input_order= torch.arange(ids.size(0),
-                              dtype=torch.long,
-                              device=self.device)
-    partition_ids = pb[ids.to(pb.device)].to(self.device)
-    ids = ids.to(self.device)
-    send_remote_count = []
-    send_ids = []
+    sampler_result: Union[SamplerOutput, HeteroSamplerOutput],
+    ntype_list: List[NodeType]
+  ):
+    rfeat_recv_dict = {}
+    rfeat_send_dict = {}
+    for ntype in ntype_list:
+      ids = sampler_result.node.get(ntype, None)
+      if ids is None:
+        send_remote_count = torch.zeros(self.num_partitions, dtype=torch.int64)
+      else:
+        ids = ids.to(torch.long)
+        _, pb = self._get_local_store(ntype)
+        ids = ids.to(self.device)
+        partition_ids = pb[ids.to(pb.device)].to(self.device)
+        send_remote_count = []
+        for pidx in range(0, self.num_partitions):
+          if pidx == self.partition_idx:
+            send_remote_count.append(0)
+          else:
+            remote_mask = (partition_ids == pidx)
+            remote_ids = torch.masked_select(ids, remote_mask)
+            ssize = remote_ids.numel()
+            send_remote_count.append(ssize)
+      send_sr, recv_sr = communicate_node_num(send_remote_count)
+      rfeat_recv_dict[ntype] = sum(recv_sr)
+      rfeat_send_dict[ntype] = sum(send_sr)
+    return rfeat_send_dict, rfeat_recv_dict
+
+  def communicate_node_id (
+    self,
+    sampler_result: Union[SamplerOutput, HeteroSamplerOutput],
+    ntype_list: List[NodeType]
+  ):
     offset = 0
     indexes = {}
+    send_ids = []
+    remote_cnt_list = torch.zeros(self.num_partitions, dtype=torch.long)
+    for ntype in ntype_list:
+      indexes[ntype] = [None] * self.num_partitions
     for pidx in range(0, self.num_partitions):
-      if pidx == self.partition_idx:
-        send_remote_count.append(0)
-      else:
-        remote_mask = (partition_ids == pidx)
-        remote_ids = torch.masked_select(ids, remote_mask)
-        indexes[pidx] = torch.masked_select(input_order, remote_mask)
-        ssize = remote_ids.numel()
-        send_ids[offset: offset + ssize] = remote_ids.tolist()
-        send_remote_count.append(remote_ids.numel())
-        offset = offset + ssize
-    assert len(send_ids) == sum(send_remote_count)
-    send_sr, recv_sr = communicate_node_num(send_remote_count)
-    tsend, trecv = sum(send_sr), sum(recv_sr)
+      remote_cnt_sum = 0
+      for ntype in ntype_list:
+        nodes = sampler_result.node.get(ntype, None)
+        if nodes is None:
+          continue
+        nodes = nodes.to(torch.long)
+        _, pb = self._get_local_store(ntype)
+        input_order= torch.arange(nodes.size(0),
+                                  dtype=torch.long,
+                                  device=self.device)
+        partition_ids = pb[nodes.to(pb.device)].to(self.device)
+        nodes = nodes.to(self.device)
+        if pidx == self.partition_idx:
+          continue
+        else:
+          remote_mask = (partition_ids == pidx)
+          remote_ids = torch.masked_select(nodes, remote_mask)
+          indexes[ntype][pidx] = torch.masked_select(input_order, remote_mask)
+          ssize = remote_ids.numel()
+          send_ids[offset: offset + ssize] = remote_ids.tolist()
+          remote_cnt_sum = remote_cnt_sum + remote_ids.numel()
+          offset = offset + ssize
+      remote_cnt_list[pidx] = remote_cnt_sum
+
+    assert len(send_ids) == sum(remote_cnt_list)
+    send_sr, recv_sr = communicate_node_num(remote_cnt_list)
+    _, trecv = sum(send_sr), sum(recv_sr)
     self.recv_rn_count = []
     for pidx in range(self.num_partitions):
       self.recv_rn_count.append(int(recv_sr[pidx]))
-    self.recv_rn_gnid = torch.zeros(trecv, dtype=ids.dtype)
-    req = dist.all_to_all_single(self.recv_rn_gnid, torch.tensor(send_ids),
-                                 self.recv_rn_count, send_remote_count,
-                                 async_op=True)
-    req.wait()
-    dist.barrier()
-    r_feats = feat[self.recv_rn_gnid]
-    feat_size = r_feats.shape[1]
-    send_count = []
-    recv_count = []
-    for np in range(self.num_partitions):
-      ele = self.recv_rn_count[np]
-      send_count.append(ele)
-      recv_count.append(send_remote_count[np])
+    self.recv_rn_gnid = torch.zeros(trecv, dtype=torch.long)
+    dist.all_to_all_single(self.recv_rn_gnid, torch.tensor(send_ids),
+                           self.recv_rn_count, remote_cnt_list.tolist(),
+                           async_op=False)
+    return remote_cnt_list, indexes
 
-    recv_feats = torch.zeros((sum(recv_count), feat_size), dtype=r_feats.dtype)
-    req = dist.all_to_all_single(recv_feats, r_feats,
+  def communicate_node_feats(
+    self,
+    ntype_list: List[NodeType],
+    remote_cnt: torch.Tensor,
+    send_num_dict: Dict[NodeType, int],
+    recv_num_dict: Dict[NodeType, int],
+    indexes: Dict[NodeType, List]
+  ):
+    rfeats_list = []
+    offset = 0
+    for ntype in ntype_list:
+      feat_num = recv_num_dict.get(ntype)
+      if feat_num > 0:
+        feat, _ = self._get_local_store(ntype)
+        ntype_ids = self.recv_rn_gnid[offset:offset+feat_num]
+        offset = offset + feat_num
+        rfeats_list.append(feat[ntype_ids])
+    rfeats_send = torch.cat(rfeats_list, dim=0)
+    feat_size = rfeats_send.shape[1]
+    send_count = self.recv_rn_count
+    recv_count = remote_cnt.tolist()
+    recv_feats = torch.zeros((sum(recv_count), feat_size), dtype=rfeats_send.dtype)
+    req = dist.all_to_all_single(recv_feats, rfeats_send,
                                  recv_count, send_count,
                                  async_op=True)
     req.wait()
     dist.barrier()
     recv_feat_list = torch.split(recv_feats, recv_count, dim = 0)
-    remote_feat_list = []
+    remote_feats_dict = {}
+    for ntype in ntype_list:
+      remote_feats_dict[ntype] = []
+
     for np in range(self.num_partitions):
       if np == self.partition_idx:
         continue
       else:
-        remote_feat_list.append((recv_feat_list[np], indexes[np]))
-    return remote_feat_list
+        offset = 0
+        for ntype in ntype_list:
+          send_num = send_num_dict.get(ntype)
+          if send_num > 0:
+            ntype_feat = recv_feat_list[np][offset:offset+send_num,:]
+            remote_feats_dict[ntype].append((ntype_feat, indexes[ntype][np]))
+            offset = offset + send_num
+
+    return remote_feats_dict
+
+  def remote_selecting_get_all2all(
+    self,
+    sampler_result: Union[SamplerOutput, HeteroSamplerOutput],
+    ntype_list: List[NodeType]
+  ) -> Dict[NodeType, List]:
+    rfeat_send_dict, rfeat_recv_dict = self.remote_selecting_prepare(sampler_result, ntype_list)
+    remote_cnt, indexes = self.communicate_node_id(sampler_result, ntype_list)
+    dist.barrier()
+    remote_feats_dict = self.communicate_node_feats(ntype_list, remote_cnt, rfeat_send_dict, rfeat_recv_dict, indexes)
+
+    return remote_feats_dict
 
   def _remote_selecting_get(
     self,
