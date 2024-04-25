@@ -346,16 +346,16 @@ class DistFeature(object):
     for ntype in ntype_list:
       remote_feats_dict[ntype] = []
 
-    for np in range(self.num_partitions):
-      if np == self.partition_idx:
+    for pidx in range(self.num_partitions):
+      if pidx == self.partition_idx:
         continue
       else:
         offset = 0
         for ntype in ntype_list:
           send_num = send_num_dict.get(ntype)
           if send_num > 0:
-            ntype_feat = recv_feat_list[np][offset:offset+send_num,:]
-            remote_feats_dict[ntype].append((ntype_feat, indexes[ntype][np]))
+            ntype_feat = recv_feat_list[pidx][offset:offset+send_num, :]
+            remote_feats_dict[ntype].append((ntype_feat, indexes[ntype][pidx]))
             offset = offset + send_num
 
     return remote_feats_dict
