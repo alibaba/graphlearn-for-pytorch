@@ -199,7 +199,7 @@ if __name__ == '__main__':
   parser.add_argument(
     "--dataset_root_dir",
     type=str,
-    default='../../data/products',
+    default='../../../data/products',
     help="The root directory (relative path) of partitioned ogbn dataset.",
   )
   parser.add_argument(
