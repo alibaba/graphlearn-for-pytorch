@@ -262,8 +262,9 @@ class DistFeature(object):
             ssize = remote_ids.numel()
             send_remote_count.append(ssize)
       send_sr, recv_sr = communicate_node_num(send_remote_count)
-      rfeat_recv_dict[ntype] = sum(recv_sr)
-      rfeat_send_dict[ntype] = sum(send_sr)
+      rfeat_recv_dict[ntype] = recv_sr
+      rfeat_send_dict[ntype] = send_sr
+
     return rfeat_send_dict, rfeat_recv_dict
 
   def communicate_node_id (
@@ -318,19 +319,23 @@ class DistFeature(object):
     self,
     ntype_list: List[NodeType],
     remote_cnt: torch.Tensor,
-    send_num_dict: Dict[NodeType, int],
-    recv_num_dict: Dict[NodeType, int],
+    send_num_dict: Dict[NodeType, List[int]],
+    recv_num_dict: Dict[NodeType, List[int]],
     indexes: Dict[NodeType, List]
   ):
     rfeats_list = []
     offset = 0
-    for ntype in ntype_list:
-      feat_num = recv_num_dict.get(ntype)
-      if feat_num > 0:
-        feat, _ = self._get_local_store(ntype)
-        ntype_ids = self.recv_rn_gnid[offset:offset+feat_num]
-        offset = offset + feat_num
-        rfeats_list.append(feat[ntype_ids])
+    for pidx in range(self.num_partitions):
+      if pidx == self.partition_idx:
+        continue
+      else:
+        for ntype in ntype_list:
+          feat_num = recv_num_dict.get(ntype)[pidx]
+          if feat_num > 0:
+            feat, _ = self._get_local_store(ntype)
+            ntype_ids = self.recv_rn_gnid[offset:offset+feat_num]
+            offset = offset + feat_num
+            rfeats_list.append(feat[ntype_ids])
     rfeats_send = torch.cat(rfeats_list, dim=0)
     feat_size = rfeats_send.shape[1]
     send_count = self.recv_rn_count
@@ -352,7 +357,7 @@ class DistFeature(object):
       else:
         offset = 0
         for ntype in ntype_list:
-          send_num = send_num_dict.get(ntype)
+          send_num = send_num_dict.get(ntype)[pidx]
           if send_num > 0:
             ntype_feat = recv_feat_list[pidx][offset:offset+send_num, :]
             remote_feats_dict[ntype].append((ntype_feat, indexes[ntype][pidx]))
