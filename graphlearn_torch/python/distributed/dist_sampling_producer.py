@@ -14,7 +14,7 @@
 # ==============================================================================
 
 import queue
-import time
+import time, datetime
 from enum import Enum
 from typing import Optional, Union
 
@@ -70,6 +70,14 @@ def _sampling_worker_loop(rank,
       rank=worker_options.worker_ranks[rank],
       group_name='_sampling_worker_subprocess'
     )
+    if worker_options.use_all2all:
+      torch.distributed.init_process_group(
+        backend='gloo',
+        timeout=datetime.timedelta(seconds=worker_options.rpc_timeout),
+        rank=worker_options.worker_ranks[rank],
+        world_size=worker_options.worker_world_size,
+        init_method='tcp://{}:{}'.format(worker_options.master_addr, worker_options.master_port)
+      )
 
     if worker_options.num_rpc_threads is None:
       num_rpc_threads = min(data.num_partitions, 16)
@@ -95,7 +103,8 @@ def _sampling_worker_loop(rank,
       data, sampling_config.num_neighbors, sampling_config.with_edge,
       sampling_config.with_neg, sampling_config.with_weight,
       sampling_config.edge_dir, sampling_config.collect_features, channel,
-      worker_options.worker_concurrency, current_device, seed=sampling_config.seed
+      worker_options.use_all2all, worker_options.worker_concurrency,
+      current_device, seed=sampling_config.seed
     )
     dist_sampler.start_loop()
 
@@ -331,7 +340,8 @@ class DistCollocatedSamplingProducer(object):
       self.sampling_config.with_edge, self.sampling_config.with_neg,
       self.sampling_config.with_weight,
       self.sampling_config.edge_dir, self.sampling_config.collect_features,
-      channel=None, concurrency=1, device=self.device, 
+      channel=None, use_all2all=self.worker_options.use_all2all,
+      concurrency=1, device=self.device,
       seed=self.sampling_config.seed
     )
     self._collocated_sampler.start_loop()
