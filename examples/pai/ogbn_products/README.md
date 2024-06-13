@@ -53,5 +53,3 @@ pai -name pytorch112z -Dscript='file://{your_path}/graphlearn-for-pytorch/exampl
 ```
 pai -name pytorch112z -Dscript='file:///{your_path}/graphlearn-for-pytorch/examples/pai/train_products_sage.tar.gz' -DentryFile='ogbn_products/dist_train_products_sage.py' -Dtables="odps://{your_project}/tables/ogbn_products_node,odps://{your_project}/tables/ogbn_products_edge,odps://{your_project}/tables/ogbn_products_train" -Dcluster="{\"worker\":{\"gpu\":200}}" -DworkerCount=2 -DuserDefinedParameters='--num_training_procs=2';
 ```
-
-Note: If the graph is directed, the sampling can only be 1 hop, e.g. `--nbrs_num='[10]'`.
