@@ -144,7 +144,13 @@ class TableDataset(Dataset):
       del feature_list
     load_time = (time.time() - start_time) / 60
     print(f'Loading table completed in {load_time:.2f} minutes.')
-    self.init_graph(edge_index, None, 'COO', graph_mode, directed, device)
+    self.init_graph(edge_index=edge_index, 
+                    edge_ids=None,
+                    edge_weights=None,
+                    layout='COO',
+                    graph_mode=graph_mode, 
+                    directed=directed,
+                    device=device)
     self.init_node_features(feature, None, sort_func, split_ratio,
                             device_group_list, device)
     self.init_node_labels(label)
