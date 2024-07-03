@@ -137,21 +137,20 @@ if __name__ == '__main__':
 
   mp_context = torch.multiprocessing.get_context('spawn')
 
-  print('--- Loading data partition ...')
-  dataset = glt.distributed.DistDataset()
-  dataset.load(
-    root_dir=osp.join(root_dir, f'{args.dataset}-partitions'),
-    partition_idx=data_pidx,
-    graph_mode='ZERO_COPY',
-    whole_node_label_file=osp.join(
-      root_dir, f'{args.dataset}-label', 'label.pt'
-    )
-  )
-
   print('--- Launching server processes ...')
   server_procs = []
   for local_proc_rank in range(args.num_server_procs_per_node):
     server_rank = args.node_rank * args.num_server_procs_per_node + local_proc_rank
+    print('--- Loading data partition ...')
+    dataset = glt.distributed.DistDataset()
+    dataset.load(
+      root_dir=osp.join(root_dir, f'{args.dataset}-partitions'),
+      partition_idx=server_rank,
+      graph_mode='ZERO_COPY',
+      whole_node_label_file=osp.join(
+        root_dir, f'{args.dataset}-label', 'label.pt'
+      )
+    )
     sproc = mp_context.Process(
       target=run_server_proc,
       args=(

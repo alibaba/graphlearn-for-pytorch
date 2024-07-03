@@ -255,7 +255,8 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                prefetch_size: int = 4,
                worker_key: str = None,
                glt_graph = None,
-               workload_type: Optional[Literal['train', 'validate', 'test']] = None):
+               workload_type: Optional[Literal['train', 'validate', 'test']] = None,
+               use_all2all: bool = False):
     # glt_graph is used in GraphScope side to get parameters
     if glt_graph:
       if not workload_type:
@@ -287,6 +288,7 @@ class RemoteDistSamplingWorkerOptions(_BasicDistSamplingWorkerOptions):
                        f"{self.prefetch_size} exceeds the buffer capacity "
                        f"{self.buffer_capacity}")
     self.worker_key = worker_key
+    self.use_all2all = use_all2all
 
 
 AllDistSamplingWorkerOptions = Union[
