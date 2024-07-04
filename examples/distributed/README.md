@@ -142,4 +142,6 @@ CUDA_VISIBLE_DEVICES=8,9 python server_client_mode/sage_supervised_client.py \
   --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
 ```
 
-Note: you should change master_addr to the ip of server-node#0
+Note: 
+1. You should change master_addr to the ip of server-node#0
+2. The number of processes should be the same with the number of dataset partitions, i.e., num_server_procs_per_node * num_server_nodes = num_dataset_partitions.
