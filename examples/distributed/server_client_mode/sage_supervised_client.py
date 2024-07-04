@@ -57,7 +57,7 @@ def test(model, test_loader, dataset_name):
 def run_client_proc(
   num_servers: int, num_clients: int, client_rank: int, server_rank_list: List[int],
   dataset_name: str, train_path_list: List[str], test_path_list: List[str], epochs: int,
-  batch_size: int, master_addr: str, server_client_port: int,
+  batch_size: int, master_addr: str, server_client_port: int, pg_master: str,
   training_pg_master_port: int, train_loader_master_port: int,
   test_loader_master_port: int
 ):
@@ -83,7 +83,7 @@ def run_client_proc(
     backend='nccl',
     rank=current_ctx.rank,
     world_size=current_ctx.world_size,
-    init_method='tcp://{}:{}'.format(master_addr, training_pg_master_port)
+    init_method='tcp://{}:{}'.format(pg_master, training_pg_master_port)
   )
 
   # TODO(hongyi): handle the case that different servers have different device count
@@ -263,6 +263,12 @@ if __name__ == '__main__':
     help="The port used for RPC initialization across all servers and clients.",
   )
   parser.add_argument(
+    "--pg_master",
+    type=str,
+    default='localhost',
+    help="The master address for PyTorch's process group initialization.",
+  )
+  parser.add_argument(
     "--training_pg_master_port",
     type=int,
     default=11111,
@@ -341,8 +347,8 @@ if __name__ == '__main__':
         [server_rank for server_rank in range(num_servers)
         ], args.dataset, train_path_list, test_path_list, args.epochs,
         args.batch_size, args.master_addr, args.server_client_master_port,
-        args.training_pg_master_port, args.train_loader_master_port,
-        args.test_loader_master_port
+        args.pg_master, args.training_pg_master_port,
+        args.train_loader_master_port, args.test_loader_master_port
       )
     )
     client_procs.append(cproc)

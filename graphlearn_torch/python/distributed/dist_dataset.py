@@ -253,7 +253,8 @@ class DistDataset(Dataset):
       self.num_partitions, self.partition_idx,
       self.graph, self.node_features, self.edge_features, self.node_labels,
       self.node_pb, self.edge_pb, self._node_feat_pb, self._edge_feat_pb, 
-      self.edge_dir, (self.train_idx, self.val_idx, self.test_idx)
+      self.edge_dir, self.graph_caching,
+      (self.train_idx, self.val_idx, self.test_idx)
     )
     return ipc_hanlde
 
