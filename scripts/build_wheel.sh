@@ -37,4 +37,4 @@ cmake -DWITH_CUDA=$CUDA_OPTION .
 make -j$CORES
 
 python3 setup.py bdist_wheel
-python3 -m pip install install dist/* --force-reinstall
+python3 -m pip install dist/* --force-reinstall
