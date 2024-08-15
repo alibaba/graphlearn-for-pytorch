@@ -17,7 +17,7 @@ on:
       - '**.md'
 
 env:
-  IMAGE: registry.cn-hongkong.aliyuncs.com/graphscope/graphscope-dev:latest
+  IMAGE: gs-graphlearn-torch-dev
   JOBNAME: glt-v6d-ci-${{ github.run_id }}
   DESTDIR: /home/graphscope/graphlearn-for-pytorch
 
@@ -33,6 +33,11 @@ jobs:
         working-directory: ${{github.workspace}}
         run: |
           git submodule update --init
+
+      - name: Build image
+        working-directory: ${{github.workspace}}
+        run: |
+          docker build -f dockerfiles/${IMAGE}.Dockerfile -t ${IMAGE} .
 
       - name: Launch CI container
         working-directory: ${{github.workspace}}

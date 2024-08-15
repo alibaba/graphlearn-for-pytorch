@@ -6,7 +6,7 @@ on:
       - '*'
 
 env:
-  IMAGE: pytorch/manylinux-cuda117
+  IMAGE: pytorch/manylinux-cuda121
   JOBNAME: glt-cd-${{ github.run_id }}
   DESTDIR: /mnt/graphlearn_for_pytorch
 
