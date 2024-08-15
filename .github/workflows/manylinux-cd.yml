@@ -6,7 +6,7 @@ on:
       - '*'
 
 env:
-  IMAGE: pytorch/manylinux-cuda121
+  IMAGE: graphlearn-torch-wheel
   JOBNAME: glt-cd-${{ github.run_id }}
   DESTDIR: /mnt/graphlearn_for_pytorch
 
@@ -22,6 +22,11 @@ jobs:
         working-directory: ${{github.workspace}}
         run: |
           git submodule update --init
+          
+      - name: Build image
+        working-directory: ${{github.workspace}}
+        run: |
+          docker build -f dockerfiles/${IMAGE}.Dockerfile -t ${IMAGE} .
 
       - name: Launch CD container
         working-directory: ${{github.workspace}}
