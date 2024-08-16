@@ -24,17 +24,10 @@ else
   VINEYARD_OPTION=$WITH_VINEYARD
 fi
 
-if [ "$VINEYARD_OPTION" = "ON" ]; then
-  # in graphscope environment
-  python3 -m pip install torch==1.13 --index-url https://download.pytorch.org/whl/cpu
-  python3 -m pip install torch_geometric ogb 
-  python3 -m pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
-fi
-
 # TODO(hongyi): build cpp with v6d
 # cmake -DWITH_CUDA=$CUDA_OPTION -DWITH_VINEYARD=$VINEYARD_OPTION .
 cmake -DWITH_CUDA=$CUDA_OPTION .
 make -j$CORES
 
 python3 setup.py bdist_wheel
-python3 -m pip install install dist/* --force-reinstall
+python3 -m pip install dist/* --force-reinstall
