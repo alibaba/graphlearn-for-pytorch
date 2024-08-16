@@ -17,7 +17,7 @@ on:
       - '**.md'
 
 env:
-  IMAGE: graphlearn/graphlearn_for_pytorch:1.0.0-ubuntu20.04-py3.8-torch1.13-cuda11.6
+  IMAGE: graphlearn-torch-dev
   JOBNAME: glt-ci-${{ github.run_id }}
   DESTDIR: /mnt/graphlearn_for_pytorch
 
@@ -33,6 +33,11 @@ jobs:
         working-directory: ${{github.workspace}}
         run: |
           git submodule update --init
+
+      - name: Build image
+        working-directory: ${{github.workspace}}
+        run: |
+          docker build -f dockerfiles/${IMAGE}.Dockerfile -t ${IMAGE} .
 
       - name: Launch CI container
         working-directory: ${{github.workspace}}
