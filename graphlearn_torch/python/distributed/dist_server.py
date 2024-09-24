@@ -19,6 +19,8 @@ import threading
 from typing import Dict, Optional, Union
 import warnings
 
+import torch
+
 from ..channel import ShmChannel, QueueTimeoutError
 from ..sampler import NodeSamplerInput, EdgeSamplerInput, SamplingConfig, RemoteSamplerInput
 
@@ -81,6 +83,30 @@ class DistServer(object):
     """
     return self.dataset.num_partitions, self.dataset.partition_idx, \
       self.dataset.get_node_types(), self.dataset.get_edge_types()
+  
+  def get_node_partition_id(self, node_type, index):
+    partition_id = None
+    if not isinstance(self.dataset.node_pb, Dict):
+      partition_id = self.dataset.node_pb[index]
+    else:
+      partition_id = self.dataset.node_pb[node_type][index]
+    return partition_id.item()
+  
+  def get_edge_partition_id(self, edge_type, index):
+    partition_id = None
+    if not isinstance(self.dataset.edge_pb, Dict):
+      partition_id = self.dataset.edge_pb[index]
+    else:
+      partition_id = self.dataset.edge_pb[edge_type][index]
+    return partition_id.item()
+
+  def get_node_feature(self, node_type, index):
+    feature = self.dataset.get_node_feature(node_type)
+    return feature[index]
+  
+  def get_edge_feature(self, edge_type, index):
+    feature = self.dataset.get_edge_feature(edge_type)
+    return feature[index]
 
   def create_sampling_producer(
     self,
