@@ -195,6 +195,28 @@ class RandomSamplerTestCase(unittest.TestCase):
                     and stats[75] > 650 and stats[77] > 650)
     self.assertEqual(sum(stats), 8000)
 
+  def test_dict_sample_from_nodes(self):
+    node_out_sampler = glt.sampler.NeighborSampler(
+      graph=self.weighted_graph_dict,
+      device='CPU',
+      num_neighbors={('user', 'u2i', 'item'): [1,0],
+                     ('item', 'i2i', 'item'): [0,1]},
+      with_edge=True,
+      with_weight=True,
+      edge_dir='out',
+    )
+    sampler_out_input = glt.sampler.NodeSamplerInput(
+      node=torch.tensor([1,5,9,13,21,29,37,38]), input_type=self.user_ntype)
+    sample_out = node_out_sampler.sample_from_nodes(
+      sampler_out_input, device=torch.device('cpu'))
+
+    assert sample_out.edge[self.rev_u2i_etype].size(0) > 0
+    assert sample_out.edge[self.i2i_etype].size(0) > 0
+    assert sample_out.num_sampled_nodes['item'].size(0) == 3
+    assert sample_out.num_sampled_nodes['user'].size(0) == 1
+    assert sample_out.num_sampled_edges[self.rev_u2i_etype].size(0) == 1
+    assert sample_out.num_sampled_edges[self.i2i_etype].size(0) == 2
+
   def test_hetero_insample_from_items(self):
     node_sampler = glt.sampler.NeighborSampler(
       graph=self.graph_in_dict,

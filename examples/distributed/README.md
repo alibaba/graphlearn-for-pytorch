@@ -129,17 +129,19 @@ CUDA_VISIBLE_DEVICES=2,3 python server_client_mode/sage_supervised_server.py \
 # client node 0:
 CUDA_VISIBLE_DEVICES=4,5 python server_client_mode/sage_supervised_client.py \
   --num_server_nodes=2 --num_client_nodes=3 --node_rank=0 --num_dataset_partitions=3 \
-  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
+  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost --pg_master=localhost
 
 # client node 1:
 CUDA_VISIBLE_DEVICES=6,7 python server_client_mode/sage_supervised_client.py \
   --num_server_nodes=2 --num_client_nodes=3 --node_rank=1 --num_dataset_partitions=3 \
-  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
+  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost --pg_master=localhost
 
 # client node 2:
 CUDA_VISIBLE_DEVICES=8,9 python server_client_mode/sage_supervised_client.py \
   --num_server_nodes=2 --num_client_nodes=3 --node_rank=2 --num_dataset_partitions=3 \
-  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost
+  --num_server_procs_per_node=1 --num_client_procs_per_node=2 --master_addr=localhost --pg_master=localhost
 ```
 
-Note: you should change master_addr to the ip of server-node#0
+Note: 
+1. You should change master_addr to the ip of server-node#0
+2. The number of processes should be the same with the number of dataset partitions, i.e., num_server_procs_per_node * num_server_nodes = num_dataset_partitions.
