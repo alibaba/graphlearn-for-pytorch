@@ -21,7 +21,7 @@ import torch
 import graphlearn_torch as glt
 
 from dist_test_utils import *
-from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
+from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset, vnum_per_partition
 from parameterized import parameterized
 from typing import List, Optional
 
@@ -32,16 +32,12 @@ def _check_sample_result(data, edge_dir):
   label = torch.arange(vnum_total).to(device)
   tc.assertTrue(glt.utils.tensor_equal_with_device(data.y, label[data.node]))
   for i, v in enumerate(data.node):
-    expect_feat = int(v) % 2 + torch.zeros(
-      512, device=device, dtype=torch.float32
-    )
+    expect_feat = torch.tensor([v] * 512, device=device, dtype=torch.float32)
     tc.assertTrue(glt.utils.tensor_equal_with_device(data.x[i], expect_feat))
   tc.assertTrue(data.edge is not None)
   tc.assertTrue(data.edge_attr is not None)
   for i, e in enumerate(data.edge):
-    expect_feat = ((int(e) // degree) % 2) + torch.ones(
-      10, device=device, dtype=torch.float32
-    )
+    expect_feat = torch.tensor([e] * 10, device=device, dtype=torch.float32)
     tc.assertTrue(glt.utils.tensor_equal_with_device(data.edge_attr[i], expect_feat))
   rows = data.node[data.edge_index[0]]
   cols = data.node[data.edge_index[1]]
@@ -307,6 +303,9 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
     self.dataset0 = _prepare_dataset(rank=0)
     self.dataset1 = _prepare_dataset(rank=1)
 
+    self.range_partition_dataset0 = _prepare_dataset(rank=0, is_range_partition=True)
+    self.range_partition_dataset1 = _prepare_dataset(rank=1, is_range_partition=True)
+
     # all for train
     self.dataset0.random_node_split(0, 0)
     self.dataset1.random_node_split(0, 0)
@@ -334,36 +333,51 @@ class DistNeighborLoaderTestCase(unittest.TestCase):
       if os.path.exists(file_path):
         os.remove(file_path)
 
-  def test_homo_collocated(self):
+  def _get_homo_datasets(self, is_range_partition):
+    return (self.range_partition_dataset0, self.range_partition_dataset1) if is_range_partition else (self.dataset0, self.dataset1)
+
+  @parameterized.expand([
+    (True),
+    (False),
+  ])
+  def test_homo_collocated(self, is_range_partition):
     print("\n--- DistNeighborLoader Test (homogeneous, collocated) ---")
-    mp_context = torch.multiprocessing.get_context('spawn')
+    dataset0, dataset1 = self._get_homo_datasets(is_range_partition)
+
+    mp_context = torch.multiprocessing.get_context('spawn')    
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, True)
+            dataset0, self.input_nodes0, _check_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, True)
+            dataset1, self.input_nodes1, _check_sample_result, True)
     )
     w0.start()
     w1.start()
     w0.join()
     w1.join()
-
-  def test_homo_mp(self):
+    
+  @parameterized.expand([
+    (True),
+    (False),
+  ])
+  def test_homo_mp(self, is_range_partition):
     print("\n--- DistNeighborLoader Test (homogeneous, multiprocessing) ---")
     mp_context = torch.multiprocessing.get_context('spawn')
+    dataset0, dataset1 = self._get_homo_datasets(is_range_partition)
+
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.input_nodes0, _check_sample_result, False)
+            dataset0, self.input_nodes0, _check_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.input_nodes1, _check_sample_result, False)
+            dataset1, self.input_nodes1, _check_sample_result, False)
     )
     w0.start()
     w1.start()
