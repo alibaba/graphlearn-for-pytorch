@@ -21,6 +21,7 @@ import graphlearn_torch as glt
 
 from dist_test_utils import *
 from dist_test_utils import _prepare_dataset, _prepare_hetero_dataset
+from parameterized import parameterized
 
 def _check_sample_result(data, edge_dir='out'):
   tc = unittest.TestCase()
@@ -338,6 +339,8 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
   def setUp(self):
     self.dataset0 = _prepare_dataset(rank=0)
     self.dataset1 = _prepare_dataset(rank=1)
+    self.range_partition_dataset0 = _prepare_dataset(rank=0, is_range_partition=True)
+    self.range_partition_dataset1 = _prepare_dataset(rank=1, is_range_partition=True)
     self.input_edges0 = torch.stack(
       (torch.arange(vnum_per_partition), torch.arange(vnum_per_partition)+1)
     ).to(dtype=torch.long)
@@ -357,37 +360,52 @@ class DistLinkNeighborLoaderTestCase(unittest.TestCase):
     self.master_port = glt.utils.get_free_port()
     self.sampling_master_port = glt.utils.get_free_port()
 
-  def test_homo_out_sample_collocated(self):
+  def _get_homo_datasets(self, is_range_partition):
+    return (self.range_partition_dataset0, self.range_partition_dataset1) if is_range_partition else (self.dataset0, self.dataset1)
+
+  @parameterized.expand([
+    (True),
+    (False),
+  ])
+  def test_homo_out_sample_collocated(self, is_range_partition):
     print("\n--- DistLinkNeighborLoader Test (homogeneous, collocated) ---")
+    dataset0, dataset1 = self._get_homo_datasets(is_range_partition)
+
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.bin_neg_sampling, self.input_edges0, _check_sample_result, True)
+            dataset0, self.bin_neg_sampling, self.input_edges0, _check_sample_result, True)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.bin_neg_sampling, self.input_edges1, _check_sample_result, True)
+            dataset1, self.bin_neg_sampling, self.input_edges1, _check_sample_result, True)
     )
     w0.start()
     w1.start()
     w0.join()
     w1.join()
-
-  def test_homo_out_sample_mp(self):
+    
+  @parameterized.expand([
+    (True),
+    (False),
+  ])
+  def test_homo_out_sample_mp(self, is_range_partition):
     print("\n--- DistLinkNeighborLoader Test (homogeneous, multiprocessing) ---")
+    dataset0, dataset1 = self._get_homo_datasets(is_range_partition)
+
     mp_context = torch.multiprocessing.get_context('spawn')
     w0 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 0, self.master_port, self.sampling_master_port,
-            self.dataset0, self.tri_neg_sampling, self.input_edges0,
+            dataset0, self.tri_neg_sampling, self.input_edges0,
             _check_sample_result, False)
     )
     w1 = mp_context.Process(
       target=run_test_as_worker,
       args=(2, 1, self.master_port, self.sampling_master_port,
-            self.dataset1, self.tri_neg_sampling, self.input_edges1,
+            dataset1, self.tri_neg_sampling, self.input_edges1,
             _check_sample_result, False)
     )
     w0.start()
