@@ -240,6 +240,8 @@ class Feature(object):
     return feature
 
   def lazy_init_with_ipc_handle(self):
+    if self._ipc_handle is None:
+      return
     with scope_lock:
       if self._ipc_handle is None:
         return
