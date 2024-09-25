@@ -15,4 +15,5 @@
 
 from .base import *
 from .frequency_partitioner import FrequencyPartitioner
+from .partition_book import *
 from .random_partitioner import RandomPartitioner
