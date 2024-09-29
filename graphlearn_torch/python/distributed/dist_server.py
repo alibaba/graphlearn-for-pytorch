@@ -20,6 +20,7 @@ from typing import Dict, Optional, Union
 import warnings
 
 import torch
+from graphscope.learning.graphlearn_torch.partition.base import PartitionBook
 
 from ..channel import ShmChannel, QueueTimeoutError
 from ..sampler import NodeSamplerInput, EdgeSamplerInput, SamplingConfig, RemoteSamplerInput
@@ -29,7 +30,6 @@ from .dist_dataset import DistDataset
 from .dist_options import RemoteDistSamplingWorkerOptions
 from .dist_sampling_producer import DistMpSamplingProducer
 from .rpc import barrier, init_rpc, shutdown_rpc
-
 
 SERVER_EXIT_STATUS_CHECK_INTERVAL = 5.0
 r""" Interval (in seconds) to check exit status of server.
@@ -85,28 +85,55 @@ class DistServer(object):
       self.dataset.get_node_types(), self.dataset.get_edge_types()
   
   def get_node_partition_id(self, node_type, index):
-    partition_id = None
-    if not isinstance(self.dataset.node_pb, Dict):
+    if isinstance(self.dataset.node_pb, PartitionBook):
       partition_id = self.dataset.node_pb[index]
-    else:
+      return partition_id.item()
+    elif isinstance(self.dataset.node_pb, Dict):
       partition_id = self.dataset.node_pb[node_type][index]
-    return partition_id.item()
+      return partition_id.item()
+    return None
   
   def get_edge_partition_id(self, edge_type, index):
-    partition_id = None
-    if not isinstance(self.dataset.edge_pb, Dict):
+    if isinstance(self.dataset.edge_pb, PartitionBook):
       partition_id = self.dataset.edge_pb[index]
-    else:
+      return partition_id.item()
+    elif isinstance(self.dataset.edge_pb, Dict):
       partition_id = self.dataset.edge_pb[edge_type][index]
-    return partition_id.item()
+      return partition_id.item()
+    return None
 
   def get_node_feature(self, node_type, index):
     feature = self.dataset.get_node_feature(node_type)
     return feature[index]
   
+  def get_node_label(self, node_type, index):
+    label = self.dataset.get_node_label(node_type)
+    return label[index]
+  
   def get_edge_feature(self, edge_type, index):
     feature = self.dataset.get_edge_feature(edge_type)
     return feature[index]
+  
+  def get_edge_index(self, edge_type, layout):
+    graph = self.dataset.get_graph(edge_type)
+    source_count = graph.row_count
+    destination_count = graph.col_count
+    size = (source_count, destination_count)
+    row = None
+    col = None
+    result = None
+    if layout == 'coo':
+      row, col, _, _ = graph.topo.to_coo()
+      result = (row, col)
+    elif layout == 'csr':
+      row, col, _, _ = graph.topo.to_csr()
+      result = (row, col)
+    elif layout == 'csc':
+      row, col, _, _ = graph.topo.to_csc()
+      result = (col, row)
+    else:
+      raise ValueError(f"Invalid layout {layout}")
+    return result, size
 
   def create_sampling_producer(
     self,
