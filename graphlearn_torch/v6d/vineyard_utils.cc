@@ -310,7 +310,7 @@ torch::Tensor VineyardFragHandle::GetInnerVertices(const std::string& v_label_na
     iv_[i++] = frag_->Vertex2Gid(v);
   }
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU);
-  torch::Tensor vertices = torch::from_blob(iv_, {iv.size()}, customDeleter<int64_t>, options);
+  torch::Tensor vertices = torch::from_blob(iv_, {static_cast<int64_t>(iv.size())}, customDeleter<int64_t>, options);
   return vertices;
 }
 
