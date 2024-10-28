@@ -109,22 +109,10 @@ class DistServer(object):
     if layout == 'coo':
       row, col, _, _ = graph.topo.to_coo()
       result = (row, col)
-      size = (graph.row_count, graph.col_count)
-    elif layout == 'csr':
-      row, col, _, _ = graph.topo.to_csr()
-      result = (row, col)
-      size = (graph.row_count, col.max().item()+1)
-    elif layout == 'csc':
-      row, col, _, _ = graph.topo.to_csc()
-      result = (row, col)
-      size = (row.max().item()+1, graph.row_count)
     else:
       raise ValueError(f"Invalid layout {layout}")
-    return result, size
-  
-  def get_edge_size(self, edge_type, layout):
-    _, size = self.get_edge_index(edge_type, layout)
-    return size
+    return result
+
 
   def create_sampling_producer(
     self,

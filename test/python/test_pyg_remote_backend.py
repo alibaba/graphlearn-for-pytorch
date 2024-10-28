@@ -1,19 +1,15 @@
-import base64
-import json
-import random
 import unittest
-from typing import List, Optional
+from collections import defaultdict
+from typing import List
 
-import graphscope.learning.graphlearn_torch as glt
+import graphlearn_torch as glt
 import torch
 from dist_test_utils import *
 from dist_test_utils import _prepare_hetero_dataset
-from graphscope.learning.gs_feature_store import GsFeatureStore
-from graphscope.learning.gs_graph_store import GsGraphStore
+from graphlearn_torch.distributed.dist_client import request_server
+from graphlearn_torch.distributed.dist_server import DistServer
 from parameterized import parameterized
-from torch_geometric.data import EdgeAttr, TensorAttr
-from torch_geometric.data.graph_store import EdgeLayout
-from torch_geometric.loader import NeighborLoader
+from torch_geometric.utils.sparse import index2ptr, ptr2index
 
 
 def run_test_as_server(
@@ -22,7 +18,6 @@ def run_test_as_server(
     server_rank: List[int],
     master_port: int,
     dataset: glt.distributed.DistDataset,
-    is_dynamic: bool = False,
 ):
     print(f"[Server {server_rank}] Initializing server ...")
     glt.distributed.init_server(
@@ -35,7 +30,6 @@ def run_test_as_server(
         request_timeout=30,
         num_rpc_threads=2,
         server_group_name="pyg_remote_backend_test_server",
-        is_dynamic=is_dynamic,
     )
 
     print(f"[Server {server_rank}] Waiting for exit ...")
@@ -49,12 +43,12 @@ def run_test_as_client(
     num_clients: int,
     client_rank: int,
     master_port: int,
-    input_nodes,
-    input_edges,
+    node_type,
+    node_index,
     feature_size,
+    edge_type,
+    edge_layout,
     check_fn,
-    edge_dir="out",
-    is_dynamic: bool = False,
 ):
     print(f"[Client {client_rank}] Initializing client ...")
     glt.distributed.init_client(
@@ -65,30 +59,11 @@ def run_test_as_client(
         master_port=master_port,
         num_rpc_threads=1,
         client_group_name="pyg_remote_backend_test_client",
-        is_dynamic=is_dynamic,
     )
 
     print(f"[Client {client_rank}] Check function {check_fn.__name__} ...")
-    config = base64.b64encode(
-        json.dumps(
-            {
-                "node_features": {
-                    input_nodes[i]: [f"feat_{j}" for j in range(feature_size[i])]
-                    for i in range(len(input_nodes))
-                },
-                "node_labels": {
-                    input_nodes[i]: "label" for i in range(len(input_nodes))
-                },
-                "edges": input_edges,
-                "edge_dir": edge_dir,
-            }
-        ).encode("utf-8")
-    ).decode("utf-8")
 
-    feature_store = GsFeatureStore(config)
-    graph_store = GsGraphStore(config)
-
-    check_fn(feature_store, graph_store, input_nodes, input_edges, feature_size)
+    check_fn(node_type, node_index, feature_size, edge_type, edge_layout)
 
     print(f"[Client {client_rank}] Shutdowning ...")
     glt.distributed.shutdown_client()
@@ -96,89 +71,81 @@ def run_test_as_client(
     print(f"[Client {client_rank}] Exited ...")
 
 
-def _check_feature_store(
-    feature_store, graph_store, input_nodes, input_edges, feature_size
-):
+def _check_feature_store(node_type, node_index, feature_size, edge_type, edge_layout):
     tc = unittest.TestCase()
-    for i in range(len(input_nodes)):
-        feature = feature_store.get_tensor(
-            TensorAttr(group_name=input_nodes[i], attr_name="x", index=0)
-        )
-        tc.assertEqual(feature.shape[-1], feature_size[i])
-        label = feature_store.get_tensor(
-            TensorAttr(group_name=input_nodes[i], attr_name="label", index=0)
-        )
-        tc.assertEqual(label.shape[-1], 1)
-        size = feature_store.get_tensor_size(TensorAttr(group_name=input_nodes[i]))
-        tc.assertEqual(size[0], feature_size[i])
-    tensor_attrs = feature_store.get_all_tensor_attrs()
-    tc.assertEqual(len(tensor_attrs), len(input_nodes) * 2)
-    for tensor_attr in tensor_attrs:
-        tc.assertIn(tensor_attr.group_name, input_nodes)
-        tc.assertIn(tensor_attr.attr_name, ["x", "label"])
-
-
-def _check_graph_store(
-    feature_store, graph_store, input_nodes, input_edges, feature_size
-):
-    tc = unittest.TestCase()
-    edge_attrs = graph_store.get_all_edge_attrs()
-    tc.assertEqual(len(edge_attrs), len(input_edges))
-    for index, edge_attr in enumerate(edge_attrs):
-        tc.assertEqual(edge_attr.edge_type, input_edges[index])
-        tc.assertEqual(edge_attr.layout, EdgeLayout.CSR)
-        tc.assertEqual(edge_attr.is_sorted, False)
-        tc.assertEqual(len(edge_attr.size), 2)
-    for i in range(len(input_edges)):
-        edge_index = graph_store.get_edge_index(EdgeAttr(input_edges[i], "csr"))
-        tc.assertEqual(len(edge_index), 2)
-        tc.assertEqual(len(edge_index[0]), edge_attrs[i].size[0] + 1)
-
-
-def _check_pyg_neighbor_loader_with_pyg_remote_backend(
-    feature_store,
-    graph_store,
-    input_nodes,
-    input_edges,
-    feature_size,
-    num_neighbors=[4, 3, 2],
-    loader_batch_size=4,
-):
-    tc = unittest.TestCase()
-    sample_node_type = input_nodes[1]
-    loader = NeighborLoader(
-        data=(feature_store, graph_store),
-        batch_size=loader_batch_size,
-        num_neighbors={input_edges[i]: num_neighbors for i in range(len(input_edges))},
-        shuffle=False,
-        input_nodes=sample_node_type,
+    patition_ids = request_server(
+        0, DistServer.get_node_partition_id, node_type, node_index
     )
+    tc.assertTrue(torch.equal(patition_ids, node_index % 2))
 
-    for batch in loader:
-        batch_node = batch[sample_node_type]
-        random_choose = random.randint(0, batch_node.batch_size - 1)
-        node_id = batch_node.n_id[random_choose].item()
-        feature_result = feature_store.get_tensor(
-            TensorAttr(group_name=sample_node_type, attr_name="x", index=node_id)
-        )[0]
-        tc.assertTrue(torch.equal(batch_node.x[random_choose], feature_result))
+    partition_to_ids = defaultdict(list)
+    partition_to_indices = defaultdict(list)
+    for idx, id in enumerate(node_index):
+        partition_id = patition_ids[idx].item()
+        partition_to_ids[partition_id].append(id.item())
+        partition_to_indices[partition_id].append(idx)
 
-        for i in range(len(input_edges)):
-            batch_edge = batch[input_edges[i]]
-            edge_result = graph_store.get_edge_index(EdgeAttr(input_edges[i], "csc"))
-            indices_start = edge_result[1][node_id]
-            indices_end = edge_result[1][node_id + 1]
-            if indices_start == indices_end:
-                continue
-            neighbors1 = edge_result[0][indices_start:indices_end]
+    partition_to_features = defaultdict(list)
+    partition_to_labels = defaultdict(list)
+    for partition_id, ids in partition_to_ids.items():
+        feature = request_server(
+            partition_id, DistServer.get_node_feature, node_type, torch.tensor(ids)
+        )
+        label = request_server(
+            partition_id, DistServer.get_node_label, node_type, torch.tensor(ids)
+        )
+        partition_to_features[partition_id] = feature
+        partition_to_labels[partition_id] = label
 
-            row_ = (batch_edge.edge_index[1] == random_choose).nonzero(as_tuple=False)
-            col_start = row_[0].item()
-            col_end = row_[-1].item()
-            col = batch_edge.edge_index[0][col_start : col_end + 1]
-            neighbors2 = batch_node.n_id[col]
+    node_features = torch.zeros(
+        (len(node_index), list(partition_to_features.values())[0].shape[-1])
+    )
+    node_labels = torch.zeros((len(node_index), 1))
+    for partition_id, indices in partition_to_indices.items():
+        partition_features = partition_to_features[partition_id]
+        partition_labels = partition_to_labels[partition_id]
+        for i, idx in enumerate(indices):
+            node_features[idx] = partition_features[i]
+            node_labels[idx] = partition_labels[i]
 
-            tc.assertTrue(torch.isin(neighbors2, neighbors1).all().item())
+    for id, index in enumerate(node_index):
+        if index % 2 == 0:
+            tc.assertTrue(torch.equal(node_features[id], torch.zeros(feature_size)))
+        else:
+            if node_type == user_ntype:
+                tc.assertTrue(torch.equal(node_features[id], torch.ones(feature_size)))
+            else:
+                tc.assertTrue(
+                    torch.equal(node_features[id], torch.full((feature_size,), 2))
+                )
+        tc.assertEqual(node_labels[id], index)
+
+
+def _check_graph_store(node_type, node_index, feature_size, edge_type, edge_layout):
+    tc = unittest.TestCase()
+
+    if edge_type == u2i_etype:
+        step = 1
+    else:
+        step = 2
+
+    for server_id in range(2):
+        true_rows = []
+        true_cols = []
+        for v in range(server_id, vnum_total, 2):
+            true_rows.extend([v for _ in range(degree)])
+            true_cols.extend(
+                sorted([((v + i + step) % vnum_total) for i in range(degree)])
+            )
+        true_rows = torch.tensor(true_rows)
+        true_cols = torch.tensor(true_cols)
+
+        (row, col) = request_server(
+            server_id, DistServer.get_edge_index, edge_type, edge_layout
+        )
+
+        tc.assertTrue(torch.equal(row, true_rows))
+        tc.assertTrue(torch.equal(col, true_cols))
 
 
 class PygRemoteBackendTestCase(unittest.TestCase):
@@ -191,17 +158,21 @@ class PygRemoteBackendTestCase(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (1, 2, [user_ntype, item_ntype], [i2i_etype], [512, 256]),
+            (1, 2, user_ntype, torch.tensor([0]), 512),
+            (1, 2, user_ntype, torch.tensor([0, 1, 2, 3]), 512),
+            (1, 2, item_ntype, torch.tensor([0]), 256),
+            (1, 2, item_ntype, torch.tensor([4, 5, 6, 7]), 256),
         ]
     )
-    def test_feature_store(
-        self, num_clients, num_servers, input_nodes, input_edges, feature_size
+    def test_dist_server_supported_feature_store(
+        self, num_clients, num_servers, node_type, node_index, feature_size
     ):
-        print("\n--- Feature Store Test (server-client mode, remote) ---")
+        print(
+            "\n--- Function in DistServer supported PyG Remote Backend Test (server-client mode, remote) ---"
+        )
         print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
 
         self.dataset_list = [self.dataset0, self.dataset1]
-        # self.input_nodes_list = [self.input_nodes0, self.input_nodes1]
 
         mp_context = torch.multiprocessing.get_context("spawn")
 
@@ -230,9 +201,11 @@ class PygRemoteBackendTestCase(unittest.TestCase):
                         num_clients,
                         client_rank,
                         self.master_port,
-                        input_nodes,
-                        input_edges,
+                        node_type,
+                        node_index,
                         feature_size,
+                        None,
+                        None,
                         _check_feature_store,
                     ),
                 )
@@ -249,72 +222,15 @@ class PygRemoteBackendTestCase(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (1, 2, [user_ntype, item_ntype], [i2i_etype], [512, 256]),
+            (1, 2, i2i_etype, "coo"),
+            (1, 2, u2i_etype, "coo"),
         ]
     )
-    def test_graph_store(
-        self, num_clients, num_servers, input_nodes, input_edges, feature_size
-    ):
-        print("\n--- Graph Store Test (server-client mode, remote) ---")
-        print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
-
-        self.dataset_list = [self.dataset0, self.dataset1]
-        # self.input_nodes_list = [self.input_nodes0, self.input_nodes1]
-
-        mp_context = torch.multiprocessing.get_context("spawn")
-
-        server_procs = []
-        for server_rank in range(num_servers):
-            server_procs.append(
-                mp_context.Process(
-                    target=run_test_as_server,
-                    args=(
-                        num_servers,
-                        num_clients,
-                        server_rank,
-                        self.master_port,
-                        self.dataset_list[server_rank],
-                    ),
-                )
-            )
-
-        client_procs = []
-        for client_rank in range(num_clients):
-            client_procs.append(
-                mp_context.Process(
-                    target=run_test_as_client,
-                    args=(
-                        num_servers,
-                        num_clients,
-                        client_rank,
-                        self.master_port,
-                        input_nodes,
-                        input_edges,
-                        feature_size,
-                        _check_graph_store,
-                    ),
-                )
-            )
-        for sproc in server_procs:
-            sproc.start()
-        for cproc in client_procs:
-            cproc.start()
-
-        for sproc in server_procs:
-            sproc.join()
-        for cproc in client_procs:
-            cproc.join()
-
-    @parameterized.expand(
-        [
-            (1, 2, [user_ntype, item_ntype], [i2i_etype], [512, 256]),
-        ]
-    )
-    def test_pyg_neighbor_loader(
-        self, num_clients, num_servers, input_nodes, input_edges, feature_size
+    def test_dist_server_supported_graph_store(
+        self, num_clients, num_servers, edge_type, edge_layout
     ):
         print(
-            "\n--- PyG NeighborLoader with remotebackend Test (server-client mode, remote) ---"
+            "\n--- Function in DistServer supported PyG Remote Backend Test (server-client mode, remote) ---"
         )
         print(f"--- num_clients: {num_clients} num_servers: {num_servers} ---")
 
@@ -347,10 +263,12 @@ class PygRemoteBackendTestCase(unittest.TestCase):
                         num_clients,
                         client_rank,
                         self.master_port,
-                        input_nodes,
-                        input_edges,
-                        feature_size,
-                        _check_pyg_neighbor_loader_with_pyg_remote_backend,
+                        None,
+                        None,
+                        None,
+                        edge_type,
+                        edge_layout,
+                        _check_graph_store,
                     ),
                 )
             )
