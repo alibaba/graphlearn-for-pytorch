@@ -96,7 +96,11 @@ class DistServer(object):
   def get_node_feature(self, node_type, index):
     feature = self.dataset.get_node_feature(node_type)
     return feature[index]
-  
+
+  def get_tensor_size(self, node_type):
+    feature = self.dataset.get_node_feature(node_type)
+    return feature.shape
+
   def get_node_label(self, node_type, index):
     label = self.dataset.get_node_label(node_type)
     return label[index]
@@ -113,6 +117,14 @@ class DistServer(object):
       raise ValueError(f"Invalid layout {layout}")
     return result
 
+  def get_edge_size(self, edge_type, layout):
+    graph = self.dataset.get_graph(edge_type)
+    if layout == 'coo':
+      row_count = graph.row_count
+      col_count = graph.col_count
+    else:
+      raise ValueError(f"Invalid layout {layout}")
+    return (row_count, col_count)
 
   def create_sampling_producer(
     self,

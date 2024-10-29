@@ -73,40 +73,34 @@ def run_test_as_client(
 
 def _check_feature_store(node_type, node_index, feature_size, edge_type, edge_layout):
     tc = unittest.TestCase()
-    patition_ids = request_server(
+    num_partitions, _, _, _ = request_server(0, DistServer.get_dataset_meta)
+    partition_ids = request_server(
         0, DistServer.get_node_partition_id, node_type, node_index
     )
-    tc.assertTrue(torch.equal(patition_ids, node_index % 2))
+    tc.assertTrue(torch.equal(partition_ids, node_index % 2))
+    indexes = []
+    features = []
+    labels = []
+    input_order = torch.arange(node_index.size(0), dtype=torch.long)
+    for pidx in range(0, num_partitions):
+        remote_mask = (partition_ids == pidx)
+        remote_ids = torch.masked_select(node_index, remote_mask)
+        if remote_ids.shape[0] > 0:
+            feature = request_server(pidx, DistServer.get_node_feature, node_type, remote_ids)
+            label = request_server(pidx, DistServer.get_node_label, node_type, remote_ids)
+            label = torch.unsqueeze(label, 1)
+            features.append(feature)
+            labels.append(label)
+            indexes.append(torch.masked_select(input_order, remote_mask))
+            
+            num_nodes = request_server(pidx, DistServer.get_tensor_size, node_type)[0]
+            tc.assertEqual(num_nodes, vnum_per_partition)
 
-    partition_to_ids = defaultdict(list)
-    partition_to_indices = defaultdict(list)
-    for idx, id in enumerate(node_index):
-        partition_id = patition_ids[idx].item()
-        partition_to_ids[partition_id].append(id.item())
-        partition_to_indices[partition_id].append(idx)
-
-    partition_to_features = defaultdict(list)
-    partition_to_labels = defaultdict(list)
-    for partition_id, ids in partition_to_ids.items():
-        feature = request_server(
-            partition_id, DistServer.get_node_feature, node_type, torch.tensor(ids)
-        )
-        label = request_server(
-            partition_id, DistServer.get_node_label, node_type, torch.tensor(ids)
-        )
-        partition_to_features[partition_id] = feature
-        partition_to_labels[partition_id] = label
-
-    node_features = torch.zeros(
-        (len(node_index), list(partition_to_features.values())[0].shape[-1])
-    )
-    node_labels = torch.zeros((len(node_index), 1))
-    for partition_id, indices in partition_to_indices.items():
-        partition_features = partition_to_features[partition_id]
-        partition_labels = partition_to_labels[partition_id]
-        for i, idx in enumerate(indices):
-            node_features[idx] = partition_features[i]
-            node_labels[idx] = partition_labels[i]
+    node_features = torch.zeros(node_index.shape[0], features[0].shape[1], dtype=features[0].dtype)
+    node_labels = torch.zeros(node_index.shape[0], 1, dtype=labels[0].dtype)
+    for i, (feature, label) in enumerate(zip(features, labels)):
+        node_features[indexes[i]] = feature
+        node_labels[indexes[i]] = label
 
     for id, index in enumerate(node_index):
         if index % 2 == 0:
