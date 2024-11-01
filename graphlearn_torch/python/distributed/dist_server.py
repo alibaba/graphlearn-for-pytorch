@@ -20,7 +20,7 @@ from typing import Dict, Optional, Union
 import warnings
 
 import torch
-from graphscope.learning.graphlearn_torch.partition.base import PartitionBook
+from ..partition import PartitionBook
 
 from ..channel import ShmChannel, QueueTimeoutError
 from ..sampler import NodeSamplerInput, EdgeSamplerInput, SamplingConfig, RemoteSamplerInput
@@ -95,7 +95,7 @@ class DistServer(object):
 
   def get_node_feature(self, node_type, index):
     feature = self.dataset.get_node_feature(node_type)
-    return feature[index]
+    return feature[index].cpu()
 
   def get_tensor_size(self, node_type):
     feature = self.dataset.get_node_feature(node_type)
