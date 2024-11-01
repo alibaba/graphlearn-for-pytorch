@@ -20,9 +20,11 @@ from typing import Literal
 
 # options for dataset generation
 vnum_per_partition = 20
-vnum_total = vnum_per_partition * 2
+num_partition = 2
+vnum_total = vnum_per_partition * num_partition  # 40
 degree = 2
-enum_total = vnum_total * degree
+enum_per_partition = vnum_per_partition * degree  # 40
+enum_total = enum_per_partition * num_partition  # 80
 
 # for hetero dataset
 user_ntype = 'user'
@@ -36,31 +38,75 @@ sampling_nprocs = 2
 device_num = 2
 
 
-def _prepare_dataset(rank: int, weighted: bool = False):
-  # partition
-  node_pb = torch.tensor(
-    [v % 2 for v in range(0, vnum_total)],
-    dtype=torch.long
-  )
-  edge_pb = torch.tensor(
-    [((e // degree) % 2) for e in range(0, enum_total)],
-    dtype=torch.long
-  )
+def _prepare_dataset(rank: int, 
+                     weighted: bool = False,
+                     is_range_partition: bool = False):
+  """
+  Prepare a synthetic graph dataset with 40 nodes and 80 edges for unit tests.
+
+  Graph topology:
+  - rows: [0, 0, 1, 1, 2, 2, ... 37, 37, 38, 38, 39, 39]
+  - cols: [1, 2, 2, 3, 3, 4, ... 38, 39, 39, 0, 0, 1]
+  - eids: [0, 1, 2, 3, 4, 5, ... 74, 75, 76, 77, 78, 79]
+
+  Node features:
+  [[0., 0., ..., 0., 0.],
+   [1., 1., ..., 1., 1.],
+   ...
+   [39., 39., ..., 39., 39.]]
+
+  Edge features:
+  [[0., 0., ..., 0., 0.],
+   [1., 1., ..., 1., 1.],
+   ...
+   [79., 79., ..., 79., 79.]]
+
+  Two partition strategies are available:
+  1. Range partition: 
+     - Nodes with IDs [0, 19] and edges with IDs [0, 39] are on partition 0
+     - Nodes with IDs [20, 39] and edges with IDs [40, 79] are on partition 1
+  2. Hash partition: 
+     - Even-numbered nodes and edges are on partition 0
+     - Odd-numbered nodes and edges are on partition 1
+
+  The graph topology and features are identical under both partition strategies.
+  """
+  if is_range_partition:
+    node_ranges = [(0, vnum_per_partition), (vnum_per_partition, vnum_total)]
+    edge_ranges = [(0, enum_total // 2), (enum_total // 2, enum_total)]
+    node_pb = glt.partition.RangePartitionBook(
+        node_ranges, rank)
+    edge_pb = glt.partition.RangePartitionBook(
+        edge_ranges, rank)
+    start, end, step = rank * vnum_per_partition, (rank + 1) * vnum_per_partition, 1
+  else:
+    node_pb = torch.tensor(
+        [v % 2 for v in range(0, vnum_total)],
+        dtype=torch.long
+    )
+    edge_pb = torch.tensor(
+        [((e // degree) % 2) for e in range(0, enum_total)],
+        dtype=torch.long
+    )
+    start, end, step = rank, vnum_total, 2
+    
 
   # graph
   nodes, rows, cols, eids = [], [], [], []
-  for v in range(rank, vnum_total, 2):
+  for v in range(start, end, step):
     nodes.append(v)
     rows.extend([v for _ in range(degree)])
     cols.extend([((v + i + 1) % vnum_total) for i in range(degree)])
     eids.extend([(v * degree + i) for i in range(degree)])
+
   edge_index = torch.tensor([rows, cols], dtype=torch.int64)
   edge_ids = torch.tensor(eids, dtype=torch.int64)
   edge_weights = (edge_ids % 2).to(torch.float)
   csr_topo = glt.data.Topology(edge_index=edge_index, edge_ids=edge_ids)
+  graph = glt.data.Graph(csr_topo, 'ZERO_COPY', device=0)
+
   weighted_csr_topo = glt.data.Topology(
     edge_index=edge_index, edge_ids=edge_ids, edge_weights=edge_weights)
-  graph = glt.data.Graph(csr_topo, 'ZERO_COPY', device=0)
   weighted_graph = glt.data.Graph(weighted_csr_topo, 'CPU')
 
   # feature
@@ -68,13 +114,13 @@ def _prepare_dataset(rank: int, weighted: bool = False):
                        glt.data.DeviceGroup(1, [1])]
   split_ratio = 0.2
 
-  nfeat = rank + torch.zeros(len(nodes), 512, dtype=torch.float32)
-  nfeat_id2idx = glt.utils.id2idx(nodes)
+  nfeat = torch.tensor(nodes, dtype=torch.float32).unsqueeze(1).repeat(1, 512)
+  nfeat_id2idx = node_pb.id2index if is_range_partition else glt.utils.id2idx(nodes)
   node_feature = glt.data.Feature(nfeat, nfeat_id2idx, split_ratio,
                                   device_group_list, device=0)
 
-  efeat = rank + torch.ones(len(eids), 10, dtype=torch.float32)
-  efeat_id2idx = glt.utils.id2idx(eids)
+  efeat = torch.tensor(eids, dtype=torch.float32).unsqueeze(1).repeat(1, 10)
+  efeat_id2idx = edge_pb.id2index if is_range_partition else glt.utils.id2idx(eids)
   edge_feature = glt.data.Feature(efeat, efeat_id2idx, split_ratio,
                                   device_group_list, device=0)
 
@@ -82,18 +128,16 @@ def _prepare_dataset(rank: int, weighted: bool = False):
   node_label = torch.arange(vnum_total)
 
   # dist dataset
-  if weighted:
-    return glt.distributed.DistDataset(
-      2, rank,
-      weighted_graph, node_feature, edge_feature, node_label,
-      node_pb, edge_pb
-    )
-  else:
-    return glt.distributed.DistDataset(
-      2, rank,
-      graph, node_feature, edge_feature, node_label,
-      node_pb, edge_pb
-    )
+  ds = glt.distributed.DistDataset(
+    2, rank,
+    weighted_graph if weighted else graph, 
+    node_feature, edge_feature, node_label,
+    node_pb, edge_pb
+  )
+
+  if is_range_partition:
+    ds.id_filter = node_pb.id_filter
+  return ds
 
 
 def _prepare_hetero_dataset(

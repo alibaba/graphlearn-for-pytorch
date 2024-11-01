@@ -36,12 +36,6 @@ class PartitionBook(object):
   def offset(self):
     return 0
 
-class GLTPartitionBook(PartitionBook, torch.Tensor):
-  r""" A partition book of graph nodes or edges.
-  """
-  def __getitem__(self, indices) -> torch.Tensor:
-    return torch.Tensor.__getitem__(self, indices)
-
 HeteroNodePartitionDict = Dict[NodeType, PartitionBook]
 HeteroEdgePartitionDict = Dict[EdgeType, PartitionBook]
 

@@ -329,6 +329,24 @@ class PartitionTestCase(unittest.TestCase):
     self.assertEqual(id2idx[3].item(), 0)
     self.assertEqual(id2idx[4].item(), 1)
     self.assertEqual(new_feat_pb[3].item(), 0)
+  
+  def test_range_partition_book(self):
+    partition_ranges = [(0, 10), (10, 20), (20, 30)]
+    range_pb = RangePartitionBook(partition_ranges, 1)
+    indices = torch.tensor([0, 5, 10, 15, 20, 25, 29])
+    self.assertTrue(torch.equal(range_pb[indices], torch.tensor([0, 0, 1, 1, 2, 2, 2])))
+    
+    with self.assertRaises(ValueError):
+      RangePartitionBook([(0, 10), (11, 20), (20, 30)], 1)
+    with self.assertRaises(ValueError):
+      RangePartitionBook([(0, 10), (10, 5), (20, 30)], 1)
+
+    id2idx = range_pb.id2index
+    self.assertTrue(torch.equal(id2idx[torch.arange(10, 20)], torch.arange(10)))
+    
+    self.assertTrue(torch.equal(range_pb.id_filter(range_pb, 1), torch.arange(10, 20)))
+
+
 
 
 if __name__ == '__main__':
