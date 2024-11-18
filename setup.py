@@ -22,7 +22,7 @@ import subprocess
 import re
 
 # This version string should be updated when releasing a new version.
-_VERSION = '0.2.3'
+_VERSION = '0.2.4'
 
 RELEASE = os.getenv("RELEASE", "FALSE")
 ROOT_PATH = os.path.abspath(os.path.join(os.getcwd()))
