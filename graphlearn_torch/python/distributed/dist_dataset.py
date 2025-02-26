@@ -244,11 +244,10 @@ class DistDataset(Dataset):
 
   def share_ipc(self):
     super().share_ipc()
-    if isinstance(self.node_pb, torch.Tensor):
-      self.node_pb = share_memory(self.node_pb)
-      self.edge_pb = share_memory(self.edge_pb)
-      self._node_feat_pb = share_memory(self._node_feat_pb)
-      self._edge_feat_pb = share_memory(self._edge_feat_pb)
+    self.node_pb = share_memory(self.node_pb)
+    self.edge_pb = share_memory(self.edge_pb)
+    self._node_feat_pb = share_memory(self._node_feat_pb)
+    self._edge_feat_pb = share_memory(self._edge_feat_pb)
     ipc_hanlde = (
       self.num_partitions, self.partition_idx,
       self.graph, self.node_features, self.edge_features, self.node_labels,
