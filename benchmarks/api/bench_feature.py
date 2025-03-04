@@ -36,7 +36,7 @@ def test_glt_ogbnproducts(split_ratio):
   csr_topo = glt.data.Topology(dataset[0].edge_index)
 
   g = glt.data.Graph(csr_topo, 'CUDA', device=0)
-  device = torch.device(0)
+  device = torch.device('cuda:0')
   sampler = glt.sampler.NeighborSampler(g, [15, 10, 5], device=device)
 
   cpu_tensor, id2index = glt.data.sort_by_in_degree(

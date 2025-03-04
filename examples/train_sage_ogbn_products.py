@@ -106,7 +106,7 @@ glt_dataset.init_node_features(
 )
 glt_dataset.init_node_labels(node_label_data=data.y)
 
-device = torch.device(0)
+device = torch.device('cuda:0')
 # graphlearn_torch NeighborLoader
 train_loader = glt.loader.NeighborLoader(glt_dataset,
                                          [15, 10, 5],

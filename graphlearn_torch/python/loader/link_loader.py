@@ -104,7 +104,7 @@ class LinkLoader(object):
     edge_label_index: InputEdges = None,
     edge_label: Optional[torch.Tensor] = None,
     neg_sampling: Optional[NegativeSampling] = None,
-    device: torch.device = torch.device(0),
+    device: torch.device = torch.device('cuda:0'),
     edge_dir: Literal['out', 'in'] = 'out',
     **kwargs,
   ):

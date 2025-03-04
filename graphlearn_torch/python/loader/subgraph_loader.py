@@ -62,7 +62,7 @@ class SubGraphLoader(NodeLoader):
     drop_last: bool = False,
     with_edge: bool = False,
     strategy: str = 'random',
-    device: torch.device = torch.device(0),
+    device: torch.device = torch.device('cuda:0'),
     seed: Optional[int] = None,
     **kwargs
   ):

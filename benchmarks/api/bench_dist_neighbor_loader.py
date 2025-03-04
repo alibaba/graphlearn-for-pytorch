@@ -123,7 +123,7 @@ if __name__ == "__main__":
     drop_last=True,
     with_edge=with_edge,
     collect_features=collect_features,
-    to_device=torch.device(0),
+    to_device=torch.device('cuda:0'),
     worker_options=glt.distributed.MpDistSamplingWorkerOptions(
       num_workers=sampling_nprocs,
       worker_devices=[torch.device('cuda', i % device_count) for i in range(sampling_nprocs)],

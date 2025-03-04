@@ -41,7 +41,7 @@ class NeighborSampler(BaseSampler):
   def __init__(self,
                graph: Union[Graph, Dict[EdgeType, Graph]],
                num_neighbors: Optional[NumNeighbors] = None,
-               device: torch.device=torch.device('cuda', 0),
+               device: torch.device=torch.device('cuda:0'),
                with_edge: bool=False,
                with_neg: bool=False,
                with_weight: bool=False,
