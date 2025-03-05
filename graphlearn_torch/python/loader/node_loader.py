@@ -56,7 +56,7 @@ class NodeLoader(object):
     data: Dataset,
     node_sampler: BaseSampler,
     input_nodes: InputNodes,
-    device: torch.device = torch.device(0),
+    device: torch.device = torch.device('cuda:0'),
     **kwargs
   ):
     self.data = data

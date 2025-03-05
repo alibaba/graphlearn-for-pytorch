@@ -116,7 +116,7 @@ random_partitioner = glt.partition.RandomPartitioner(
   edge_feat=None,
   edge_assign_strategy='by_src', # assign graph edges by src node.
   chunk_size=10000, # chunk size for node assignment
-  device=torch.device(0) # device used for partitioning
+  device=torch.device('cuda:0') # device used for partitioning
 )
 random_partitioner.partition()
 ```
@@ -170,7 +170,7 @@ freq_partitioner = glt.partition.FrequencyPartitioner(
   edge_assign_strategy='by_src', # assign graph edges by src node.
   chunk_size=10000, # chunk size for node assignment
   cache_ratio=0.2, # cache 20% hottest graph nodes
-  device=torch.device(0) # device used for partitioning
+  device=torch.device('cuda:0') # device used for partitioning
 )
 freq_partitioner.partition()
 ```
@@ -507,7 +507,7 @@ train_loader = glt.distributed.DistNeighborLoader(
   # Set to true to collect node features for sampled subgraphs.
   collect_features=True,
   # All sampled results will be moved to this device.
-  to_device=torch.device(0),
+  to_device=torch.device('cuda:0'),
   # Use `MpDistSamplingWorkerOptions`.
   worker_options=mp_options
 )
@@ -589,7 +589,7 @@ train_loader = glt.distributed.DistNeighborLoader(
   input_nodes=train_idx,
   batch_size=1024,
   collect_features=True,
-  to_device=torch.device(0),
+  to_device=torch.device('cuda:0'),
   worker_options=collocated_options
 )
 ```
@@ -645,7 +645,7 @@ train_loader = glt.distributed.DistNeighborLoader(
   input_nodes=train_idx,
   batch_size=1024,
   collect_features=True,
-  to_device=torch.device(0),
+  to_device=torch.device('cuda:0'),
   worker_options=remote_options
 )
 ```

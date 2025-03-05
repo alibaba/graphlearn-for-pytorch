@@ -85,7 +85,7 @@ train_loader = glt.loader.NeighborLoader(glt_dataset,
                                          batch_size=1024,
                                          shuffle=True,
                                          drop_last=True,
-                                         device=torch.device(0),
+                                         device=torch.device('cuda:0'),
                                          as_pyg_v1=True)
 ```
 > **Note**

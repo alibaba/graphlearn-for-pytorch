@@ -68,7 +68,7 @@ class NeighborLoader(NodeLoader):
     with_edge: bool = False,
     with_weight: bool = False,
     strategy: str = 'random',
-    device: torch.device = torch.device(0),
+    device: torch.device = torch.device('cuda:0'),
     as_pyg_v1: bool = False,
     seed: Optional[int] = None,
     **kwargs
