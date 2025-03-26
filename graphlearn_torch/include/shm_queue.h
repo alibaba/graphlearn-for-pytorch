@@ -139,7 +139,7 @@ public:
 
   /// Get a block to read.
   /// \return block id
-  size_t GetBlockToRead();
+  size_t GetBlockToRead(uint32_t timeout_ms = 0);
 
   /// Release a block with block id.
   void ReleaseBlock(size_t id);
@@ -152,17 +152,18 @@ public:
   void* GetData(size_t offset);
 
 private:
-  size_t     max_block_num_;
-  size_t     max_buf_size_;
-  size_t     block_meta_offset_;
-  size_t     data_buf_offset_;
-  size_t     write_block_id_;
-  size_t     read_block_id_;
-  size_t     alloc_offset_;
-  size_t     released_offset_;
-  sem_t      alloc_lock_;
-  sem_t      release_lock_;
-  friend class ShmQueue;
+ size_t max_block_num_;
+ size_t max_buf_size_;
+ size_t block_meta_offset_;
+ size_t data_buf_offset_;
+ size_t write_block_id_;
+ size_t read_block_id_;
+ size_t alloc_offset_;
+ size_t released_offset_;
+ pthread_mutex_t mutex_;
+ pthread_cond_t  alloc_cond_;
+ pthread_cond_t  release_cond_;
+ friend class ShmQueue;
 };
 
 /// Shared-Memory Queue should be constructed and destructed on main process.
@@ -206,7 +207,7 @@ public:
 
   /// Dequeue a message on child process.
   /// \return `ShmData`
-  ShmData Dequeue(unsigned int timeout_ms = 0);
+  ShmData Dequeue(uint32_t timeout_ms = 0);
 
   bool Empty();
 
