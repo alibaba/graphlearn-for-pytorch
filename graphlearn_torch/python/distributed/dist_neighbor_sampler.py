@@ -182,7 +182,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
             local_only=False, rpc_router=self.rpc_router, device=self.device
           )
       else:
-        assert isinstance(self.dist_node_labels, Dict)
+        assert self.dist_node_labels is None or isinstance(self.dist_node_labels, Dict)
         if self.dist_node_labels is not None and \
             all(isinstance(value, Feature) for value in self.dist_node_labels.values()):
           self.dist_node_labels = DistFeature(
