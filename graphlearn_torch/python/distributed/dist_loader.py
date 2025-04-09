@@ -122,6 +122,8 @@ class DistLoader(object):
     self.sampling_config = sampling_config
     self.to_device = get_available_device(to_device)
     self.worker_options = worker_options
+    self._shutdowned = False
+
     if self.worker_options is None:
       self.worker_options = CollocatedDistSamplingWorkerOptions()
 
@@ -258,7 +260,6 @@ class DistLoader(object):
           f"worker options type '{type(worker_options)}'"
         )
 
-    self._shutdowned = False
 
   def __del__(self):
     if python_exit_status is True or python_exit_status is None:
