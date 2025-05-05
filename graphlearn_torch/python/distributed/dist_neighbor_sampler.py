@@ -358,7 +358,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         num_sampled_nodes=num_sampled_nodes,
         num_sampled_edges=num_sampled_edges,
         input_type=input_type,
-        metadata={}
+        metadata={'input_seeds': input_seeds},
       )
 
     else:
@@ -389,7 +389,7 @@ class DistNeighborSampler(ConcurrentEventLoop):
         batch=batch,
         num_sampled_nodes=num_sampled_nodes,
         num_sampled_edges=num_sampled_edges,
-        metadata={}
+        metadata={'input_seeds': input_seeds},
       )
     # Reclaim inducer into pool.
     self.inducer_pool.put(inducer)

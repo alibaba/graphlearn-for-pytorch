@@ -113,21 +113,24 @@ def to_hetero_data(
   # update meta data
   input_type = hetero_sampler_out.input_type
   if isinstance(hetero_sampler_out.metadata, dict):
-    # if edge_dir == 'out', we need to reverse the edge type
-    res_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
     for k, v in hetero_sampler_out.metadata.items():
-      if k == 'edge_label_index':
-        if edge_dir == 'out':
-          data[res_edge_type]['edge_label_index'] = \
-            torch.stack((v[1], v[0]), dim=0)
+      if isinstance(input_type, tuple):
+        # if edge_dir == 'out', we need to reverse the edge type
+        res_edge_type = reverse_edge_type(input_type) if edge_dir == 'out' else input_type
+        if k == 'edge_label_index':
+          if edge_dir == 'out':
+            data[res_edge_type]['edge_label_index'] = \
+              torch.stack((v[1], v[0]), dim=0)
+          else:
+            data[res_edge_type]['edge_label_index'] = v
+        elif k == 'edge_label':
+          data[res_edge_type]['edge_label'] = v
+        elif k == 'src_index':
+          data[input_type[0]]['src_index'] = v
+        elif k in ['dst_pos_index', 'dst_neg_index']:
+          data[input_type[-1]][k] = v
         else:
-          data[res_edge_type]['edge_label_index'] = v
-      elif k == 'edge_label':
-        data[res_edge_type]['edge_label'] = v
-      elif k == 'src_index':
-        data[input_type[0]]['src_index'] = v
-      elif k in ['dst_pos_index', 'dst_neg_index']:
-        data[input_type[-1]][k] = v
+          data[k] = v
       else:
         data[k] = v
   elif hetero_sampler_out.metadata is not None:
