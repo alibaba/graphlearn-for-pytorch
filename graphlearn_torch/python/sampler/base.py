@@ -60,10 +60,10 @@ class NodeSamplerInput(CastMixin):
     if not isinstance(index, torch.Tensor):
       index = torch.tensor(index, dtype=torch.long)
     index = index.to(self.node.device)
-    return NodeSamplerInput(self.node[index], self.input_type)
+    return NodeSamplerInput(self.node[index].view(-1), self.input_type)
 
   def __len__(self):
-    return self.node.numel()
+    return self.node.shape[0]
 
   def share_memory(self):
     self.node.share_memory_()
