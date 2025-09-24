@@ -349,7 +349,7 @@ class SamplingConfig:
   with_neg: bool
   with_weight: bool
   edge_dir: Literal['in', 'out']
-  seed: int
+  seed: Optional[int]
 
 
 class BaseSampler(ABC):
