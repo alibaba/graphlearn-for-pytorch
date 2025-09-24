@@ -24,6 +24,8 @@ import torch
 from ..typing import NodeType, EdgeType, NumNeighbors, Split
 from ..utils import CastMixin
 
+AllNodeSamplerInputsBase = Union['NodeSamplerInput', 'RemoteNodeSplitSamplerInput', 'RemoteNodePathSamplerInput']
+AllNodeSamplerInputs = Union[AllNodeSamplerInputsBase, List['RemoteNodePathSamplerInput'], List['RemoteNodeSplitSamplerInput']]
 
 class EdgeIndex(NamedTuple):
   r""" PyG's :class:`~torch_geometric.loader.EdgeIndex` used in old data loader
