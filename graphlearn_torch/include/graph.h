@@ -51,7 +51,8 @@ public:
   void InitCPUGraphFromCSR(const torch::Tensor& indptr,
                            const torch::Tensor& indices,
                            const torch::Tensor& edge_ids=torch::empty(0),
-                           const torch::Tensor& edge_weights=torch::empty(0));
+                           const torch::Tensor& edge_weights=torch::empty(0),
+                           int64_t col_count=-1);
 #ifdef WITH_CUDA
   virtual ~Graph();
   void LookupDegree(const int64_t* nodes,

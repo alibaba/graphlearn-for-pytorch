@@ -58,7 +58,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     .def(py::init<>())
     .def("init_cpu_from_csr", &Graph::InitCPUGraphFromCSR,
          py::arg("indptr"), py::arg("indices"),
-         py::arg("edge_ids"), py::arg("edge_weights"))
+         py::arg("edge_ids"), py::arg("edge_weights"),
+         py::arg("col_count") = -1)
 #ifdef WITH_CUDA
     .def("init_cuda_from_csr",
          py::overload_cast<const torch::Tensor&,

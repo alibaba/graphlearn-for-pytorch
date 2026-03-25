@@ -13,7 +13,10 @@
 # limitations under the License.
 # ==============================================================================
 
+import pickle
 import unittest
+from multiprocessing.reduction import ForkingPickler
+
 import torch
 
 from graphlearn_torch.data import Topology, Graph
@@ -101,6 +104,8 @@ class GraphTestCase(unittest.TestCase):
     g = Graph(self.csr_topo, mode='CPU')
     self.assertEqual(g.edge_count, self.indices_csr.size(0))
     self.assertEqual(g.row_count, self.indptr_csr.size(0) - 1)
+    self.assertEqual(g.col_count, 6)
+    self.assertEqual(g.share_ipc()[1:], ('CPU', 6))
 
   def test_cuda_graph_init(self):
     g = Graph(self.csr_topo, 'CUDA', 0)
@@ -111,6 +116,24 @@ class GraphTestCase(unittest.TestCase):
     g = Graph(self.csr_topo, 'ZERO_COPY', 0)
     self.assertEqual(g.edge_count, self.indices_csr.size(0))
     self.assertEqual(g.row_count, self.indptr_csr.size(0) - 1)
+
+  def test_cpu_graph_init_with_cached_col_count(self):
+    g = Graph(self.csr_topo, mode='CPU', col_count=6)
+    self.assertEqual(g.col_count, 6)
+    self.assertIs(g.share_ipc()[0], self.csr_topo)
+    self.assertEqual(g.share_ipc()[1:], ('CPU', 6))
+
+  def test_graph_from_legacy_ipc_handle(self):
+    g = Graph.from_ipc_handle((self.csr_topo, 'CPU'))
+    self.assertEqual(g.col_count, 6)
+    self.assertIs(g.share_ipc()[0], self.csr_topo)
+    self.assertEqual(g.share_ipc()[1:], ('CPU', 6))
+
+  def test_graph_forking_pickler_preserves_cached_col_count(self):
+    g = Graph(self.csr_topo, mode='CPU', col_count=6)
+    restored = pickle.loads(ForkingPickler.dumps(g))
+    self.assertEqual(restored.share_ipc()[1:], ('CPU', 6))
+    self.assertEqual(restored.col_count, 6)
 
   def test_topo_with_layout(self):
     # 'COO' -> 'CSC'

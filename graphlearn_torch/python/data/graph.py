@@ -200,13 +200,22 @@ class Graph(object):
       operations. Note that this parameter will be ignored if the graph mode
       set to 'CPU'. The value of ``torch.cuda.current_device()`` will be used
       if set to ``None``. (Default: ``None``).
+    col_count (int, optional): Cached number of unique column ids for CPU
+      graphs. If provided, CPU graph init will reuse it instead of
+      recomputing the value from indices. (Default: ``None``).
   """
   def __init__(self, topo: Topology, mode = 'ZERO_COPY',
-               device: Optional[int] = None):
+               device: Optional[int] = None,
+               col_count: Optional[int] = None):
     self.topo = topo
     self.topo.share_memory_()
     self.mode = mode.upper()
     self.device = device
+    if col_count is not None:
+      print(f"Reusing cached col_count: {col_count}")
+    else:
+      print("col count not provided, will compute it from indices")
+    self._cached_col_count = None if col_count is None else int(col_count)
 
     if self.mode != 'CPU' and self.device is not None:
       self.device = int(self.device)
@@ -234,7 +243,14 @@ class Graph(object):
       edge_weights = torch.empty(0)
 
     if self.mode == 'CPU':
-      self._graph.init_cpu_from_csr(indptr, indices, edge_ids, edge_weights)
+      self._graph.init_cpu_from_csr(
+        indptr,
+        indices,
+        edge_ids,
+        edge_weights,
+        -1 if self._cached_col_count is None else self._cached_col_count
+      )
+      self._cached_col_count = self._graph.get_col_count()
     else:
       if self.device is None:
         self.device = torch.cuda.current_device()
@@ -258,16 +274,23 @@ class Graph(object):
     r""" Create ipc handle for multiprocessing.
 
     Returns:
-      A tuple of topo and graph mode.
+      A tuple of topo, graph mode and cached CPU col_count metadata.
     """
-    return self.topo, self.mode
+    if self.mode == 'CPU' and self._cached_col_count is None and \
+       self._graph is not None:
+      self._cached_col_count = self._graph.get_col_count()
+    return self.topo, self.mode, self._cached_col_count
 
   @classmethod
   def from_ipc_handle(cls, ipc_handle):
-    r""" Create from ipc handle.
+    r""" Create from an old or new ipc handle.
     """
-    topo, mode = ipc_handle
-    return cls(topo, mode, device=None)
+    if len(ipc_handle) == 2:
+      topo, mode = ipc_handle
+      cached_col_count = None
+    else:
+      topo, mode, cached_col_count = ipc_handle
+    return cls(topo, mode, device=None, col_count=cached_col_count)
 
   @property
   def row_count(self):

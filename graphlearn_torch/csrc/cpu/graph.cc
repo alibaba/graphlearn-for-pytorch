@@ -22,7 +22,8 @@ void Graph::InitCPUGraphFromCSR(
     const torch::Tensor& indptr,
     const torch::Tensor& indices,
     const torch::Tensor& edge_ids,
-    const torch::Tensor& edge_weights) {
+    const torch::Tensor& edge_weights,
+    int64_t col_count) {
   CheckEq<int64_t>(indptr.dim(), 1);
   CheckEq<int64_t>(indices.dim(), 1);
 
@@ -30,7 +31,8 @@ void Graph::InitCPUGraphFromCSR(
   col_idx_ = indices.data_ptr<int64_t>();
   row_count_ = indptr.size(0) - 1;
   edge_count_ = indices.size(0);
-  col_count_ = std::get<0>(at::_unique(indices)).size(0);
+  col_count_ = col_count >= 0 ? col_count :
+    std::get<0>(at::_unique(indices)).size(0);
 
   if (edge_ids.numel()) {
     CheckEq<int64_t>(edge_ids.dim(), 1);
